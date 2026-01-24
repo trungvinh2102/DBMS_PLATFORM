@@ -1,0 +1,36 @@
+{
+  "name": "@BI/db",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:start": "docker compose up -d",
+    "db:watch": "docker compose up",
+    "db:stop": "docker compose stop",
+    "db:down": "docker compose down"
+  },
+  "dependencies": {
+    "@BI/env": "workspace:*",
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "catalog:",
+    "dotenv": "catalog:",
+    "pg": "^8.17.1",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@BI/config": "workspace:*",
+    "@types/pg": "^8.16.0",
+    "prisma": "^7.2.0",
+    "typescript": "catalog:"
+  }
+}
