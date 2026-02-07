@@ -115,7 +115,7 @@ export function AIAssistantSidebar({
   if (!show) return null;
 
   return (
-    <div className="w-80 sm:w-100 border-l bg-background/95 backdrop-blur-xl flex flex-col h-full shadow-2xl animate-in slide-in-from-right duration-300 z-30 relative">
+    <div className="w-full h-full flex flex-col bg-background/95 backdrop-blur-xl animate-in fade-in duration-300 relative">
       <div className="flex items-center justify-between p-4 border-b bg-amber-500/5">
         <div className="flex items-center gap-2 font-bold text-amber-600">
           <Zap className="h-5 w-5 fill-amber-500/20" />

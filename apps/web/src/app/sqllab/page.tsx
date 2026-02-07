@@ -245,17 +245,30 @@ export default function SQLLabPage() {
                   )}
                 </ResizablePanel>
               )}
+
+              {showAISidebar && (
+                <>
+                  <ResizableHandle
+                    withHandle
+                    className="w-1 hover:bg-primary/20 transition-colors"
+                  />
+                  <ResizablePanel defaultSize={30} minSize={20}>
+                    <div className="h-full w-full bg-background border-l">
+                      <AIAssistantSidebar
+                        show={true}
+                        onClose={() => setShowAISidebar(false)}
+                        onApplySQL={(aiSql) => {
+                          setSql(aiSql);
+                          toast.success("AI SQL inserted into editor");
+                        }}
+                        databaseId={selectedDS}
+                        schema={selectedSchema}
+                      />
+                    </div>
+                  </ResizablePanel>
+                </>
+              )}
             </ResizablePanelGroup>
-            <AIAssistantSidebar
-              show={showAISidebar}
-              onClose={() => setShowAISidebar(false)}
-              onApplySQL={(aiSql) => {
-                setSql(aiSql);
-                toast.success("AI SQL inserted into editor");
-              }}
-              databaseId={selectedDS}
-              schema={selectedSchema}
-            />
           </div>
         </div>
       </div>

@@ -179,6 +179,7 @@ export function SQLLabToolbar({
           } else {
             setShowRightPanel(true);
             setRightPanelMode("object");
+            setShowAISidebar(false);
           }
         }}
         className={cn(
@@ -198,6 +199,7 @@ export function SQLLabToolbar({
           } else {
             setShowRightPanel(true);
             setRightPanelMode("history");
+            setShowAISidebar(false);
           }
         }}
         className={cn(
@@ -211,7 +213,14 @@ export function SQLLabToolbar({
         icon={<Zap className="h-4 w-4" />}
         label="AI SQL"
         active={showAISidebar}
-        onClick={() => setShowAISidebar(!showAISidebar)}
+        onClick={() => {
+          if (showAISidebar) {
+            setShowAISidebar(false);
+          } else {
+            setShowAISidebar(true);
+            setShowRightPanel(false);
+          }
+        }}
         className={cn(
           "font-bold transition-all duration-300",
           showAISidebar
