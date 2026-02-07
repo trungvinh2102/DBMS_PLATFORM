@@ -5,6 +5,7 @@
  */
 
 import type { AppRouter } from "@dbms-platform/api/routers/index";
+import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
@@ -58,3 +59,6 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   client: trpcClient,
   queryClient,
 });
+
+export type RouterInputs = inferRouterInputs<AppRouter>;
+export type RouterOutputs = inferRouterOutputs<AppRouter>;

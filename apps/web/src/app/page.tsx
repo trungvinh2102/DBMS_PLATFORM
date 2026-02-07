@@ -1,51 +1,46 @@
 /**
- * @file page.tsx
- * @description Landing page for the application showing system health and welcome message.
+ * @file apps/web/src/app/page.tsx
+ * @description Main dashboard home page for the authenticated user.
+ * Displays system status, metrics, quick actions, and recent activity.
  */
 
 "use client";
-import { useQuery } from "@tanstack/react-query";
 
-import { trpc } from "@/utils/trpc";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
-const TITLE_TEXT = `
- ██████╗ ███████╗████████╗████████╗███████╗██████╗
- ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
- ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
- ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
- ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
- ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
-
- ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
- ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-    ██║       ███████╗   ██║   ███████║██║     █████╔╝
-    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
-    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
-    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
+import { DashboardStats } from "@/components/dashboard/dashboard-stats";
+import { QuickActions } from "@/components/dashboard/quick-actions";
+import { RecentActivity } from "@/components/dashboard/recent-activity";
 
 export default function Home() {
-  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-2">
-      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
-      <div className="grid gap-6">
-        <section className="rounded-lg border p-4">
-          <h2 className="mb-2 font-medium">API Status</h2>
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-2 w-2 rounded-full ${healthCheck.data ? "bg-green-500" : "bg-red-500"}`}
-            />
-            <span className="text-sm text-muted-foreground">
-              {healthCheck.isLoading
-                ? "Checking..."
-                : healthCheck.data
-                  ? "Connected"
-                  : "Disconnected"}
-            </span>
-          </div>
-        </section>
+    <div className="container mx-auto max-w-7xl px-6 py-8 space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
+          Welcome back, {user?.name?.split(" ")[0] || "User"}
+        </h1>
+        <p className="text-muted-foreground text-lg">
+          Manage your databases, execute queries, and monitor system health.
+        </p>
+      </div>
+
+      {/* Dashboard Content */}
+      <DashboardStats />
+
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-7">
+        <QuickActions />
+        <RecentActivity />
       </div>
     </div>
   );

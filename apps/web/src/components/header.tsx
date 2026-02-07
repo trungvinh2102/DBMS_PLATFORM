@@ -33,14 +33,12 @@ import {
 import { ModeToggle } from "./mode-toggle";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
 // Sample data from app-sidebar.tsx
 const data = {
-  user: {
-    name: "User",
-    email: "user@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
+  // User data removed, using useAuth hook
+
   navMain: [
     {
       title: "Connections",
@@ -61,9 +59,17 @@ const data = {
   ],
 };
 
+import { useEffect, useState } from "react";
+
 export default function Header() {
+  const { user, logout } = useAuth();
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (isAuthPage) {
     return null;
@@ -105,69 +111,98 @@ export default function Header() {
           <ModeToggle />
 
           {/* User Profile */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={cn(
-                buttonVariants({ variant: "ghost" }),
-                "relative h-8 w-8 rounded-full",
-              )}
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={data.user.avatar} alt={data.user.name} />
-                <AvatarFallback>CN</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src={data.user.avatar}
-                        alt={data.user.name}
-                      />
-                      <AvatarFallback>CN</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {data.user.name}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {data.user.email}
-                      </p>
+          {mounted && user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={cn(
+                  buttonVariants({ variant: "ghost" }),
+                  "relative h-8 w-8 rounded-full",
+                )}
+              >
+                <Avatar className="h-8 w-8">
+                  {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
+                  <AvatarFallback>
+                    {user.name
+                      ? user.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)
+                      : user.email?.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Avatar className="h-8 w-8">
+                        {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
+                        <AvatarFallback>
+                          {user.name
+                            ? user.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2)
+                            : user.email?.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {user.name || "User"}
+                        </p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user.email}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </DropdownMenuLabel>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Upgrade to Pro
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Upgrade to Pro
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem>
+                    <BadgeCheck className="mr-2 h-4 w-4" />
+                    Account
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Billing
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifications
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    logout();
+                    window.location.href = "/auth/login";
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out
                 </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem>
-                  <BadgeCheck className="mr-2 h-4 w-4" />
-                  Account
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Billing
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Bell className="mr-2 h-4 w-4" />
-                  Notifications
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <LogOut className="mr-2 h-4 w-4" />
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link
+              href="/auth/login"
+              className={buttonVariants({ variant: "default", size: "sm" })}
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </div>
     </header>
