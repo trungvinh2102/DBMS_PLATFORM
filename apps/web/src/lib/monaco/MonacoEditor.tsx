@@ -26,6 +26,7 @@ import type * as monacoEditor from "monaco-editor";
 import { useTheme } from "next-themes";
 
 import { useEditorValidation } from "./useEditorValidation";
+import { useSettingsStore } from "@/stores/use-settings-store";
 import { ErrorPanel } from "./ErrorPanel";
 import type { SupportedLanguage, ValidationOptions } from "./types";
 
@@ -110,6 +111,19 @@ export function MonacoEditor({
   const currentTheme = theme === "system" ? systemTheme : theme;
   const editorTheme =
     currentTheme === "dark" ? "validation-dark" : "validation-light";
+
+  // ============================================================================
+  // SETTINGS
+  // ============================================================================
+  const {
+    editorFontSize,
+    editorFontFamily,
+    editorTabSize,
+    editorMinimap,
+    editorWordWrap,
+    editorLineNumbers,
+    editorFormatOnPaste,
+  } = useSettingsStore();
 
   // ============================================================================
   // VALIDATION HOOK
@@ -301,13 +315,13 @@ export function MonacoEditor({
           onChange={onChange}
           onMount={handleEditorDidMount}
           options={{
-            minimap: { enabled: false },
-            fontSize: 13,
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+            minimap: { enabled: editorMinimap },
+            fontSize: editorFontSize,
+            fontFamily: editorFontFamily,
             fontWeight: "500",
             scrollBeyondLastLine: false,
             automaticLayout: true,
-            wordWrap: "on",
+            wordWrap: editorWordWrap,
             padding: { top: 12, bottom: 12 },
             scrollbar: {
               vertical: "visible",
@@ -316,13 +330,13 @@ export function MonacoEditor({
               verticalScrollbarSize: 10,
               horizontalScrollbarSize: 10,
             },
-            lineNumbers: "on",
+            lineNumbers: editorLineNumbers,
             renderLineHighlight: "all",
             lineHeight: 20,
             cursorBlinking: "smooth",
             cursorSmoothCaretAnimation: "on",
             smoothScrolling: true,
-            tabSize: 2,
+            tabSize: editorTabSize,
             readOnly,
             // Glyph margin for error icons
             glyphMargin: enableValidation,
@@ -331,6 +345,7 @@ export function MonacoEditor({
             foldingStrategy: "auto",
             // Show error squiggles
             renderValidationDecorations: "on",
+            formatOnPaste: editorFormatOnPaste,
             ...options,
           }}
         />

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useSettingsStore } from "@/stores/use-settings-store";
 
 interface JsonTreeNodeProps {
   name?: string;
@@ -145,13 +146,15 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
+  const { showNullAs } = useSettingsStore();
+
   const [selectedJson, setSelectedJson] = useState<{
     key: string;
     value: any;
   } | null>(null);
 
   const displayValue = (val: any) => {
-    if (val === null) return "NULL";
+    if (val === null) return showNullAs;
     if (typeof val === "object") return JSON.stringify(val);
     return String(val);
   };
@@ -229,7 +232,7 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
                         <div className="truncate">
                           {val === null ? (
                             <span className="text-muted-foreground/40 italic font-black uppercase tracking-widest text-[9px]">
-                              NULL
+                              {showNullAs}
                             </span>
                           ) : typeof val === "boolean" ? (
                             <span

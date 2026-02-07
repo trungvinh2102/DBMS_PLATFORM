@@ -232,8 +232,8 @@ export function SQLLabSidebar({
       <div className="p-3 pb-4 flex flex-col gap-3 border-b border-border/40">
         <DropdownMenu>
           <DropdownMenuTrigger className="outline-none w-full group">
-            <div className="flex items-center gap-3 p-2 rounded-md transition-all hover:bg-muted/40 cursor-pointer w-full text-left">
-              <div className="h-9 w-9 bg-muted/30 rounded flex items-center justify-center shrink-0 border border-border/40">
+            <div className="flex items-center gap-3 p-2 rounded-xl transition-all hover:bg-muted/40 cursor-pointer w-full text-left">
+              <div className="h-9 w-9 bg-muted/30 rounded-lg flex items-center justify-center shrink-0 border border-border/40">
                 {getDBIcon(selectedDSData?.type || "")}
               </div>
               <div className="flex flex-col items-start overflow-hidden flex-1 leading-tight">
@@ -247,19 +247,19 @@ export function SQLLabSidebar({
               <ChevronsUpDown className="h-4 w-4 opacity-20 group-hover:opacity-100 transition-opacity shrink-0" />
             </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-68 ml-2 shadow-2xl rounded-lg border-muted-foreground/10 bg-background/95 backdrop-blur-md">
+          <DropdownMenuContent className="w-68 ml-2 shadow-2xl rounded-2xl border-muted-foreground/10 bg-background/95 backdrop-blur-md">
             {dataSources.map((ds) => (
               <DropdownMenuItem
                 key={ds.id}
                 onClick={() => setSelectedDS(ds.id)}
                 className={cn(
-                  "flex items-center gap-3 py-2.5 px-3 cursor-pointer rounded-md m-1",
+                  "flex items-center gap-3 py-2.5 px-3 cursor-pointer rounded-xl m-1",
                   selectedDS === ds.id
                     ? "bg-primary/10 text-primary font-bold"
                     : "hover:bg-muted/50",
                 )}
               >
-                <div className="h-6 w-6 bg-muted/20 rounded-sm flex items-center justify-center border border-border/20 scale-75">
+                <div className="h-6 w-6 bg-muted/20 rounded-md flex items-center justify-center border border-border/20 scale-75">
                   {getDBIcon(ds.type)}
                 </div>
                 <div className="flex flex-col">
@@ -279,18 +279,18 @@ export function SQLLabSidebar({
             value={selectedSchema}
             onValueChange={(val) => val && setSelectedSchema(val)}
           >
-            <SelectTrigger className="w-full h-10 text-xs font-bold bg-muted/40 border border-border/40 hover:bg-muted/60 transition-all rounded-md px-4 gap-2.5 shadow-sm outline-none ring-0 focus:ring-1 focus:ring-primary/20">
+            <SelectTrigger className="w-full h-10 text-xs font-bold bg-muted/40 border border-border/40 hover:bg-muted/60 transition-all rounded-xl px-4 gap-2.5 shadow-sm outline-none ring-0 focus:ring-1 focus:ring-primary/20">
               <div className="flex items-center gap-2 flex-1 truncate">
                 <Database className="h-3.5 w-3.5 opacity-40 shrink-0" />
                 <SelectValue placeholder="Select Schema" className="truncate" />
               </div>
             </SelectTrigger>
-            <SelectContent className="rounded-lg border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5">
+            <SelectContent className="rounded-2xl border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5">
               {schemas.map((s) => (
                 <SelectItem
                   key={s}
                   value={s}
-                  className="text-xs font-medium rounded-md cursor-pointer px-3 py-2.5"
+                  className="text-xs font-medium rounded-xl cursor-pointer px-3 py-2.5"
                 >
                   {s}
                 </SelectItem>
@@ -306,7 +306,7 @@ export function SQLLabSidebar({
             placeholder="Search tables..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-9 pl-9 bg-muted/20 border-border/40 text-[11px] font-medium rounded-md focus-visible:ring-1 focus-visible:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
+            className="h-9 pl-9 bg-muted/20 border-border/40 text-[11px] font-medium rounded-xl focus-visible:ring-1 focus-visible:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
           />
         </div>
       </div>

@@ -31,7 +31,6 @@
   },
   "devDependencies": {
     "@dbms-platform/config": "workspace:*",
-    "@prisma/client": "^7.3.0",
     "@types/json2csv": "^5.0.7",
     "typescript": "catalog:"
   }

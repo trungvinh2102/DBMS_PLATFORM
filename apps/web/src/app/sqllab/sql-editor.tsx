@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEditorValidation } from "@/lib/monaco/useEditorValidation";
 import { ErrorPanel } from "@/lib/monaco/ErrorPanel";
 import type { ValidationOptions } from "@/lib/monaco/types";
+import { useSettingsStore } from "@/stores/use-settings-store";
 
 // ============================================================================
 // TYPES
@@ -93,6 +94,20 @@ export function SQLEditor({
 
   const { theme, systemTheme } = useTheme();
   const currentTheme = theme === "system" ? systemTheme : theme;
+
+  // ============================================================================
+  // SETTINGS FROM STORE
+  // ============================================================================
+
+  const {
+    editorFontSize,
+    editorFontFamily,
+    editorTabSize,
+    editorMinimap,
+    editorWordWrap,
+    editorLineNumbers,
+    editorFormatOnPaste,
+  } = useSettingsStore();
 
   // ============================================================================
   // REFS
@@ -540,14 +555,14 @@ export function SQLEditor({
           onChange={onChange}
           onMount={handleEditorDidMount}
           options={{
-            minimap: { enabled: false },
-            tabSize: tabSize,
-            fontSize: 13,
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+            minimap: { enabled: editorMinimap },
+            tabSize: editorTabSize,
+            fontSize: editorFontSize,
+            fontFamily: editorFontFamily,
             fontWeight: "500",
             scrollBeyondLastLine: false,
             automaticLayout: true,
-            wordWrap: "on",
+            wordWrap: editorWordWrap,
             padding: { top: 12, bottom: 12 },
             scrollbar: {
               vertical: "visible",
@@ -556,11 +571,11 @@ export function SQLEditor({
               verticalScrollbarSize: 10,
               horizontalScrollbarSize: 10,
             },
-            lineNumbers: "on",
+            lineNumbers: editorLineNumbers,
             renderLineHighlight: "all",
             hideCursorInOverviewRuler: true,
             overviewRulerBorder: false,
-            lineHeight: 20,
+            lineHeight: Math.round(editorFontSize * 1.5),
             cursorBlinking: "smooth",
             cursorSmoothCaretAnimation: "on",
             smoothScrolling: true,
@@ -573,6 +588,7 @@ export function SQLEditor({
             suggestOnTriggerCharacters: true,
             parameterHints: { enabled: true },
             fontLigatures: true,
+            formatOnPaste: editorFormatOnPaste,
             // Enable glyph margin for error icons
             glyphMargin: enableValidation,
             // Show error squiggles

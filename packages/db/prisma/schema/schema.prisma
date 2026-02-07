@@ -96,10 +96,27 @@ model User {
 
   savedQueries SavedQuery[]
 
+  settings UserSetting?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+}
+
+/// Stores user-specific settings and preferences.
+model UserSetting {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Stores all UI and editor settings in a JSON object
+  settings Json 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_settings")
 }
 
 /// Defines a role within the system (e.g., Admin, Creator, Viewer).
