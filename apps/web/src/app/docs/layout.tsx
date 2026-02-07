@@ -1,5 +1,4 @@
 import { DocsSidebarNav } from "@/components/docs-sidebar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const sidebarNavItems = [
   {
@@ -53,12 +52,15 @@ export default function DocsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="container flex-1 items-start md:grid md:grid-cols-[220px_minmax(0,1fr)] md:gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-10 h-full">
-      <aside className="fixed top-14 z-30 -ml-2 hidden h-[calc(100vh-3.5rem)] w-full shrink-0 md:sticky md:block overflow-y-auto border-r py-6 pr-6 lg:py-8">
-        <DocsSidebarNav items={sidebarNavItems} />
+    <div className="h-screen w-full bg-slate-50 dark:bg-background text-slate-900 dark:text-foreground overflow-hidden flex transition-colors">
+      {/* Sidebar - same width and style as connections */}
+      <aside className="w-64 border-r border-slate-200 dark:border-border bg-white dark:bg-background shrink-0">
+        <DocsSidebarNav items={sidebarNavItems} className="h-full" />
       </aside>
-      <main className="relative py-6 lg:gap-10 lg:py-8 xl:grid xl:grid-cols-[1fr_200px] h-full overflow-y-auto">
-        <div className="mx-auto w-full min-w-0">{children}</div>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto bg-white dark:bg-background border-l border-slate-200 dark:border-border transition-colors">
+        <div className="max-w-4xl mx-auto py-8 px-8">{children}</div>
       </main>
     </div>
   );
