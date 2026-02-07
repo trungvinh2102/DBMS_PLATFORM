@@ -44,12 +44,11 @@ import {
 } from "@/components/ui/dialog";
 
 export default function ConnectionsPage() {
-  const [creationMode, setCreationMode] = useState<"form" | "uri">("form");
   const [selectedType, setSelectedType] = useState<string>("postgres");
   const [formData, setFormData] = useState({
     name: "",
     host: "localhost",
-    port: "",
+    port: DEFAULT_PORTS["postgres"],
     user: "",
     password: "",
     database: "",
@@ -62,13 +61,6 @@ export default function ConnectionsPage() {
   const [activeConn, setActiveConn] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("DB Connections");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Set default ports based on DB type
-  useEffect(() => {
-    if (DEFAULT_PORTS[selectedType] && !editingId) {
-      setFormData((prev) => ({ ...prev, port: DEFAULT_PORTS[selectedType] }));
-    }
-  }, [selectedType, editingId]);
 
   // Clear active connection when switching away from DB Connections (List or Config view)
   useEffect(() => {
@@ -96,32 +88,22 @@ export default function ConnectionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const config =
-        creationMode === "uri"
-          ? { uri: formData.uri }
-          : {
-              host: formData.host,
-              port: parseInt(formData.port),
-              user: formData.user,
-              password: formData.password,
-              database: formData.database,
-            };
+      // Save all connection data - both URI and individual fields
+      const config = {
+        uri: formData.uri || undefined,
+        host: formData.host,
+        port: formData.port ? parseInt(formData.port) : undefined,
+        user: formData.user,
+        password: formData.password || undefined,
+        database: formData.database,
+      };
 
       if (editingId) {
         // Update existing connection
-        // Only include password if provided
         const updateConfig = { ...config };
-        if (!formData.password && creationMode === "form") {
-          delete (updateConfig as any).password;
-          // Send a marker or handle on backend.
-          // Our backend logic says: if config.password is missing, it might overwrite with null?
-          // Actually backend logic: if password is '********' or missing, it might need care.
-          // Backend update logic: "if (config.password && config.password !== '********') encrypt".
-          // So if we send nothing?
-          // Ideally we should send '********' if we want to keep current, or handle in backend.
-          // For now let's assume user re-enters password or we send '********' if unmodified.
-          // Let's send '********' as placeholder if empty
-          (updateConfig as any).password = "********";
+        // If password is empty, send marker to keep current password
+        if (!formData.password) {
+          updateConfig.password = "********";
         }
 
         await updateMutation.mutateAsync({
@@ -150,7 +132,7 @@ export default function ConnectionsPage() {
       setFormData({
         name: "",
         host: "localhost",
-        port: "5432",
+        port: DEFAULT_PORTS[selectedType] || "5432",
         user: "",
         password: "",
         database: "",
@@ -171,15 +153,14 @@ export default function ConnectionsPage() {
     setFormData({
       name: conn.name,
       host: config.host || "",
-      port: config.port?.toString() || "",
+      port: config.port?.toString() || DEFAULT_PORTS[conn.type] || "",
       user: config.user || "",
-      password: "", // Placeholder or empty
+      password: "", // Empty - user needs to re-enter if changing
       database: config.database || "",
       description: conn.description || "",
       uri: config.uri || "",
     });
 
-    setCreationMode(config.uri ? "uri" : "form");
     setIsCreateModalOpen(true);
   };
 
@@ -292,8 +273,6 @@ export default function ConnectionsPage() {
                         setIsCreateModalOpen(open);
                         if (!open) setEditingId(null);
                       }}
-                      creationMode={creationMode}
-                      setCreationMode={setCreationMode}
                       selectedType={selectedType}
                       setSelectedType={setSelectedType}
                       formData={formData}
@@ -307,10 +286,11 @@ export default function ConnectionsPage() {
                           className="h-10 bg-blue-600 hover:bg-blue-700 text-white gap-2 px-4 shadow-sm font-semibold"
                           onClick={() => {
                             setEditingId(null);
+                            setSelectedType("postgres");
                             setFormData({
                               name: "",
                               host: "localhost",
-                              port: "5432",
+                              port: DEFAULT_PORTS["postgres"],
                               user: "",
                               password: "",
                               database: "",

@@ -153,7 +153,8 @@ export function ConnectionTable({
         const type = row.getValue("type") as string;
         const dbType =
           DB_TYPES.find((t) => t.id === type) ||
-          DB_TYPES.find((t) => t.id === "documentdb");
+          DB_TYPES.find((t) => t.id === "postgres");
+
         return (
           <div className="flex items-center gap-2">
             <span className={cn("text-lg", dbType?.color)}>{dbType?.icon}</span>
