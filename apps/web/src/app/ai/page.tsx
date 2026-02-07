@@ -1,7 +1,12 @@
+/**
+ * @file page.tsx
+ * @description AI assistance page for natural language queries and support.
+ */
+
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { env } from "@BI/env/web";
+import { env } from "@dbms-platform/env/web";
 import { DefaultChatTransport } from "ai";
 import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -44,7 +49,9 @@ export default function AIPage() {
             <div
               key={message.id}
               className={`p-3 rounded-lg ${
-                message.role === "user" ? "bg-primary/10 ml-8" : "bg-secondary/20 mr-8"
+                message.role === "user"
+                  ? "bg-primary/10 ml-8"
+                  : "bg-secondary/20 mr-8"
               }`}
             >
               <p className="text-sm font-semibold mb-1">
@@ -55,7 +62,9 @@ export default function AIPage() {
                   return (
                     <Streamdown
                       key={index}
-                      isAnimating={status === "streaming" && message.role === "assistant"}
+                      isAnimating={
+                        status === "streaming" && message.role === "assistant"
+                      }
                     >
                       {part.text}
                     </Streamdown>
@@ -69,7 +78,10 @@ export default function AIPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="w-full flex items-center space-x-2 pt-2 border-t">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full flex items-center space-x-2 pt-2 border-t"
+      >
         <Input
           name="prompt"
           value={input}

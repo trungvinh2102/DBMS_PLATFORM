@@ -1,3 +1,8 @@
+/**
+ * @file layout.tsx
+ * @description Root layout component that provides global providers, fonts, and base structure.
+ */
+
 import type { Metadata } from "next";
 
 import { Geist, Geist_Mono } from "next/font/google";
@@ -17,8 +22,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BI",
-  description: "BI",
+  title: "DBMS",
+  description: "DBMS",
 };
 
 export default function RootLayout({
@@ -28,11 +33,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         <Providers>
-          <div className="grid grid-rows-[auto_1fr] h-svh">
+          <div className="relative flex h-screen flex-col bg-background overflow-hidden">
             <Header />
-            {children}
+            <main className="flex-1 flex flex-col overflow-hidden">
+              {children}
+            </main>
           </div>
         </Providers>
       </body>

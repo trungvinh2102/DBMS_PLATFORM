@@ -1,3 +1,8 @@
+/**
+ * @file page.tsx
+ * @description Landing page for the application showing system health and welcome message.
+ */
+
 "use client";
 import { useQuery } from "@tanstack/react-query";
 

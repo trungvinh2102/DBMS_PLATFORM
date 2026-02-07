@@ -1,5 +1,5 @@
 {
-  "name": "@BI/db",
+  "name": "@dbms-platform/db",
   "type": "module",
   "exports": {
     ".": {
@@ -19,18 +19,23 @@
     "db:stop": "docker compose stop",
     "db:down": "docker compose down"
   },
+  "prisma": {
+    "seed": "bun run prisma/seed.ts"
+  },
   "dependencies": {
-    "@BI/env": "workspace:*",
+    "@dbms-platform/env": "workspace:*",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "catalog:",
+    "@types/bcryptjs": "^3.0.0",
+    "bcryptjs": "^3.0.3",
     "dotenv": "catalog:",
     "pg": "^8.17.1",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@BI/config": "workspace:*",
+    "@dbms-platform/config": "workspace:*",
     "@types/pg": "^8.16.0",
-    "prisma": "^7.2.0",
+    "prisma": "^7.3.0",
     "typescript": "catalog:"
   }
 }

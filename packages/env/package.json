@@ -1,5 +1,5 @@
 {
-  "name": "@BI/env",
+  "name": "@dbms-platform/env",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@BI/config": "workspace:*",
+    "@dbms-platform/config": "workspace:*",
     "@types/node": "^22.13.14",
     "typescript": "catalog:"
   }

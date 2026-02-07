@@ -1,6 +1,11 @@
 import { devToolsMiddleware } from "@ai-sdk/devtools";
 import { google } from "@ai-sdk/google";
-import { streamText, type UIMessage, convertToModelMessages, wrapLanguageModel } from "ai";
+import {
+  streamText,
+  type UIMessage,
+  convertToModelMessages,
+  wrapLanguageModel,
+} from "ai";
 
 export const maxDuration = 30;
 

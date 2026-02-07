@@ -1,5 +1,5 @@
 {
-  "name": "BI",
+  "name": "dbms_platform",
   "private": true,
   "workspaces": {
     "packages": [
@@ -11,7 +11,7 @@
       "zod": "^4.1.13",
       "typescript": "^5",
       "next": "^16.1.1",
-      "@prisma/client": "^7.2.0",
+      "@prisma/client": "^7.3.0",
       "@trpc/server": "^11.7.2",
       "@trpc/client": "^11.7.2"
     }
@@ -23,23 +23,25 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
-    "db:push": "turbo -F @BI/db db:push",
-    "db:studio": "turbo -F @BI/db db:studio",
-    "db:generate": "turbo -F @BI/db db:generate",
-    "db:migrate": "turbo -F @BI/db db:migrate",
-    "db:start": "turbo -F @BI/db db:start",
-    "db:watch": "turbo -F @BI/db db:watch",
-    "db:stop": "turbo -F @BI/db db:stop",
-    "db:down": "turbo -F @BI/db db:down"
+    "db:push": "turbo -F @dbms-platform/db db:push",
+    "db:studio": "turbo -F @dbms-platform/db db:studio",
+    "db:generate": "turbo -F @dbms-platform/db db:generate",
+    "db:migrate": "turbo -F @dbms-platform/db db:migrate",
+    "db:start": "turbo -F @dbms-platform/db db:start",
+    "db:watch": "turbo -F @dbms-platform/db db:watch",
+    "db:stop": "turbo -F @dbms-platform/db db:stop",
+    "db:down": "turbo -F @dbms-platform/db db:down",
+    "format": "prettier --write ."
   },
   "dependencies": {
-    "@BI/env": "workspace:*",
+    "@dbms-platform/env": "workspace:*",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@BI/config": "workspace:*",
+    "@dbms-platform/config": "workspace:*",
     "@types/node": "^22.13.14",
+    "prettier": "^3.8.1",
     "turbo": "^2.6.3",
     "typescript": "catalog:"
   },

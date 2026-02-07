@@ -1,5 +1,5 @@
-import { createContext } from "@BI/api/context";
-import { appRouter } from "@BI/api/routers/index";
+import { createContext } from "@dbms-platform/api/context";
+import { appRouter } from "@dbms-platform/api/routers/index";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { NextRequest } from "next/server";
 

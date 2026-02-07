@@ -1,17 +1,17 @@
-name: BI
+name: dbms_platform
 
 services:
   postgres:
     image: postgres
-    container_name: BI-postgres
+    container_name: dbms_platform
     environment:
-      POSTGRES_DB: BI
+      POSTGRES_DB: dbms_platform
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - BI_postgres_data:/var/lib/postgresql
+      - dbms_platform_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -20,4 +20,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  BI_postgres_data:
+  dbms_platform_postgres_data:

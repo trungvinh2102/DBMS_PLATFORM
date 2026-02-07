@@ -1,9 +1,147 @@
+// This is the simplified schema for the SQL Lab platform.
+// It focuses on database connections and query management.
+
 generator client {
-  provider = "prisma-client"
-  output   = "../generated"
-  moduleFormat = "esm"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+/// Represents a connection to an external database (e.g., Postgres, MySQL, Snowflake).
+model Db {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  type        String   // e.g., "postgres", "mysql", "bigquery"
+  description String?
+  
+  // Environment Classification
+  environment Environment @default(DEVELOPMENT)
+  
+  // Security & Governance
+  isReadOnly  Boolean  @default(false)
+  sslMode     SSLMode  @default(DISABLE)
+  sshConfig   Json?    // Stores { host, port, user, privateKey, type }
+  tags        String[] // ["finance", "pci-dss"]
+  
+  // Explicit Connection Details (migrating from config)
+  username     String?
+  password     String? // Encrypted string
+  databaseName String?
+  host         String?
+  port         Int?
+  
+  // Stores connection details (host, port, user, pass, database name or full connection string).
+  config      Json     
+
+  savedQueries  SavedQuery[]
+  queryHistories QueryHistory[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("databases")
+}
+
+
+/// Stores SQL queries saved by users for future use.
+model SavedQuery {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  sql         String
+  
+  databaseId  String
+  database    Db @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  userId      String?
+  user        User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("saved_queries")
+}
+
+/// Keeps track of executed queries for auditing and history.
+model QueryHistory {
+  id          String   @id @default(uuid())
+  sql         String
+  status      String   // "SUCCESS", "FAILED", "RUNNING"
+  executionTime Int?   // in milliseconds
+  errorMessage String?
+  
+  databaseId  String
+  database    Db @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  executedAt  DateTime @default(now())
+
+  @@index([executedAt])
+  @@map("query_histories")
+}
+
+/// Represents a user of the platform.
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String   // Hashed password
+  name      String?
+  
+  // RBAC: User belongs to a specific Role
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+
+  savedQueries SavedQuery[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+/// Defines a role within the system (e.g., Admin, Creator, Viewer).
+model Role {
+  id          String       @id @default(uuid())
+  name        String       @unique // e.g., "Admin", "Creator", "Viewer", "Default"
+  description String?
+
+  users       User[]
+  
+  // A role can have multiple permissions
+  permissions Permission[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+/// Granular permissions assigned to roles.
+model Permission {
+  id          String @id @default(uuid())
+  action      String // e.g., "create", "read", "update", "delete", "manage"
+  resource    String // e.g., "database", "query", "user", "all"
+  description String?
+
+  // Permissions can belong to multiple roles
+  roles       Role[]
+
+  @@unique([action, resource])
+  @@map("permissions")
+}
+
+enum Environment {
+  PRODUCTION
+  STAGING
+  DEVELOPMENT
+}
+
+enum SSLMode {
+  DISABLE
+  REQUIRE
+  VERIFY_CA
+  VERIFY_FULL
 }
