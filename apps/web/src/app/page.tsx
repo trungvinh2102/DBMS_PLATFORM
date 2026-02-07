@@ -24,7 +24,7 @@ export default function Home() {
   if (!mounted) return null;
 
   return (
-    <div className="container mx-auto max-w-7xl px-6 py-8 space-y-8">
+    <div className="w-full px-6 py-8 space-y-8">
       {/* Header Section */}
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">

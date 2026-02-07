@@ -18,6 +18,7 @@ import {
   Sparkles,
   SquareTerminal,
   Database,
+  LayoutDashboard,
 } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,6 +41,11 @@ const data = {
   // User data removed, using useAuth hook
 
   navMain: [
+    {
+      title: "Home",
+      url: "/",
+      icon: LayoutDashboard,
+    },
     {
       title: "Connections",
       url: "/connections",

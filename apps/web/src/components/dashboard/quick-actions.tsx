@@ -19,7 +19,7 @@ import {
 
 export function QuickActions() {
   return (
-    <Card className="col-span-3 shadow-sm h-full flex flex-col">
+    <Card className="col-span-3 shadow-sm h-full flex flex-col rounded-xl">
       <CardHeader>
         <CardTitle>Quick Actions</CardTitle>
         <CardDescription>Common tasks to get you started</CardDescription>
@@ -44,20 +44,6 @@ export function QuickActions() {
               <span className="font-semibold">New Connection</span>
             </Button>
           </Link>
-        </div>
-
-        <div className="rounded-lg bg-muted/40 p-4 flex flex-col gap-2 mt-auto border">
-          <h3 className="font-medium text-sm">Documentation & Help</h3>
-          <p className="text-xs text-muted-foreground text-wrap">
-            Learn how to connect databases, write queries with AI assistance,
-            and manage your workspace efficiently.
-          </p>
-          <Button
-            variant="link"
-            className="px-0 w-fit h-auto text-xs text-primary underline-offset-4"
-          >
-            Read Documentation &rarr;
-          </Button>
         </div>
       </CardContent>
     </Card>

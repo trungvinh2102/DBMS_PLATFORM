@@ -5,7 +5,7 @@
 
 "use client";
 
-import { Activity, Database, FileCode } from "lucide-react";
+import { Activity, Database, FileCode, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { trpc } from "@/utils/trpc";
@@ -33,9 +33,9 @@ export function DashboardStats() {
   const isSystemHealthy = !!healthCheck.data;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {/* Active Connections */}
-      <Card className="shadow-sm hover:shadow-md transition-shadow">
+      <Card className="rounded-xl shadow-sm hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">
             Total Connections
@@ -55,7 +55,7 @@ export function DashboardStats() {
       </Card>
 
       {/* Saved Queries */}
-      <Card className="shadow-sm hover:shadow-md transition-shadow">
+      <Card className="rounded-xl shadow-sm hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Saved Queries</CardTitle>
           <FileCode className="h-4 w-4 text-blue-500" />
@@ -73,7 +73,7 @@ export function DashboardStats() {
       </Card>
 
       {/* System Health */}
-      <Card className="shadow-sm hover:shadow-md transition-shadow">
+      <Card className="rounded-xl shadow-sm hover:shadow-md transition-shadow">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">System Status</CardTitle>
           <Activity className="h-4 w-4 text-green-500" />
@@ -98,6 +98,25 @@ export function DashboardStats() {
           <p className="text-xs text-muted-foreground mt-1">
             API Service availability
           </p>
+        </CardContent>
+      </Card>
+      {/* Documentation - Quick Link */}
+      <Card className="rounded-xl shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-primary/5 to-transparent border-primary/20">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Documentation</CardTitle>
+          <BookOpen className="h-4 w-4 text-primary" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm font-medium pt-1">Learn & Explore</div>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            Guides, API references, and tips.
+          </p>
+          <a
+            href="/docs"
+            className="text-xs bg-primary/10 hover:bg-primary/20 text-primary px-2 py-1 rounded-md transition-colors font-medium inline-block"
+          >
+            Read Docs &rarr;
+          </a>
         </CardContent>
       </Card>
     </div>

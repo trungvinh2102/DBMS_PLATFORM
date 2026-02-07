@@ -42,7 +42,7 @@ export function RecentActivity() {
   const recentQueries = historyData as QueryHistoryData | undefined;
 
   return (
-    <Card className="col-span-4 shadow-sm flex flex-col h-full">
+    <Card className="col-span-4 shadow-sm flex flex-col h-full rounded-xl">
       <CardHeader>
         <CardTitle>Recent Activity</CardTitle>
         <CardDescription>
