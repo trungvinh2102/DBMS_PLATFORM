@@ -3,6 +3,9 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { trpc } from "@/utils/trpc";
+import { useAuth } from "@/hooks/use-auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +17,40 @@ import {
 
 export function ModeToggle() {
   const { setTheme } = useTheme();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Fetch current settings to merge updates
+  const { data: settings } = useQuery({
+    ...trpc.user.getSettings.queryOptions(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+
+  const updateMutation = useMutation(
+    trpc.user.updateSettings.mutationOptions({
+      onSuccess: () => {
+        // Invalidate settings query to update other components
+        queryClient.invalidateQueries({
+          queryKey: trpc.user.getSettings.queryOptions().queryKey,
+        });
+      },
+      onError: (err: any) => {
+        console.error("Failed to sync theme preference", err);
+      },
+    }),
+  );
+
+  const handleSetTheme = (newTheme: string) => {
+    setTheme(newTheme);
+    // Only sync if user is logged in and we have loaded current settings
+    // (to avoid overwriting other settings with a partial update)
+    if (user && settings !== undefined) {
+      // Merge with existing settings
+      const newSettings = { ...(settings || {}), theme: newTheme as any };
+      updateMutation.mutate(newSettings);
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -23,13 +60,13 @@ export function ModeToggle() {
         <span className="sr-only">Toggle theme</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => handleSetTheme("light")}>
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => handleSetTheme("dark")}>
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
+        <DropdownMenuItem onClick={() => handleSetTheme("system")}>
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

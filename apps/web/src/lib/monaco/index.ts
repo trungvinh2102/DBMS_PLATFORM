@@ -11,14 +11,7 @@ export { ErrorPanel } from "./ErrorPanel";
 export { useEditorValidation } from "./useEditorValidation";
 
 // Services
-export {
-  validateCode,
-  validateSQL,
-  validateJSON,
-  validateJavaScript,
-  validatePython,
-  markersToErrorEntries,
-} from "./validationService";
+export { validateCode, markersToErrorEntries } from "./validationService";
 
 // Types
 export type {
