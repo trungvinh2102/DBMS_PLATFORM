@@ -213,9 +213,9 @@ export function SQLLabObjectPanel({
                   ))}
                 </div>
               ) : (
-                columnsData?.map((col: any) => (
+                columnsData?.map((col: any, i: number) => (
                   <div
-                    key={col.name}
+                    key={`${col.name}-${i}`}
                     className="flex items-center justify-between text-[11px] p-3 bg-muted/20 border border-transparent rounded-lg hover:bg-muted/40 hover:border-border/60 transition-all group"
                   >
                     <div className="flex items-center gap-3">

@@ -171,9 +171,9 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
               <th className="border-b border-r p-1 text-[9px] text-muted-foreground font-black w-12 text-center bg-muted/20 sticky left-0 z-51 uppercase tracking-tighter">
                 #
               </th>
-              {columns.map((col) => (
+              {columns.map((col, i) => (
                 <th
-                  key={col}
+                  key={`${col}-${i}`}
                   className={cn(
                     "border-b border-r pt-3 pb-2 px-3 text-left font-black text-[11px] bg-muted/5 w-45 transition-colors hover:bg-muted/10 group truncate select-text uppercase tracking-tighter",
                     mini ? "px-2 w-37.5" : "px-3",

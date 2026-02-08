@@ -5,7 +5,7 @@
 
 import { FileCode, Database, ChevronRight, Plus, X } from "lucide-react";
 import dynamic from "next/dynamic";
-import { type QueryTab } from "../hooks/useSQLLab";
+import { type QueryTab } from "../hooks/use-sqllab-tabs";
 import { cn } from "@/lib/utils";
 
 const SQLEditor = dynamic(
@@ -36,11 +36,13 @@ interface SQLLabEditorContainerProps {
   sql: string;
   setSql: (sql: string) => void;
   onPositionChange: (pos: { lineNumber: number; column: number }) => void;
+  onSelectionChange?: (text: string) => void;
   selectedDSName: string;
   selectedSchema: string;
-  onRun?: () => void;
+  onRun?: (sql?: string) => void;
   onFormat?: () => void;
   onStop?: () => void;
+  onSave?: () => void;
   tabSize?: number;
   tables?: string[];
   columns?: any[];
@@ -66,11 +68,13 @@ export function SQLLabEditorContainer({
   sql,
   setSql,
   onPositionChange,
+  onSelectionChange,
   selectedDSName,
   selectedSchema,
   onRun,
   onFormat,
   onStop,
+  onSave,
   tabSize,
   tables,
   columns,
@@ -153,10 +157,12 @@ export function SQLLabEditorContainer({
           key={activeTabId} // Re-mount when switching tabs to ensure clean state
           value={sql}
           onChange={(val) => setSql(val || "")}
+          onSelectionChange={onSelectionChange}
           onPositionChange={onPositionChange}
           onRun={onRun}
           onFormat={onFormat}
           onStop={onStop}
+          onSave={onSave}
           tabSize={tabSize}
           tables={tables}
           columns={columns}

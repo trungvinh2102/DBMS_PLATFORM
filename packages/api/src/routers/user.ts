@@ -1,7 +1,25 @@
 import { router, adminProcedure, protectedProcedure } from "../trpc";
 import { z } from "zod";
+import type { UserSettings } from "../types";
 // Updated: 2026-02-07 23:35
 import { TRPCError } from "@trpc/server";
+
+const userSettingsSchema = z.object({
+  theme: z.enum(["light", "dark", "system"]).optional(),
+  language: z.enum(["en", "vi"]).optional(),
+  editorFontSize: z.number().optional(),
+  editorFontFamily: z.string().optional(),
+  editorTabSize: z.number().optional(),
+  editorMinimap: z.boolean().optional(),
+  editorWordWrap: z.enum(["on", "off", "wordWrapColumn", "bounded"]).optional(),
+  editorLineNumbers: z.enum(["on", "off", "relative", "interval"]).optional(),
+  editorFormatOnPaste: z.boolean().optional(),
+  editorFormatOnSave: z.boolean().optional(),
+  defaultQueryLimit: z.number().optional(),
+  showNullAs: z.string().optional(),
+  dateTimeFormat: z.string().optional(),
+  csvDelimiter: z.enum([",", ";"]).optional(),
+});
 
 export const userRouter = router({
   // Only admins can view all users
@@ -54,13 +72,13 @@ export const userRouter = router({
         const userSetting = await (ctx.prisma as any).userSetting.findUnique({
           where: { userId },
         });
-        return userSetting?.settings || null;
+        return (userSetting?.settings as UserSettings) || null;
       }
 
       // Fallback to raw query if model is missing at runtime
       const result: any[] = await ctx.prisma
         .$queryRaw`SELECT settings FROM user_settings WHERE "userId" = ${userId} LIMIT 1`;
-      return result[0]?.settings || null;
+      return (result[0]?.settings as UserSettings) || null;
     } catch (e) {
       console.error("Error in getSettings:", e);
       return null;
@@ -69,7 +87,7 @@ export const userRouter = router({
 
   // Save/Update user settings in DB
   updateSettings: protectedProcedure
-    .input(z.any()) // Flexible JSON storage
+    .input(userSettingsSchema)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user!.id;
       const prisma = ctx.prisma as any;

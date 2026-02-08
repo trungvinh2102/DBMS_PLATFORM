@@ -108,6 +108,7 @@ export default function SQLLabPage() {
     handleRedo,
     showAISidebar,
     setShowAISidebar,
+    setSelectedText,
   } = useSQLLab();
 
   // Syntax validation errors from the editor
@@ -171,7 +172,9 @@ export default function SQLLabPage() {
                       selectedSchema={selectedSchema}
                       onRun={handleRun}
                       onFormat={handleFormat}
+                      onSelectionChange={setSelectedText}
                       onStop={handleStop}
+                      onSave={handleSave}
                       tabSize={tabSize}
                       tables={tables as any}
                       columns={allColumns as any}

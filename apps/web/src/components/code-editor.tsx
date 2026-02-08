@@ -17,16 +17,15 @@ export function CodeEditor({
   language = "json",
   height = "300px",
 }: CodeEditorProps) {
-  const { theme, systemTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
+  const currentTheme = resolvedTheme || "light";
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-
-  const currentTheme = theme === "system" ? systemTheme : theme;
 
   useEffect(() => {
     if (monacoRef.current) {
       monacoRef.current.editor.setTheme(
-        currentTheme === "dark" ? "vs-dark" : "light",
+        currentTheme === "dark" ? "vs-dark" : "vs",
       );
     }
   }, [currentTheme]);
@@ -35,7 +34,7 @@ export function CodeEditor({
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    monaco.editor.setTheme(currentTheme === "dark" ? "vs-dark" : "light");
+    monaco.editor.setTheme(currentTheme === "dark" ? "vs-dark" : "vs");
   };
 
   return (
@@ -44,7 +43,7 @@ export function CodeEditor({
         height="100%"
         defaultLanguage={language}
         language={language}
-        theme={currentTheme === "dark" ? "vs-dark" : "light"}
+        theme={currentTheme === "dark" ? "vs-dark" : "vs"}
         value={value}
         onChange={onChange}
         onMount={handleEditorDidMount}

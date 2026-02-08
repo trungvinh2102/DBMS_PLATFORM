@@ -40,3 +40,20 @@ export interface QueryResult<T = unknown> {
   executionTime: number;
   error: string | null;
 }
+
+export interface UserSettings {
+  theme?: "light" | "dark" | "system";
+  language?: "en" | "vi";
+  editorFontSize?: number;
+  editorFontFamily?: string;
+  editorTabSize?: number;
+  editorMinimap?: boolean;
+  editorWordWrap?: "on" | "off" | "wordWrapColumn" | "bounded";
+  editorLineNumbers?: "on" | "off" | "relative" | "interval";
+  editorFormatOnPaste?: boolean;
+  editorFormatOnSave?: boolean;
+  defaultQueryLimit?: number;
+  showNullAs?: string;
+  dateTimeFormat?: string;
+  csvDelimiter?: "," | ";";
+}

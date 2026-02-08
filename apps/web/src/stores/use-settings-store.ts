@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface SettingsState {
+export interface SettingsState {
   // General
   theme: "light" | "dark" | "system";
   language: "en" | "vi";
