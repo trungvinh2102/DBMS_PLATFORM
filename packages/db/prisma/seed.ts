@@ -62,8 +62,8 @@ async function main() {
   // await prisma.db.deleteMany({});
 
   // 4. Add Local Database if not exists
-  const existingLocalDetails = await prisma.db.findUnique({
-    where: { name: "Local Database" },
+  const existingLocalDetails = await prisma.db.findFirst({
+    where: { databaseName: "dbms_platform" },
   });
 
   // Replicate simple encryption from api utils to avoid circular deps
@@ -81,9 +81,8 @@ async function main() {
   if (!existingLocalDetails) {
     await prisma.db.create({
       data: {
-        name: "Local Database",
+        databaseName: "dbms_platform",
         type: "postgres",
-        description: "The primary application database (dbms_platform)",
         config: {
           host: "localhost",
           port: 5432,

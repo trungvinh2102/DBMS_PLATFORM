@@ -59,7 +59,7 @@ export class DatabaseService {
    */
   async listDatabases() {
     const databases = await prisma.db.findMany({
-      orderBy: { name: "asc" },
+      orderBy: { databaseName: "asc" },
     });
 
     // Mask sensitive config before sending to frontend
@@ -390,7 +390,7 @@ export class DatabaseService {
       include: {
         database: {
           select: {
-            name: true,
+            databaseName: true,
           },
         },
       },
@@ -401,9 +401,8 @@ export class DatabaseService {
    * Creates a new database connection.
    */
   async createDatabase(data: {
-    name: string;
+    databaseName: string;
     type: string;
-    description?: string;
     environment?: "PRODUCTION" | "STAGING" | "DEVELOPMENT";
     isReadOnly?: boolean;
     sslMode?: "DISABLE" | "REQUIRE" | "VERIFY_CA" | "VERIFY_FULL";
@@ -421,9 +420,8 @@ export class DatabaseService {
 
     const result = await prisma.db.create({
       data: {
-        name: data.name,
+        databaseName: data.databaseName,
         type: data.type,
-        description: data.description,
         environment: data.environment,
         isReadOnly: data.isReadOnly,
         sslMode: data.sslMode,
@@ -445,9 +443,8 @@ export class DatabaseService {
   async updateDatabase(
     id: string,
     data: {
-      name?: string;
+      databaseName?: string;
       type?: string;
-      description?: string;
       environment?: "PRODUCTION" | "STAGING" | "DEVELOPMENT";
       isReadOnly?: boolean;
       sslMode?: "DISABLE" | "REQUIRE" | "VERIFY_CA" | "VERIFY_FULL";
@@ -551,7 +548,7 @@ export class DatabaseService {
       orderBy: { updatedAt: "desc" },
       include: {
         database: {
-          select: { name: true },
+          select: { databaseName: true },
         },
       },
     });

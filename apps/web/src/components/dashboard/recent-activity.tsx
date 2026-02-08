@@ -96,7 +96,7 @@ export function RecentActivity() {
                         <Database className="h-3 w-3 mr-1 opacity-70" />
                         {connections?.find(
                           (c: DatabaseItem) => c.id === item.databaseId,
-                        )?.name || "Unknown DB"}
+                        )?.databaseName || "Unknown DB"}
                       </Badge>
                     )}
                     <span className="text-[10px] text-muted-foreground">

@@ -116,38 +116,22 @@ export function useConnectionColumns({
       enableHiding: false,
     },
     {
-      accessorKey: "name",
+      id: "databaseName",
       header: () => (
         <span className="text-[12px] font-semibold text-slate-500 dark:text-slate-400">
-          Connection Name
+          Database Name
         </span>
       ),
       cell: ({ row }) => {
-        const name = row.getValue("name") as string;
-        const isSubItem = name.startsWith("[") || name.includes("://");
-
+        const dbName =
+          row.original.databaseName || row.original.config.database || "-";
         return (
-          <div className={cn("flex items-center gap-2", isSubItem && "ml-6")}>
-            {!isSubItem && (
-              <div className="flex items-center gap-1">
-                <div className="h-4 w-4 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
-                  <PlusIcon className="h-2 w-2 text-slate-400" />
-                </div>
-                <FileText className="h-4 w-4 text-slate-400" />
-              </div>
-            )}
-            {isSubItem && (
-              <div className="w-4 h-px bg-slate-200 dark:bg-slate-700 mr-1" />
-            )}
-            <span
-              className={cn(
-                "text-[13px] font-medium tracking-tight",
-                isSubItem
-                  ? "text-slate-500 dark:text-slate-400"
-                  : "text-slate-900 dark:text-slate-100",
-              )}
-            >
-              {name}
+          <div className="flex items-center gap-1">
+            <div className="h-4 w-4 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
+              <FileText className="h-2 w-2 text-slate-400" />
+            </div>
+            <span className="text-[13px] font-medium text-slate-900 dark:text-slate-100">
+              {dbName}
             </span>
           </div>
         );
@@ -173,6 +157,23 @@ export function useConnectionColumns({
               {dbType?.name || type}
             </span>
           </div>
+        );
+      },
+    },
+    {
+      id: "username",
+      header: () => (
+        <span className="text-[12px] font-semibold text-slate-500 dark:text-slate-400">
+          Username
+        </span>
+      ),
+      cell: ({ row }) => {
+        const username =
+          row.original.username || row.original.config?.user || "-";
+        return (
+          <span className="text-[13px] text-slate-500 dark:text-slate-400">
+            {username}
+          </span>
         );
       },
     },

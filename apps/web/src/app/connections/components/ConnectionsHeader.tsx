@@ -43,14 +43,6 @@ export function ConnectionsHeader({
 }: ConnectionsHeaderProps) {
   return (
     <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        className="h-10 px-4 bg-white dark:bg-background border-slate-200 dark:border-border text-slate-600 dark:text-slate-300 gap-2 font-medium hover:bg-slate-50 dark:hover:bg-accent"
-      >
-        Connection Name
-        <ChevronDown className="h-4 w-4 opacity-50" />
-      </Button>
-
       <div className="relative flex-1 max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input
@@ -89,13 +81,12 @@ export function ConnectionsHeader({
                 setEditingId(null);
                 setSelectedType("postgres");
                 setFormData({
-                  name: "",
+                  databaseName: "",
                   host: "localhost",
                   port: DEFAULT_PORTS["postgres"],
                   user: "",
                   password: "",
                   database: "",
-                  description: "",
                   uri: "",
                 });
                 setIsCreateModalOpen(true);

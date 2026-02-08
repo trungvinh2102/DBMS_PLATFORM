@@ -185,7 +185,7 @@ export function SQLEditor({
 
       setMounted(true);
     },
-    [onPositionChange, onSelectionChange, currentTheme], // Removed onRun, onFormat, onStop from deps
+    [onPositionChange, onSelectionChange, currentTheme],
   );
 
   return (

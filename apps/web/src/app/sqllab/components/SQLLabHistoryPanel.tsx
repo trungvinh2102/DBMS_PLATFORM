@@ -50,7 +50,7 @@ export function SQLLabHistoryPanel({
   const filteredHistory = (history as unknown as any[])?.filter((h: any) => {
     const matchesSearch =
       h.sql.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.database.name.toLowerCase().includes(searchTerm.toLowerCase());
+      h.database.databaseName.toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesSearch;
   });
@@ -149,7 +149,7 @@ export function SQLLabHistoryPanel({
                         )}
                         <span className="text-[10px] font-black flex items-center gap-1.5 uppercase tracking-tighter text-foreground/70">
                           <Database className="h-3 w-3 opacity-40 text-blue-500" />
-                          {item.database.name}
+                          {item.database.databaseName}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">

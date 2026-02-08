@@ -12,6 +12,7 @@ import {
   FunctionSquare,
   Settings2,
   Zap,
+  Eye,
 } from "lucide-react";
 import {
   SiPostgresql,
@@ -238,7 +239,7 @@ export function SQLLabSidebar({
               </div>
               <div className="flex flex-col items-start overflow-hidden flex-1 leading-tight">
                 <span className="text-sm font-bold truncate w-full tracking-tight text-foreground/90">
-                  {selectedDSData?.name || "Select Database"}
+                  {selectedDSData?.databaseName || "Select Database"}
                 </span>
                 <span className="text-[10px] text-muted-foreground/60 truncate w-full font-medium">
                   {selectedDSData?.config?.host}
@@ -263,7 +264,7 @@ export function SQLLabSidebar({
                   {getDBIcon(ds.type)}
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold">{ds.name}</span>
+                  <span className="text-xs font-bold">{ds.databaseName}</span>
                   <span className="text-[9px] opacity-40">
                     {ds.config?.host || "localhost"}
                   </span>
@@ -323,7 +324,7 @@ export function SQLLabSidebar({
         {folderItem(
           "views",
           "Views",
-          <Layers className="h-3.5 w-3.5" />,
+          <Eye className="h-3.5 w-3.5" />,
           filteredViews,
           filteredViews?.length,
         )}

@@ -114,7 +114,7 @@
       "name": "@dbms-platform/db",
       "dependencies": {
         "@dbms-platform/env": "workspace:*",
-        "@prisma/adapter-pg": "^7.2.0",
+        "@prisma/adapter-pg": "^7.3.0",
         "@prisma/client": "catalog:",
         "@types/bcryptjs": "^3.0.0",
         "bcryptjs": "^3.0.3",

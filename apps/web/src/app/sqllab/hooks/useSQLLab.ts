@@ -177,7 +177,8 @@ export function useSQLLab() {
     isLoadingColumns: isLoadingSchemas || isLoadingTables,
     executionTime: (runSQLMutation as any).data?.executionTime || 0,
     selectedDSName:
-      dataSources.find((ds) => ds.id === activeTab.selectedDS)?.name || "",
+      dataSources.find((ds) => ds.id === activeTab.selectedDS)?.databaseName ||
+      "",
     handleRun: (sqlOverride?: string) =>
       handleRun(sqlOverride || selectedText || undefined),
     handleFormat: () =>

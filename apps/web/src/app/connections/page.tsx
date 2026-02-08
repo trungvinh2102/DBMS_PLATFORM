@@ -3,6 +3,10 @@
  * @description Main Connections page component for managing database connections.
  * This file serves as the container for connection listing, creation, and configuration.
  *
+ * @performance Implements lazy loading for conditional components:
+ * - ConnectionConfig: Only loads when a connection is selected for editing
+ * - DeleteConnectionDialog: Only loads when delete dialog is triggered
+ *
  * @example
  * // Next.js page component
  * export default function ConnectionsPage() ...
@@ -10,12 +14,11 @@
 
 "use client";
 
+import dynamic from "next/dynamic";
 import { Database } from "lucide-react";
 import { Sidebar } from "./components/Sidebar";
 import { ConnectionTable } from "./components/ConnectionTable";
-import { ConnectionConfig } from "./components/ConnectionConfig";
 import { ConnectionsHeader } from "./components/ConnectionsHeader";
-import { DeleteConnectionDialog } from "./components/DeleteConnectionDialog";
 import { useConnectionsPage } from "./hooks/use-connections-page";
 import {
   Breadcrumb,
@@ -25,6 +28,28 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+
+// Lazy-loaded components for conditional rendering
+const ConnectionConfig = dynamic(
+  () => import("./components/ConnectionConfig").then((m) => m.ConnectionConfig),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="animate-pulse space-y-4 p-8">
+        <div className="h-8 w-48 bg-muted rounded" />
+        <div className="h-64 bg-muted rounded-lg" />
+      </div>
+    ),
+  },
+);
+
+const DeleteConnectionDialog = dynamic(
+  () =>
+    import("./components/DeleteConnectionDialog").then(
+      (m) => m.DeleteConnectionDialog,
+    ),
+  { ssr: false },
+);
 
 export default function ConnectionsPage() {
   const { state, data, handlers } = useConnectionsPage();
@@ -85,7 +110,7 @@ export default function ConnectionsPage() {
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbPage className="font-semibold text-slate-900 dark:text-slate-100">
-                      {activeConn.name}
+                      {activeConn.databaseName}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>

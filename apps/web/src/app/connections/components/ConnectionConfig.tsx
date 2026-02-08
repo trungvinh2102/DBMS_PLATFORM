@@ -161,16 +161,6 @@ export function ConnectionConfig({
         </div>
 
         <PermissionsSection />
-
-        <div className="space-y-2">
-          <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
-            Description & Meta
-          </Label>
-          <textarea
-            className="w-full min-h-24 rounded-md border border-border bg-muted/10 p-3 text-xs font-medium focus:outline-none focus:border-blue-500 transition-all placeholder:text-muted-foreground/40 text-foreground resize-none"
-            placeholder="PRIMARY ANALYTICS CLUSTER FOR REGION_01..."
-          />
-        </div>
       </section>
 
       <SecuritySection />

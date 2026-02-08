@@ -7,16 +7,13 @@ import { FileCode, Database, ChevronRight, Plus, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import { type QueryTab } from "../hooks/use-sqllab-tabs";
 import { cn } from "@/lib/utils";
+import { EditorLoadingSkeleton } from "./Skeletons";
 
 const SQLEditor = dynamic(
   () => import("../sql-editor").then((mod) => mod.SQLEditor),
   {
     ssr: false,
-    loading: () => (
-      <div className="h-full w-full bg-background flex items-center justify-center text-muted-foreground">
-        Loading Editor...
-      </div>
-    ),
+    loading: () => <EditorLoadingSkeleton />,
   },
 );
 

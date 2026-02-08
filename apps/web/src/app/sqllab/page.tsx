@@ -3,11 +3,18 @@
  * @description Main SQLLab page component for executing and managing SQL queries.
  * This file orchestrates various components like the editor, toolbar, result panel, and sidebar.
  * Logic is managed by the useSQLLab hook.
+ *
+ * @performance Implements lazy loading for conditional and heavy components:
+ * - AIAssistantSidebar: Only loads when AI sidebar is toggled on
+ * - SQLLabObjectPanel/HistoryPanel: Only loads when right panel is visible
+ * - SQLLabResultPanel: Heavy data table component
+ * - SaveQueryDialog/OpenQueryDialog: Only loads when dialogs are opened
  */
 
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 
 import { toast } from "sonner";
 import {
@@ -16,7 +23,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 
-// Components
+// Static imports for critical above-the-fold components
 import { SQLLabSidebar } from "./components/SQLLabSidebar";
 import { SQLLabToolbar } from "./components/SQLLabToolbar";
 import {
@@ -24,11 +31,48 @@ import {
   type SyntaxError,
 } from "./components/SQLLabEditorContainer";
 import { SQLLabResultPanel } from "./components/SQLLabResultPanel";
-import { SQLLabObjectPanel } from "./components/SQLLabObjectPanel";
-import { SQLLabHistoryPanel } from "./components/SQLLabHistoryPanel";
-import { SaveQueryDialog } from "./components/SaveQueryDialog";
-import { OpenQueryDialog } from "./components/OpenQueryDialog";
-import { AIAssistantSidebar } from "./components/AIAssistantSidebar";
+
+// Loading skeletons
+import { PanelSkeleton, SidebarSkeleton } from "./components/Skeletons";
+
+// Lazy-loaded components for conditional/heavy components
+
+const SQLLabObjectPanel = dynamic(
+  () =>
+    import("./components/SQLLabObjectPanel").then((m) => m.SQLLabObjectPanel),
+  {
+    ssr: false,
+    loading: () => <PanelSkeleton />,
+  },
+);
+
+const SQLLabHistoryPanel = dynamic(
+  () =>
+    import("./components/SQLLabHistoryPanel").then((m) => m.SQLLabHistoryPanel),
+  {
+    ssr: false,
+    loading: () => <PanelSkeleton />,
+  },
+);
+
+const AIAssistantSidebar = dynamic(
+  () =>
+    import("./components/AIAssistantSidebar").then((m) => m.AIAssistantSidebar),
+  {
+    ssr: false,
+    loading: () => <SidebarSkeleton />,
+  },
+);
+
+const SaveQueryDialog = dynamic(
+  () => import("./components/SaveQueryDialog").then((m) => m.SaveQueryDialog),
+  { ssr: false },
+);
+
+const OpenQueryDialog = dynamic(
+  () => import("./components/OpenQueryDialog").then((m) => m.OpenQueryDialog),
+  { ssr: false },
+);
 
 // Hooks
 import { useSQLLab } from "./hooks/useSQLLab";

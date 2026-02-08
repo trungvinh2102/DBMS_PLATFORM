@@ -16,13 +16,11 @@ import { DEFAULT_PORTS } from "../components/constants";
 export function useConnectionsPage() {
   const [selectedType, setSelectedType] = useState<string>("postgres");
   const [formData, setFormData] = useState({
-    name: "",
     host: "localhost",
     port: DEFAULT_PORTS["postgres"],
     user: "",
     password: "",
     database: "",
-    description: "",
     uri: "",
   });
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -75,17 +73,15 @@ export function useConnectionsPage() {
 
         await updateMutation.mutateAsync({
           id: editingId,
-          name: formData.name,
+          databaseName: formData.database,
           type: selectedType,
-          description: formData.description,
           config: updateConfig,
         });
         toast.success("Connection updated successfully");
       } else {
         await createMutation.mutateAsync({
-          name: formData.name,
+          databaseName: formData.database,
           type: selectedType,
-          description: formData.description,
           config,
         });
         toast.success("Connection created successfully");
@@ -102,13 +98,11 @@ export function useConnectionsPage() {
 
   const resetForm = (type: string) => {
     setFormData({
-      name: "",
       host: "localhost",
       port: DEFAULT_PORTS[type] || "5432",
       user: "",
       password: "",
       database: "",
-      description: "",
       uri: "",
     });
   };
@@ -119,13 +113,11 @@ export function useConnectionsPage() {
 
     const config = conn.config || {};
     setFormData({
-      name: conn.name,
       host: config.host || "",
       port: config.port?.toString() || DEFAULT_PORTS[conn.type] || "",
       user: config.user || "",
       password: "",
-      database: config.database || "",
-      description: conn.description || "",
+      database: config.database || conn.databaseName || "",
       uri: config.uri || "",
     });
 
@@ -155,7 +147,9 @@ export function useConnectionsPage() {
 
   const filteredConnections = ((connections as any) || []).filter(
     (conn: any) =>
-      conn.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (conn.databaseName || "")
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
       conn.type.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 

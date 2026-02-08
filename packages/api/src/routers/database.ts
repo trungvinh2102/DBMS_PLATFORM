@@ -130,9 +130,8 @@ export const databaseRouter = router({
   createDatabase: publicProcedure
     .input(
       z.object({
-        name: z.string(),
+        databaseName: z.string(),
         type: z.string(),
-        description: z.string().optional(),
         environment: z
           .enum(["PRODUCTION", "STAGING", "DEVELOPMENT"])
           .optional(),
@@ -154,9 +153,8 @@ export const databaseRouter = router({
     .input(
       z.object({
         id: z.string(),
-        name: z.string().optional(),
+        databaseName: z.string().optional(),
         type: z.string().optional(),
-        description: z.string().optional(),
         environment: z
           .enum(["PRODUCTION", "STAGING", "DEVELOPMENT"])
           .optional(),

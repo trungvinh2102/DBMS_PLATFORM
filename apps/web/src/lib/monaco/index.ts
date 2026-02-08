@@ -4,7 +4,6 @@
  */
 
 // Components
-export { MonacoEditor } from "./MonacoEditor";
 export { ErrorPanel } from "./ErrorPanel";
 
 // Hooks

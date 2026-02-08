@@ -26,11 +26,7 @@ export function ConnectionTable({
 
   return (
     <div className="w-full">
-      <DataTable
-        columns={columns}
-        data={connections || []}
-        onRowClick={(row) => onEdit(row)}
-      />
+      <DataTable columns={columns} data={connections || []} />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  engineType = "library"
 }
 
 datasource db {
@@ -12,9 +13,7 @@ datasource db {
 /// Represents a connection to an external database (e.g., Postgres, MySQL, Snowflake).
 model Db {
   id          String   @id @default(uuid())
-  name        String   @unique
   type        String   // e.g., "postgres", "mysql", "bigquery"
-  description String?
   
   // Environment Classification
   environment Environment @default(DEVELOPMENT)
@@ -28,7 +27,7 @@ model Db {
   // Explicit Connection Details (migrating from config)
   username     String?
   password     String? // Encrypted string
-  databaseName String?
+  databaseName String
   host         String?
   port         Int?
   

@@ -1,11 +1,16 @@
 /**
  * @file page.tsx
  * @description Settings page for managing user preferences and account details.
+ *
+ * @performance Implements lazy loading for tab content components:
+ * - Only one tab is visible at a time, so lazy loading reduces initial bundle
+ * - EditorSettings, DataSettings, AccountSettings load on-demand
  */
 
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import {
   Palette,
@@ -25,10 +30,35 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { GeneralSettings } from "./components/GeneralSettings";
-import { EditorSettings } from "./components/EditorSettings";
-import { DataSettings } from "./components/DataSettings";
-import { AccountSettings } from "./components/AccountSettings";
+
+// Settings card skeleton for loading state
+const SettingsCardSkeleton = () => (
+  <div className="animate-pulse space-y-4">
+    <div className="h-6 w-32 bg-muted rounded" />
+    <div className="h-32 bg-muted rounded-lg" />
+  </div>
+);
+
+// Lazy-loaded tab content components
+const GeneralSettings = dynamic(
+  () => import("./components/GeneralSettings").then((m) => m.GeneralSettings),
+  { loading: () => <SettingsCardSkeleton /> },
+);
+
+const EditorSettings = dynamic(
+  () => import("./components/EditorSettings").then((m) => m.EditorSettings),
+  { loading: () => <SettingsCardSkeleton /> },
+);
+
+const DataSettings = dynamic(
+  () => import("./components/DataSettings").then((m) => m.DataSettings),
+  { loading: () => <SettingsCardSkeleton /> },
+);
+
+const AccountSettings = dynamic(
+  () => import("./components/AccountSettings").then((m) => m.AccountSettings),
+  { loading: () => <SettingsCardSkeleton /> },
+);
 
 export default function SettingsPage() {
   const { setTheme: setNextTheme } = useTheme();

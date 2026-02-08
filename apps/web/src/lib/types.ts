@@ -15,9 +15,8 @@ export interface DatabaseConfig {
 
 export interface DataSource {
   id: string;
-  name: string;
+  databaseName: string;
   type: string;
-  description?: string;
   config?: DatabaseConfig;
   createdAt?: string;
   updatedAt?: string;

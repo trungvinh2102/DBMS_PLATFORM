@@ -158,38 +158,6 @@ export function ConnectionDialog({
                 </SelectContent>
               </Select>
             </div>
-            {/* Connection Name */}
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/30 ml-1">
-                Connection Name
-              </Label>
-              <Input
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    name: e.target.value,
-                  })
-                }
-                className="h-11 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-slate-700 dark:text-white/80 focus-visible:ring-blue-500 transition-all placeholder:text-slate-300 dark:placeholder:text-white/10"
-                placeholder="e.g. Production Cluster"
-              />
-            </div>
-            {/* Description */}
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/30 ml-1">
-                Description
-              </Label>
-              <Textarea
-                placeholder="Brief reason for connection or database documentation..."
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                className="min-h-20 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-[11px] focus-visible:ring-blue-500 transition-all placeholder:text-slate-300 dark:placeholder:text-white/10 resize-none"
-              />
-            </div>
             {/* Connection Form */}
             <ConnectionForm
               formData={formData}

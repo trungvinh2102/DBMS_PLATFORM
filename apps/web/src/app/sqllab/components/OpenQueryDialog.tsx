@@ -25,7 +25,7 @@ export function OpenQueryDialog({
 }: OpenQueryDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[500px] flex flex-col p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-150 h-125 flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-2">
           <DialogTitle>Saved Queries</DialogTitle>
           <DialogDescription>
@@ -62,7 +62,9 @@ export function OpenQueryDialog({
                   <div className="flex items-center gap-4 mt-1 ml-6 text-[10px] text-muted-foreground/60">
                     <div className="flex items-center gap-1">
                       <Database className="h-3 w-3" />
-                      <span>{query.database?.name || "Unknown DB"}</span>
+                      <span>
+                        {query.database?.databaseName || "Unknown DB"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
