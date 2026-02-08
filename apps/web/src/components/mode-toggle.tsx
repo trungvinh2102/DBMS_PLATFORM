@@ -59,14 +59,23 @@ export function ModeToggle() {
         <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         <span className="sr-only">Toggle theme</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleSetTheme("light")}>
+      <DropdownMenuContent align="end" className="p-1.5 focus:outline-none">
+        <DropdownMenuItem
+          onClick={() => handleSetTheme("light")}
+          className="px-3 py-2 cursor-pointer transition-colors"
+        >
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleSetTheme("dark")}>
+        <DropdownMenuItem
+          onClick={() => handleSetTheme("dark")}
+          className="px-3 py-2 cursor-pointer transition-colors"
+        >
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleSetTheme("system")}>
+        <DropdownMenuItem
+          onClick={() => handleSetTheme("system")}
+          className="px-3 py-2 cursor-pointer transition-colors"
+        >
           System
         </DropdownMenuItem>
       </DropdownMenuContent>

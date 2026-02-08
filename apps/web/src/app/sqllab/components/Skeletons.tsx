@@ -102,7 +102,7 @@ export const EditorLoadingSkeleton = () => {
           <div className="flex-1 flex min-h-0">
             {/* Line numbers gutter - matches Monaco's gutter */}
             <div className="w-12.5 flex flex-col items-end pr-3 pt-3 space-y-1.5 bg-[#fffffe] dark:bg-[#1e1e1e] shrink-0">
-              {Array.from({ length: 15 }).map((_, n) => (
+              {Array.from({ length: 5 }).map((_, n) => (
                 <div
                   key={n}
                   className="h-4.5 w-2.5 rounded-sm bg-[#d4d4d4]/40 dark:bg-[#6e6e6e]/40"
@@ -116,16 +116,6 @@ export const EditorLoadingSkeleton = () => {
               <div className="h-4.5 w-[78%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
               <div className="h-4.5 w-[95%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
               <div className="h-4.5 w-[88%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[72%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[90%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[82%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[68%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[94%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[76%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[88%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[65%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[80%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
-              <div className="h-4.5 w-[70%] rounded-sm bg-[#e4e4e4] dark:bg-[#2d2d2d]" />
             </div>
           </div>
           {/* Loading indicator overlay */}
