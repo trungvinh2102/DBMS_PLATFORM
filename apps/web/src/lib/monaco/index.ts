@@ -12,6 +12,9 @@ export { useEditorValidation } from "./useEditorValidation";
 // Services
 export { validateCode, markersToErrorEntries } from "./validationService";
 
+// Monaco Editor
+export { SQLEditor } from "./MonacoEditor";
+
 // Types
 export type {
   ValidationMarker,

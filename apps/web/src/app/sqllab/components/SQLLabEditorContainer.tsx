@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { EditorLoadingSkeleton } from "./Skeletons";
 
 const SQLEditor = dynamic(
-  () => import("../sql-editor").then((mod) => mod.SQLEditor),
+  () => import("../../../lib/monaco/MonacoEditor").then((mod) => mod.SQLEditor),
   {
     ssr: false,
     loading: () => <EditorLoadingSkeleton />,

@@ -18,7 +18,7 @@ import type { ValidationOptions } from "@/lib/monaco/types";
 import { useSettingsStore } from "@/stores/use-settings-store";
 import { defineThemes } from "@/lib/monaco/themes";
 import { registerSqlAutocomplete } from "@/lib/monaco/sql-autocomplete";
-import { registerEditorCommands } from "./hooks/use-editor-commands";
+import { registerEditorCommands } from "../../app/sqllab/hooks/use-editor-commands";
 
 interface SQLEditorProps {
   value: string;
