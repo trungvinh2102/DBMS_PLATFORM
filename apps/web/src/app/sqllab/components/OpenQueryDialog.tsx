@@ -69,7 +69,7 @@ export function OpenQueryDialog({
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
                       <span>
-                        {new Date(query.updatedAt).toLocaleDateString()}
+                        {new Date(query.changed_on).toLocaleDateString()}
                       </span>
                     </div>
                   </div>

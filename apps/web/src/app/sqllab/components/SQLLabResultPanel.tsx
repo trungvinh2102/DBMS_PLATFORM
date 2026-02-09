@@ -35,6 +35,8 @@ interface SQLLabResultPanelProps {
   tabSize?: number;
   syntaxErrors?: any[];
   onErrorClick?: (line: number, column: number) => void;
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
 }
 
 type TabType = "results" | "messages" | "problems";
@@ -48,8 +50,10 @@ export function SQLLabResultPanel({
   tabSize = 4,
   syntaxErrors = [],
   onErrorClick,
+  activeTab,
+  onTabChange,
 }: SQLLabResultPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabType>("results");
+  // const [activeTab, setActiveTab] = useState<TabType>("results");
 
   const errorCount = syntaxErrors.filter((e) => e.severity === 8).length;
   const warningCount = syntaxErrors.filter((e) => e.severity === 4).length;
@@ -62,14 +66,14 @@ export function SQLLabResultPanel({
         <div className="flex items-center gap-8 h-full font-black text-[10px] uppercase tracking-[0.2em]">
           <TabButton
             active={effectiveTab === "results"}
-            onClick={() => setActiveTab("results")}
+            onClick={() => onTabChange("results")}
             count={results.length}
           >
             Results
           </TabButton>
           <TabButton
             active={effectiveTab === "messages"}
-            onClick={() => setActiveTab("messages")}
+            onClick={() => onTabChange("messages")}
             hasError={!!error}
           >
             Messages{" "}
@@ -79,7 +83,7 @@ export function SQLLabResultPanel({
           </TabButton>
           <TabButton
             active={effectiveTab === "problems"}
-            onClick={() => setActiveTab("problems")}
+            onClick={() => onTabChange("problems")}
             count={totalProblems}
             errorCount={errorCount}
           >
@@ -112,7 +116,7 @@ export function SQLLabResultPanel({
         tabSize={tabSize}
         errorCount={errorCount}
         warningCount={warningCount}
-        setActiveTab={setActiveTab}
+        setActiveTab={onTabChange}
       />
     </div>
   );

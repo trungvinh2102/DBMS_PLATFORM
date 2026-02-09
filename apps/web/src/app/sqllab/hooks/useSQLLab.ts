@@ -30,6 +30,9 @@ export function useSQLLab() {
 
   // Basic UI States
   const [activeRightTab, setActiveRightTab] = useState("data");
+  const [activeResultTab, setActiveResultTab] = useState<
+    "results" | "messages" | "problems"
+  >("results");
   const [rightPanelMode, setRightPanelMode] = useState<"object" | "history">(
     "object",
   );
@@ -53,6 +56,11 @@ export function useSQLLab() {
     refetchTables,
     isLoadingTables,
     allColumns,
+    indexes,
+    foreignKeys,
+    tableInfo,
+    tableDDL,
+    refetchAll,
     ...metadata
   } = useSQLLabMetadata({
     selectedDS: activeTab.selectedDS,
@@ -78,9 +86,13 @@ export function useSQLLab() {
         columns: res.columns || [],
         error: res.error || null,
       });
+      // Switch to results tab on success
+      setActiveResultTab("results");
     },
     onError: (err) => {
       updateActiveTab({ error: err });
+      // Switch to messages tab on error
+      setActiveResultTab("messages");
     },
   });
 
@@ -134,6 +146,8 @@ export function useSQLLab() {
     setSql: (sql: string) => updateActiveTab({ sql }),
     activeRightTab,
     setActiveRightTab,
+    activeResultTab,
+    setActiveResultTab,
     rightPanelMode,
     setRightPanelMode,
     selectedDS: activeTab.selectedDS,
@@ -175,12 +189,19 @@ export function useSQLLab() {
     loadingTData: tableDataMutation.isPending,
     columnsData: allColumns,
     isLoadingColumns: isLoadingSchemas || isLoadingTables,
+    indexes,
+    foreignKeys,
+    tableInfo,
+    tableDDL,
     executionTime: (runSQLMutation as any).data?.executionTime || 0,
     selectedDSName:
       dataSources.find((ds) => ds.id === activeTab.selectedDS)?.databaseName ||
       "",
-    handleRun: (sqlOverride?: string) =>
-      handleRun(sqlOverride || selectedText || undefined),
+    handleRun: (sqlOverride?: string | React.SyntheticEvent) => {
+      const actualSql =
+        typeof sqlOverride === "string" ? sqlOverride : undefined;
+      return handleRun(actualSql || selectedText || undefined);
+    },
     handleFormat: () =>
       handleFormat(activeTab.sql, (s: string) => updateActiveTab({ sql: s })),
     setSelectedText,

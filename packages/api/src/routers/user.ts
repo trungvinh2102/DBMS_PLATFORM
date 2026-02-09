@@ -35,7 +35,7 @@ export const userRouter = router({
             description: true,
           },
         },
-        createdAt: true,
+        created_on: true,
       },
     });
   }),
@@ -109,10 +109,10 @@ export const userRouter = router({
 
         // Postgres UPSERT syntax
         await prisma.$executeRaw`
-          INSERT INTO user_settings (id, "userId", settings, "createdAt", "updatedAt")
+          INSERT INTO user_settings (id, "userId", settings, created_on, changed_on)
           VALUES (${globalThis.crypto.randomUUID()}, ${userId}, ${JSON.stringify(input)}::jsonb, NOW(), NOW())
           ON CONFLICT ("userId") 
-          DO UPDATE SET settings = ${JSON.stringify(input)}::jsonb, "updatedAt" = NOW()
+          DO UPDATE SET settings = ${JSON.stringify(input)}::jsonb, changed_on = NOW()
         `;
 
         return { success: true };

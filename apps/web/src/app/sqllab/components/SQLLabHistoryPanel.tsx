@@ -155,7 +155,7 @@ export function SQLLabHistoryPanel({
                       <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-2.5 w-2.5" />
-                          {formatDistanceToNow(new Date(item.executedAt), {
+                          {formatDistanceToNow(new Date(item.created_on), {
                             addSuffix: true,
                           })}
                         </span>

@@ -309,6 +309,130 @@ export class DatabaseService {
   }
 
   /**
+   * Fetches indexes for a table.
+   */
+  async getIndexes(databaseId: string, schema: string, table: string) {
+    return await this.runDynamicQuery(databaseId, async (client) => {
+      const res = await client.query<{ indexname: string; indexdef: string }>(
+        `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1 AND tablename = $2`,
+        [schema, table],
+      );
+      return res.rows;
+    });
+  }
+
+  /**
+   * Fetches foreign keys (relations) for a table.
+   */
+  async getForeignKeys(databaseId: string, schema: string, table: string) {
+    return await this.runDynamicQuery(databaseId, async (client) => {
+      const res = await client.query<any>(
+        `SELECT
+            tc.constraint_name,
+            kcu.column_name,
+            ccu.table_schema AS foreign_table_schema,
+            ccu.table_name AS foreign_table_name,
+            ccu.column_name AS foreign_column_name
+        FROM
+            information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+              ON tc.constraint_name = kcu.constraint_name
+              AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+              ON ccu.constraint_name = tc.constraint_name
+              AND ccu.table_schema = tc.table_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1 AND tc.table_name = $2`,
+        [schema, table],
+      );
+      return res.rows.map((r) => ({
+        constraint: r.constraint_name,
+        column: r.column_name,
+        foreignSchema: r.foreign_table_schema,
+        foreignTable: r.foreign_table_name,
+        foreignColumn: r.foreign_column_name,
+      }));
+    });
+  }
+
+  /**
+   * Fetches table stats/info.
+   */
+  async getTableInfo(databaseId: string, schema: string, table: string) {
+    return await this.runDynamicQuery(databaseId, async (client) => {
+      const res = await client.query<any>(
+        `SELECT
+          pg_size_pretty(pg_total_relation_size(quote_ident($1) || '.' || quote_ident($2))) as total_size,
+          pg_size_pretty(pg_relation_size(quote_ident($1) || '.' || quote_ident($2))) as data_size,
+          pg_size_pretty(pg_total_relation_size(quote_ident($1) || '.' || quote_ident($2)) - pg_relation_size(quote_ident($1) || '.' || quote_ident($2))) as index_size,
+          (SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = $1 AND relname = $2) as row_count
+        `,
+        [schema, table],
+      );
+      return res.rows[0];
+    });
+  }
+
+  /**
+   * Generates a basic CREATE TABLE script (DDL).
+   */
+  async getTableDDL(databaseId: string, schema: string, table: string) {
+    // This is a simplified reconstruction.
+    // Ideally, use pg_dump or a robust library.
+    return await this.runDynamicQuery(databaseId, async (client) => {
+      // Get columns
+      const colsRes = await client.query<any>(
+        `SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+         FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = $2
+         ORDER BY ordinal_position`,
+        [schema, table],
+      );
+
+      // Get PK
+      const pkRes = await client.query<any>(
+        `SELECT kcu.column_name
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.key_column_usage kcu
+           ON tc.constraint_name = kcu.constraint_name
+           AND tc.table_schema = kcu.table_schema
+         WHERE tc.constraint_type = 'PRIMARY KEY'
+           AND tc.table_schema = $1
+           AND tc.table_name = $2`,
+        [schema, table],
+      );
+      const pks = pkRes.rows.map((r) => r.column_name);
+
+      let sql = `CREATE TABLE "${schema}"."${table}" (\n`;
+      const lines: string[] = [];
+
+      colsRes.rows.forEach((col) => {
+        let line = `  "${col.column_name}" ${col.data_type.toUpperCase()}`;
+        if (col.character_maximum_length) {
+          line += `(${col.character_maximum_length})`;
+        }
+        if (col.is_nullable === "NO") {
+          line += " NOT NULL";
+        }
+        if (col.column_default) {
+          line += ` DEFAULT ${col.column_default}`;
+        }
+        lines.push(line);
+      });
+
+      if (pks.length > 0) {
+        lines.push(
+          `  PRIMARY KEY (${pks.map((k: string) => `"${k}"`).join(", ")})`,
+        );
+      }
+
+      sql += lines.join(",\n");
+      sql += "\n);";
+
+      return sql;
+    });
+  }
+
+  /**
    * Executes a raw SQL query.
    */
   async executeQuery(databaseId: string, sql: string) {
@@ -385,7 +509,7 @@ export class DatabaseService {
   async getQueryHistory(databaseId?: string, limit: number = 50) {
     return prisma.queryHistory.findMany({
       where: databaseId ? { databaseId } : {},
-      orderBy: { executedAt: "desc" },
+      orderBy: { created_on: "desc" },
       take: limit,
       include: {
         database: {
@@ -545,7 +669,7 @@ export class DatabaseService {
       where: {
         AND: [databaseId ? { databaseId } : {}, userId ? { userId } : {}],
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { changed_on: "desc" },
       include: {
         database: {
           select: { databaseName: true },

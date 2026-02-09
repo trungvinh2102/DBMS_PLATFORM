@@ -19,8 +19,8 @@ export interface DataSource {
   type: string;
   description?: string | null;
   config?: unknown;
-  createdAt?: Date;
-  updatedAt?: Date;
+  created_on?: Date;
+  changed_on?: Date;
 }
 
 export interface ColumnInfo {

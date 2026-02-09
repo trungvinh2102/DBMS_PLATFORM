@@ -84,6 +84,8 @@ export default function SQLLabPage() {
     setSql,
     activeRightTab,
     setActiveRightTab,
+    activeResultTab,
+    setActiveResultTab,
     rightPanelMode,
     setRightPanelMode,
     selectedDS,
@@ -116,6 +118,10 @@ export default function SQLLabPage() {
     columnsData,
     allColumns,
     isLoadingColumns,
+    indexes,
+    foreignKeys,
+    tableInfo,
+    tableDDL,
     results,
     columns,
     executing,
@@ -248,6 +254,8 @@ export default function SQLLabPage() {
                       cursorPos={cursorPos}
                       tabSize={tabSize}
                       syntaxErrors={syntaxErrors}
+                      activeTab={activeResultTab}
+                      onTabChange={setActiveResultTab}
                     />
                   </ResizablePanel>
                 </ResizablePanelGroup>
@@ -279,6 +287,11 @@ export default function SQLLabPage() {
                       executionTime={executionTime}
                       isLoadingColumns={isLoadingColumns}
                       columnsData={columnsData as any}
+                      indexes={indexes}
+                      foreignKeys={foreignKeys}
+                      tableInfo={tableInfo}
+                      tableDDL={tableDDL}
+                      triggers={triggers}
                     />
                   ) : (
                     <SQLLabHistoryPanel

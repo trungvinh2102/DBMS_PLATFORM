@@ -37,8 +37,8 @@ model Db {
   savedQueries  SavedQuery[]
   queryHistories QueryHistory[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  created_on   DateTime @default(now()) @map("created_on")
+  changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@map("databases")
 }
@@ -57,8 +57,8 @@ model SavedQuery {
   userId      String?
   user        User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  created_on   DateTime @default(now()) @map("created_on")
+  changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@index([userId])
   @@map("saved_queries")
@@ -76,6 +76,9 @@ model QueryHistory {
   database    Db @relation(fields: [databaseId], references: [id], onDelete: Cascade)
 
   executedAt  DateTime @default(now())
+  
+  created_on   DateTime @default(now()) @map("created_on")
+  changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@index([executedAt])
   @@map("query_histories")
@@ -97,8 +100,8 @@ model User {
 
   settings UserSetting?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  created_on DateTime @default(now()) @map("created_on")
+  changed_on DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@map("users")
 }
@@ -112,8 +115,8 @@ model UserSetting {
   // Stores all UI and editor settings in a JSON object
   settings Json 
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  created_on DateTime @default(now()) @map("created_on")
+  changed_on DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@map("user_settings")
 }
@@ -129,8 +132,8 @@ model Role {
   // A role can have multiple permissions
   permissions Permission[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  created_on   DateTime @default(now()) @map("created_on")
+  changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@map("roles")
 }
@@ -144,6 +147,9 @@ model Permission {
 
   // Permissions can belong to multiple roles
   roles       Role[]
+
+  created_on   DateTime @default(now()) @map("created_on")
+  changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
 
   @@unique([action, resource])
   @@map("permissions")

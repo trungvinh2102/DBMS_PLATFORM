@@ -18,6 +18,6 @@ export interface DataSource {
   databaseName: string;
   type: string;
   config?: DatabaseConfig;
-  createdAt?: string;
-  updatedAt?: string;
+  created_on?: string;
+  changed_on?: string;
 }

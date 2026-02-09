@@ -105,6 +105,70 @@ export const databaseRouter = router({
       return databaseService.getAllColumns(input.databaseId, input.schema);
     }),
 
+  getIndexes: publicProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        schema: z.string(),
+        table: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return databaseService.getIndexes(
+        input.databaseId,
+        input.schema,
+        input.table,
+      );
+    }),
+
+  getForeignKeys: publicProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        schema: z.string(),
+        table: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return databaseService.getForeignKeys(
+        input.databaseId,
+        input.schema,
+        input.table,
+      );
+    }),
+
+  getTableInfo: publicProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        schema: z.string(),
+        table: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return databaseService.getTableInfo(
+        input.databaseId,
+        input.schema,
+        input.table,
+      );
+    }),
+
+  getTableDDL: publicProcedure
+    .input(
+      z.object({
+        databaseId: z.string(),
+        schema: z.string(),
+        table: z.string(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return databaseService.getTableDDL(
+        input.databaseId,
+        input.schema,
+        input.table,
+      );
+    }),
+
   execute: publicProcedure
     .input(
       z.object({

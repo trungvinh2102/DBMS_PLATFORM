@@ -4,13 +4,22 @@
  */
 
 import { Parser } from "node-sql-parser";
+import { MySQL, PostgreSQL } from "dt-sql-parser";
 import {
   MarkerSeverity,
   type ValidationMarker,
   type ValidationResult,
 } from "../types";
 
-const sqlParser = new Parser();
+// Cache parser instances
+// Note: GenericSQL is not available in all versions, so we rely on specific parsers
+// and fallback to node-sql-parser for others.
+const parsers = {
+  mysql: new MySQL(),
+  postgresql: new PostgreSQL(),
+};
+
+const nodeSqlParser = new Parser();
 
 const SQL_DIALECT_MAP: Record<string, string> = {
   mysql: "MySQL",
@@ -35,13 +44,47 @@ export function validateSQL(
     };
   }
 
-  try {
-    const parserDialect = SQL_DIALECT_MAP[dialect] || "PostgreSQL";
-    sqlParser.astify(code, { database: parserDialect });
-    markers.push(...runCustomSQLValidations(code));
-  } catch (error) {
-    markers.push(extractSQLErrorMarker(error, code));
+  // 1. Try dt-sql-parser for supported dialects
+  const dtParser = parsers[dialect as keyof typeof parsers];
+
+  if (dtParser) {
+    try {
+      const errors = dtParser.validate(code);
+      if (errors && errors.length > 0) {
+        markers.push(...errors.map((err: any) => mapDtErrorToMarker(err)));
+      }
+    } catch (error: any) {
+      console.error("dt-sql-parser error:", error);
+      // If dt-sql-parser fails internally, we might want to fallback or just report it
+      markers.push({
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: 1,
+        message: "Validator error: " + (error.message || "Unknown error"),
+        severity: MarkerSeverity.Warning,
+        source: "dt-sql-parser-internal",
+      });
+    }
+  } else {
+    // 2. Fallback to node-sql-parser for other dialects (e.g. SQLite)
+    try {
+      const parserDialect = SQL_DIALECT_MAP[dialect] || "PostgreSQL";
+      nodeSqlParser.astify(code, { database: parserDialect });
+    } catch (error: any) {
+      // Filter out spurious "column does not exist" errors from parser
+      const msg = error.message || "";
+      if (
+        !msg.toLowerCase().includes("column") ||
+        !msg.toLowerCase().includes("does not exist")
+      ) {
+        markers.push(extractSQLErrorMarker(error, code));
+      }
+    }
   }
+
+  // 3. Custom logical rules (apply to all)
+  markers.push(...runCustomSQLValidations(code));
 
   return {
     isValid:
@@ -51,7 +94,44 @@ export function validateSQL(
   };
 }
 
-function extractSQLErrorMarker(error: unknown, code: string): ValidationMarker {
+function mapDtErrorToMarker(error: any): ValidationMarker {
+  let message = error.message;
+
+  // Clean up ANTLR Error Messages
+  if (message.includes("mismatched input")) {
+    const match = message.match(/mismatched input '([^']+)'/);
+    if (match) {
+      message = `Unexpected token '${match[1]}'`;
+    }
+  } else if (message.includes("no viable alternative at input")) {
+    const match = message.match(/no viable alternative at input '([^']+)'/);
+    if (match) {
+      message = `Invalid syntax near '${match[1]}'`;
+    }
+  } else if (message.includes("is not valid at this position")) {
+    const match = message.match(/'([^']+)' is not valid at this position/);
+    if (match) {
+      message = `Unexpected token '${match[1]}'`;
+    }
+  } else if (message.includes("missing") && message.includes("at")) {
+    const match = message.match(/missing '([^']+)'/);
+    if (match) {
+      message = `Missing '${match[1]}'`;
+    }
+  }
+
+  return {
+    startLineNumber: error.startLine,
+    startColumn: error.startColumn,
+    endLineNumber: error.endLine,
+    endColumn: error.endColumn,
+    message: message,
+    severity: MarkerSeverity.Error,
+    source: "dt-sql-parser",
+  };
+}
+
+function extractSQLErrorMarker(error: any, code: string): ValidationMarker {
   const message =
     error instanceof Error ? error.message : "Unknown SQL syntax error";
   const lines = code.split("\n");
@@ -61,16 +141,22 @@ function extractSQLErrorMarker(error: unknown, code: string): ValidationMarker {
     endLineNumber = 1,
     endColumn = lines[0]?.length || 1;
 
-  // 1. Try to extract location from Jison hash (common in node-sql-parser)
-  const hash = (error as any)?.hash;
-  if (hash?.loc) {
+  // node-sql-parser location
+  const location = error.location;
+  const hash = error.hash;
+
+  if (location) {
+    startLineNumber = location.start.line;
+    startColumn = location.start.column;
+    endLineNumber = location.end.line;
+    endColumn = location.end.column;
+  } else if (hash?.loc) {
     startLineNumber = hash.loc.first_line;
     startColumn = hash.loc.first_column + 1;
     endLineNumber = hash.loc.last_line;
     endColumn = hash.loc.last_column + 1;
   } else {
-    // 2. Try to extract from message using multiple patterns
-    // Matches "at line 3, column 5", "on line 3", "line 3: column 5", etc.
+    // Regex fallback
     const locationMatch = message.match(
       /(?:at|on|line)\s+(\d+)(?:[:,\s]+column\s+(\d+))?/i,
     );
@@ -85,24 +171,7 @@ function extractSQLErrorMarker(error: unknown, code: string): ValidationMarker {
     }
   }
 
-  // 3. Try to refine with "near" token search if available
-  const nearMatch = message.match(/near ['"]([^'"]+)['"]/i);
-  if (nearMatch) {
-    const token = nearMatch[1];
-    // Start searching from startLineNumber downwards
-    for (let i = startLineNumber - 1; i < lines.length; i++) {
-      const idx = lines[i].indexOf(token);
-      if (idx !== -1) {
-        startLineNumber = i + 1;
-        startColumn = idx + 1;
-        endLineNumber = i + 1;
-        endColumn = idx + token.length + 1;
-        break;
-      }
-    }
-  }
-
-  // 4. Special handling for "end of input" (incomplete query)
+  // "end of input" fallback
   if (
     message.toLowerCase().includes("end of input") ||
     message.toLowerCase().includes("unexpected end of string")
@@ -113,7 +182,7 @@ function extractSQLErrorMarker(error: unknown, code: string): ValidationMarker {
     endColumn = startColumn + 1;
   }
 
-  // Ensure line numbers are within bounds
+  // Bounds check
   startLineNumber = Math.max(1, Math.min(startLineNumber, lines.length));
   endLineNumber = Math.max(1, Math.min(endLineNumber, lines.length));
 
@@ -127,7 +196,7 @@ function extractSQLErrorMarker(error: unknown, code: string): ValidationMarker {
       .replace(/Parse error on line \d+:?/gi, "")
       .trim(),
     severity: MarkerSeverity.Error,
-    source: "sql-validator",
+    source: "node-sql-parser",
   };
 }
 

@@ -33,36 +33,34 @@ export function useSQLLabMetadata({
   });
   const schemas = (schemasData as string[]) || [];
 
-  const {
-    data: tables,
-    isLoading: isLoadingTables,
-    refetch: refetchTables,
-    error: tablesError,
-  } = useQuery({
+  const tablesQuery = useQuery({
     ...trpc.database.getTables.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
     }),
     enabled: !!selectedDS,
   });
+  const tables = (tablesQuery.data as string[]) || [];
 
-  const { data: views } = useQuery({
+  const viewsQuery = useQuery({
     ...trpc.database.getViews.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
     }),
     enabled: !!selectedDS,
   });
+  const views = (viewsQuery.data as string[]) || [];
 
-  const { data: allColumns, error: allColumnsError } = useQuery({
+  const allColumnsQuery = useQuery({
     ...trpc.database.getAllColumns.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
     }),
     enabled: !!selectedDS,
   });
+  const allColumns = (allColumnsQuery.data as any[]) || [];
 
-  const { data: functionsData } = useQuery({
+  const functionsQuery = useQuery({
     ...trpc.database.getFunctions.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
@@ -70,7 +68,7 @@ export function useSQLLabMetadata({
     enabled: !!selectedDS,
   });
 
-  const { data: proceduresData } = useQuery({
+  const proceduresQuery = useQuery({
     ...trpc.database.getProcedures.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
@@ -78,7 +76,7 @@ export function useSQLLabMetadata({
     enabled: !!selectedDS,
   });
 
-  const { data: triggersData } = useQuery({
+  const triggersQuery = useQuery({
     ...trpc.database.getTriggers.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
@@ -86,7 +84,7 @@ export function useSQLLabMetadata({
     enabled: !!selectedDS,
   });
 
-  const { data: eventsData } = useQuery({
+  const eventsQuery = useQuery({
     ...trpc.database.getEvents.queryOptions({
       databaseId: selectedDS,
       schema: selectedSchema,
@@ -95,30 +93,92 @@ export function useSQLLabMetadata({
   });
 
   const metadata = {
-    views: (views as string[]) || [],
-    functions: (functionsData as string[]) || [],
-    procedures: (proceduresData as string[]) || [],
-    triggers: (triggersData as string[]) || [],
-    events: (eventsData as string[]) || [],
+    views: views,
+    functions: (functionsQuery.data as string[]) || [],
+    procedures: (proceduresQuery.data as string[]) || [],
+    triggers: (triggersQuery.data as string[]) || [],
+    events: (eventsQuery.data as string[]) || [],
   };
 
+  const indexesQuery = useQuery({
+    ...trpc.database.getIndexes.queryOptions({
+      databaseId: selectedDS,
+      schema: selectedSchema,
+      table: selectedTable!,
+    }),
+    enabled: !!selectedDS && !!selectedTable,
+  });
+
+  const foreignKeysQuery = useQuery({
+    ...trpc.database.getForeignKeys.queryOptions({
+      databaseId: selectedDS,
+      schema: selectedSchema,
+      table: selectedTable!,
+    }),
+    enabled: !!selectedDS && !!selectedTable,
+  });
+
+  const tableInfoQuery = useQuery({
+    ...trpc.database.getTableInfo.queryOptions({
+      databaseId: selectedDS,
+      schema: selectedSchema,
+      table: selectedTable!,
+    }),
+    enabled: !!selectedDS && !!selectedTable,
+  });
+
+  const tableDDLQuery = useQuery({
+    ...trpc.database.getTableDDL.queryOptions({
+      databaseId: selectedDS,
+      schema: selectedSchema,
+      table: selectedTable!,
+    }),
+    enabled: !!selectedDS && !!selectedTable,
+  });
+
   useEffect(() => {
-    const error = schemasError || tablesError || allColumnsError;
+    const error = schemasError || tablesQuery.error || allColumnsQuery.error;
     if (error) {
       toast.error(
         (error as any).message || "Failed to fetch database metadata",
       );
     }
-  }, [schemasError, tablesError, allColumnsError]);
+  }, [schemasError, tablesQuery.error, allColumnsQuery.error]);
+
+  const refetchAll = async () => {
+    if (selectedTable) {
+      await Promise.all([
+        indexesQuery.refetch(),
+        foreignKeysQuery.refetch(),
+        tableInfoQuery.refetch(),
+        tableDDLQuery.refetch(),
+        allColumnsQuery.refetch(),
+      ]);
+    }
+    // Always refetch sidebar items too
+    await Promise.all([
+      tablesQuery.refetch(),
+      viewsQuery.refetch(),
+      functionsQuery.refetch(),
+      proceduresQuery.refetch(),
+      eventsQuery.refetch(),
+      triggersQuery.refetch(),
+    ]);
+  };
 
   return {
     dataSources,
     schemas,
     isLoadingSchemas,
     tables,
-    refetchTables,
-    isLoadingTables,
+    refetchTables: refetchAll, // Use refetchAll for sidebar too or expose separately if needed
+    isLoadingTables: tablesQuery.isLoading,
     allColumns: allColumns || [],
     ...metadata,
+    indexes: (indexesQuery.data as any[]) || [],
+    foreignKeys: (foreignKeysQuery.data as any[]) || [],
+    tableInfo: (tableInfoQuery.data as any) || null,
+    tableDDL: (tableDDLQuery.data as string) || "",
+    refetchAll,
   };
 }
