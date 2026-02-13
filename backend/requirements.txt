@@ -1,0 +1,15 @@
+
+flask
+flask-cors
+sqlalchemy
+psycopg2-binary
+python-dotenv
+cryptography
+pytest
+pytest-flask
+pytest-mock
+# Auth
+pyjwt
+passlib[bcrypt]
+# AI
+google-generativeai

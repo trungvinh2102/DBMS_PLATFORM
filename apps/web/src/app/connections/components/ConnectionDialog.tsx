@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { DB_TYPES, DEFAULT_PORTS } from "./constants";
 import { ConnectionForm } from "./ConnectionForm";
 import { toast } from "sonner";
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { useMutation } from "@tanstack/react-query";
 
 interface ConnectionDialogProps {
@@ -51,9 +51,10 @@ export function ConnectionDialog({
   isPending,
   trigger,
 }: ConnectionDialogProps) {
-  const testConnectionMutation = useMutation(
-    trpc.database.testConnection.mutationOptions(),
-  );
+  const testConnectionMutation = useMutation({
+    mutationFn: (vars: { type?: string; config: any }) =>
+      databaseApi.test({ ...vars.config, type: selectedType }),
+  });
 
   const handleTestConnection = async () => {
     try {

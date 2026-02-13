@@ -6,7 +6,6 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { env } from "@dbms-platform/env/web";
 import { DefaultChatTransport } from "ai";
 import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

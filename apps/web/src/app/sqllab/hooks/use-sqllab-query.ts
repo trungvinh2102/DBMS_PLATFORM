@@ -1,11 +1,6 @@
-/**
- * @file use-sqllab-query.ts
- * @description Hook to manage SQL query execution, formatting, and saving.
- */
-
 import { useCallback } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { trpc, queryClient } from "@/utils/trpc";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { format } from "sql-formatter";
 
@@ -22,13 +17,20 @@ export function useSQLLabQuery({
   onSuccess,
   onError,
 }: QueryProps) {
-  const runSQLMutation = useMutation(trpc.database.execute.mutationOptions());
-  const saveQueryMutation = useMutation(
-    trpc.database.saveQuery.mutationOptions(),
-  );
+  const queryClient = useQueryClient();
 
-  const { data: savedQueries, refetch: refetchSavedQueries } = useQuery({
-    ...trpc.database.listSavedQueries.queryOptions({ databaseId: selectedDS }),
+  const runSQLMutation = useMutation({
+    mutationFn: (vars: { databaseId: string; sql: string }) =>
+      databaseApi.execute(vars.databaseId, vars.sql),
+  });
+
+  const saveQueryMutation = useMutation({
+    mutationFn: (vars: any) => databaseApi.saveQuery(vars),
+  });
+
+  const { data: savedQueries = [], refetch: refetchSavedQueries } = useQuery({
+    queryKey: ["savedQueries", selectedDS],
+    queryFn: () => databaseApi.listSavedQueries(selectedDS),
     enabled: !!selectedDS,
   });
 
@@ -40,23 +42,24 @@ export function useSQLLabQuery({
       }
 
       try {
-        const response = await runSQLMutation.mutateAsync({
+        const response: any = await runSQLMutation.mutateAsync({
           databaseId: selectedDS,
           sql: sqlOverride || sql,
         });
+
+        // Axios returns data in data prop usually, but our client interceptor returns response.data
+        // Flask returns { data: [], columns: [], ... }
         onSuccess(response);
       } catch (error: any) {
         const msg = error.message || "Failed to execute query";
         onError(msg);
       } finally {
         queryClient.invalidateQueries({
-          queryKey: trpc.database.getQueryHistory.queryKey({
-            databaseId: selectedDS,
-          }),
+          queryKey: ["history", selectedDS],
         });
       }
     },
-    [selectedDS, sql, runSQLMutation, onSuccess, onError],
+    [selectedDS, sql, runSQLMutation, onSuccess, onError, queryClient],
   );
 
   const handleFormat = useCallback(
@@ -85,7 +88,7 @@ export function useSQLLabQuery({
     executing: runSQLMutation.isPending,
     runSQLMutation,
     saveQueryMutation,
-    savedQueries: (savedQueries as unknown as any[]) || [],
+    savedQueries: (savedQueries as any[]) || [],
     refetchSavedQueries,
   };
 }

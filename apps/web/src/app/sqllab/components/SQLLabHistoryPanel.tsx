@@ -15,7 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
@@ -40,12 +40,11 @@ export function SQLLabHistoryPanel({
     data: history,
     isLoading,
     refetch,
-  } = useQuery(
-    trpc.database.getQueryHistory.queryOptions({
-      databaseId: selectedDS,
-      limit: 100,
-    }),
-  );
+  } = useQuery({
+    queryKey: ["queryHistory", selectedDS],
+    queryFn: () => databaseApi.getHistory(selectedDS),
+    enabled: !!selectedDS,
+  });
 
   const filteredHistory = (history as unknown as any[])?.filter((h: any) => {
     const matchesSearch =

@@ -8,22 +8,27 @@
 import { Activity, Database, FileCode, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { Card, CardContent, CardTitle, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardStats() {
   // Fetch System Health
-  const healthCheck = useQuery(trpc.healthCheck.queryOptions());
+  const healthCheck = useQuery({
+    queryKey: ["health"],
+    queryFn: () => databaseApi.health(),
+  });
 
   // Fetch Connections Count
-  const { data: connections, isLoading: isLoadingConnections } = useQuery(
-    trpc.database.listDatabases.queryOptions(),
-  );
+  const { data: connections, isLoading: isLoadingConnections } = useQuery({
+    queryKey: ["databases"],
+    queryFn: () => databaseApi.list(),
+  });
 
   // Fetch Saved Queries
   const { data: savedQueries, isLoading: isLoadingSavedQueries } = useQuery({
-    ...trpc.database.listSavedQueries.queryOptions({}),
+    queryKey: ["savedQueries"],
+    queryFn: () => databaseApi.listSavedQueries(),
     retry: false,
   });
 

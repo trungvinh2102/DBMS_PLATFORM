@@ -4,7 +4,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { userApi } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 
 import { Button } from "@/components/ui/button";
@@ -22,24 +22,24 @@ export function ModeToggle() {
 
   // Fetch current settings to merge updates
   const { data: settings } = useQuery({
-    ...trpc.user.getSettings.queryOptions(),
+    queryKey: ["settings"],
+    queryFn: () => userApi.getSettings(),
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 
-  const updateMutation = useMutation(
-    trpc.user.updateSettings.mutationOptions({
-      onSuccess: () => {
-        // Invalidate settings query to update other components
-        queryClient.invalidateQueries({
-          queryKey: trpc.user.getSettings.queryOptions().queryKey,
-        });
-      },
-      onError: (err: any) => {
-        console.error("Failed to sync theme preference", err);
-      },
-    }),
-  );
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => userApi.updateSettings(data),
+    onSuccess: () => {
+      // Invalidate settings query to update other components
+      queryClient.invalidateQueries({
+        queryKey: ["settings"],
+      });
+    },
+    onError: (err: any) => {
+      console.error("Failed to sync theme preference", err);
+    },
+  });
 
   const handleSetTheme = (newTheme: string) => {
     setTheme(newTheme);

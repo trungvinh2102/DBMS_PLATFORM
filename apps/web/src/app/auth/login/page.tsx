@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, User } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { authApi } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 
 import { AuthLayout } from "@/components/auth/auth-layout";
@@ -38,18 +38,17 @@ export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuth();
 
-  const loginMutation = useMutation(
-    trpc.auth.login.mutationOptions({
-      onSuccess: (data) => {
-        setAuth(data.token, data.user);
-        toast.success("Welcome back!");
-        router.push("/"); // Or wherever 'home' is
-      },
-      onError: (error) => {
-        toast.error(error.message);
-      },
-    }),
-  );
+  const loginMutation = useMutation({
+    mutationFn: (data: any) => authApi.login(data),
+    onSuccess: (data: any) => {
+      setAuth(data.token, data.user);
+      toast.success("Welcome back!");
+      router.push("/"); // Or wherever 'home' is
+    },
+    onError: (error: any) => {
+      toast.error(error.message);
+    },
+  });
 
   const [showPassword, setShowPassword] = React.useState(false);
 

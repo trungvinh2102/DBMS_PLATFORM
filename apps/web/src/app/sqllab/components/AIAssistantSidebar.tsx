@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { aiApi } from "@/lib/api-client";
 import { toast } from "sonner";
 
 interface Message {
@@ -62,9 +62,9 @@ export function AIAssistantSidebar({
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const generateSQLMutation = useMutation(
-    trpc.ai.generateSQL.mutationOptions(),
-  );
+  const generateSQLMutation = useMutation({
+    mutationFn: (vars: any) => aiApi.generateSQL(vars),
+  });
 
   useEffect(() => {
     if (scrollRef.current) {

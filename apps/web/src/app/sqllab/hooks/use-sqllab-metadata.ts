@@ -1,11 +1,6 @@
-/**
- * @file use-sqllab-metadata.ts
- * @description Hook to fetch database metadata (schemas, tables, columns, etc.).
- */
-
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 
 interface MetadataProps {
@@ -19,131 +14,86 @@ export function useSQLLabMetadata({
   selectedSchema,
   selectedTable,
 }: MetadataProps) {
-  const { data: dsData } = useQuery(trpc.database.listDatabases.queryOptions());
-  const dataSources =
-    (dsData as unknown as import("@/lib/types").DataSource[]) || [];
+  const { data: dataSources = [] } = useQuery({
+    queryKey: ["databases"],
+    queryFn: async () => {
+      const res = await databaseApi.list();
+      return (res as any).data || res;
+    },
+  });
 
   const {
-    data: schemasData,
+    data: schemas = [],
     isLoading: isLoadingSchemas,
     error: schemasError,
   } = useQuery({
-    ...trpc.database.getSchemas.queryOptions({ databaseId: selectedDS }),
+    queryKey: ["schemas", selectedDS],
+    queryFn: () => databaseApi.getSchemas(selectedDS),
     enabled: !!selectedDS,
   });
-  const schemas = (schemasData as string[]) || [];
 
   const tablesQuery = useQuery({
-    ...trpc.database.getTables.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
+    queryKey: ["tables", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getTables(selectedDS, selectedSchema),
     enabled: !!selectedDS,
   });
-  const tables = (tablesQuery.data as string[]) || [];
+  const tables = (tablesQuery.data as any) || [];
 
-  const viewsQuery = useQuery({
-    ...trpc.database.getViews.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
-    enabled: !!selectedDS,
-  });
-  const views = (viewsQuery.data as string[]) || [];
+  // Views not yet implemented in backend strictly, using tables endpoint for now or empty
+  // TODO: Add separate views endpoint if needed or filter tables
+  const views = [];
 
   const allColumnsQuery = useQuery({
-    ...trpc.database.getAllColumns.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
+    queryKey: ["columns", selectedDS, selectedSchema],
+    // Backend doesn't have getAllColumns yet, maybe implement or loop tables?
+    // For now returning empty or we need to add endpoint
+    queryFn: async () => [],
     enabled: !!selectedDS,
   });
   const allColumns = (allColumnsQuery.data as any[]) || [];
 
-  const functionsQuery = useQuery({
-    ...trpc.database.getFunctions.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
-    enabled: !!selectedDS,
-  });
-
-  const proceduresQuery = useQuery({
-    ...trpc.database.getProcedures.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
-    enabled: !!selectedDS,
-  });
-
-  const triggersQuery = useQuery({
-    ...trpc.database.getTriggers.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
-    enabled: !!selectedDS,
-  });
-
-  const eventsQuery = useQuery({
-    ...trpc.database.getEvents.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-    }),
-    enabled: !!selectedDS,
-  });
-
+  // Functions, Procedures, Triggers, Events are placeholders in current backend implementation
+  // Returns empty arrays safely
   const metadata = {
-    views: views,
-    functions: (functionsQuery.data as string[]) || [],
-    procedures: (proceduresQuery.data as string[]) || [],
-    triggers: (triggersQuery.data as string[]) || [],
-    events: (eventsQuery.data as string[]) || [],
+    views: [],
+    functions: [],
+    procedures: [],
+    triggers: [],
+    events: [],
   };
 
   const indexesQuery = useQuery({
-    ...trpc.database.getIndexes.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-      table: selectedTable!,
-    }),
+    queryKey: ["indexes", selectedDS, selectedTable],
+    queryFn: () => databaseApi.getIndexes(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const foreignKeysQuery = useQuery({
-    ...trpc.database.getForeignKeys.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-      table: selectedTable!,
-    }),
+    queryKey: ["fks", selectedDS, selectedTable],
+    queryFn: () => databaseApi.getForeignKeys(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const tableInfoQuery = useQuery({
-    ...trpc.database.getTableInfo.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-      table: selectedTable!,
-    }),
+    queryKey: ["tableInfo", selectedDS, selectedTable],
+    queryFn: () => databaseApi.getTableInfo(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const tableDDLQuery = useQuery({
-    ...trpc.database.getTableDDL.queryOptions({
-      databaseId: selectedDS,
-      schema: selectedSchema,
-      table: selectedTable!,
-    }),
+    queryKey: ["ddl", selectedDS, selectedTable],
+    queryFn: () => databaseApi.getDDL(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   useEffect(() => {
-    const error = schemasError || tablesQuery.error || allColumnsQuery.error;
+    const error = schemasError || tablesQuery.error;
     if (error) {
       toast.error(
         (error as any).message || "Failed to fetch database metadata",
       );
     }
-  }, [schemasError, tablesQuery.error, allColumnsQuery.error]);
+  }, [schemasError, tablesQuery.error]);
 
   const refetchAll = async () => {
     if (selectedTable) {
@@ -152,18 +102,9 @@ export function useSQLLabMetadata({
         foreignKeysQuery.refetch(),
         tableInfoQuery.refetch(),
         tableDDLQuery.refetch(),
-        allColumnsQuery.refetch(),
       ]);
     }
-    // Always refetch sidebar items too
-    await Promise.all([
-      tablesQuery.refetch(),
-      viewsQuery.refetch(),
-      functionsQuery.refetch(),
-      proceduresQuery.refetch(),
-      eventsQuery.refetch(),
-      triggersQuery.refetch(),
-    ]);
+    await tablesQuery.refetch();
   };
 
   return {
@@ -171,9 +112,9 @@ export function useSQLLabMetadata({
     schemas,
     isLoadingSchemas,
     tables,
-    refetchTables: refetchAll, // Use refetchAll for sidebar too or expose separately if needed
+    refetchTables: refetchAll,
     isLoadingTables: tablesQuery.isLoading,
-    allColumns: allColumns || [],
+    allColumns,
     ...metadata,
     indexes: (indexesQuery.data as any[]) || [],
     foreignKeys: (foreignKeysQuery.data as any[]) || [],

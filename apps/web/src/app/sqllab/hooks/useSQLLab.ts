@@ -1,11 +1,6 @@
-/**
- * @file useSQLLab.ts
- * @description Composed hook to manage the state and logic for the SQLLab page.
- */
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { useSQLLabTabs } from "./use-sqllab-tabs";
@@ -80,7 +75,8 @@ export function useSQLLab() {
   } = useSQLLabQuery({
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
-    onSuccess: (res) => {
+    onSuccess: (res: any) => {
+      // Adapt response shape if needed
       updateActiveTab({
         results: res.data || [],
         columns: res.columns || [],
@@ -98,36 +94,36 @@ export function useSQLLab() {
 
   // Data Source initialization
   useEffect(() => {
-    if (dataSources.length > 0) {
+    const ds = dataSources as unknown as any[];
+    if (ds && ds.length > 0) {
       if (initialConnectionId) {
-        const target = dataSources.find((d) => d.id === initialConnectionId);
+        const target = ds.find((d: any) => d.id === initialConnectionId);
         if (target) {
           updateActiveTab({ selectedDS: target.id });
           return;
         }
       }
       if (!activeTab.selectedDS) {
-        updateActiveTab({ selectedDS: dataSources[0].id });
+        updateActiveTab({ selectedDS: ds[0].id });
       }
     }
   }, [dataSources, initialConnectionId, activeTab.selectedDS, updateActiveTab]);
 
   // Schema initialization
   useEffect(() => {
-    if (schemas.length > 0) {
-      if (
-        !activeTab.selectedSchema ||
-        !schemas.includes(activeTab.selectedSchema)
-      ) {
-        const def = schemas.includes("public") ? "public" : schemas[0];
+    const s = schemas as unknown as string[];
+    if (s && s.length > 0) {
+      if (!activeTab.selectedSchema || !s.includes(activeTab.selectedSchema)) {
+        const def = s.includes("public") ? "public" : s[0];
         updateActiveTab({ selectedSchema: def });
       }
     }
   }, [schemas, activeTab.selectedSchema, updateActiveTab]);
 
-  const tableDataMutation = useMutation(
-    trpc.database.execute.mutationOptions(),
-  );
+  const tableDataMutation = useMutation({
+    mutationFn: (vars: { databaseId: string; sql: string }) =>
+      databaseApi.execute(vars.databaseId, vars.sql),
+  });
 
   useEffect(() => {
     if (selectedTable && activeTab.selectedDS && activeRightTab === "data") {
@@ -184,8 +180,8 @@ export function useSQLLab() {
     columns: activeTab.columns,
     executing,
     error: activeTab.error,
-    currentTData: tableDataMutation.data?.data || [],
-    currentTColumns: tableDataMutation.data?.columns || [],
+    currentTData: (tableDataMutation.data as any)?.data || [],
+    currentTColumns: (tableDataMutation.data as any)?.columns || [],
     loadingTData: tableDataMutation.isPending,
     columnsData: allColumns,
     isLoadingColumns: isLoadingSchemas || isLoadingTables,

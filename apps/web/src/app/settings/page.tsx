@@ -25,7 +25,7 @@ import {
   type SettingsState,
 } from "@/stores/use-settings-store";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { userApi } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -67,19 +67,19 @@ export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
 
   const settingsQuery = useQuery({
-    ...trpc.user.getSettings.queryOptions(),
+    queryKey: ["settings"],
+    queryFn: () => userApi.getSettings(),
     enabled: !!user,
   });
 
   const dbSettings = settingsQuery.data as Partial<SettingsState> | null;
   const refetch = settingsQuery.refetch;
 
-  const updateMutation = useMutation(
-    trpc.user.updateSettings.mutationOptions({
-      onSuccess: () => toast.success("Settings saved successfully"),
-      onError: (err: any) => toast.error(`Save failed: ${err.message}`),
-    }),
-  );
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => userApi.updateSettings(data),
+    onSuccess: () => toast.success("Settings saved successfully"),
+    onError: (err: any) => toast.error(`Save failed: ${err.message}`),
+  });
 
   useEffect(() => {
     if (dbSettings) {

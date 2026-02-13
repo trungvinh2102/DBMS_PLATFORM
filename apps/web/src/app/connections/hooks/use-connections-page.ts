@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { DEFAULT_PORTS } from "../components/constants";
 
@@ -41,17 +41,20 @@ export function useConnectionsPage() {
     data: connections,
     refetch,
     isFetching,
-  } = useQuery(trpc.database.listDatabases.queryOptions());
+  } = useQuery({
+    queryKey: ["databases"],
+    queryFn: () => databaseApi.list(),
+  });
 
-  const createMutation = useMutation(
-    trpc.database.createDatabase.mutationOptions(),
-  );
-  const updateMutation = useMutation(
-    trpc.database.updateDatabase.mutationOptions(),
-  );
-  const deleteMutation = useMutation(
-    trpc.database.deleteDatabase.mutationOptions(),
-  );
+  const createMutation = useMutation({
+    mutationFn: (data: any) => databaseApi.create(data),
+  });
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => databaseApi.update(data),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (data: { id: string }) => databaseApi.delete(data.id),
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

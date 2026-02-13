@@ -9,8 +9,8 @@ import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Database, LayoutDashboard, Search } from "lucide-react";
 
-import { trpc } from "@/utils/trpc";
-import type { RouterOutputs } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
+
 import {
   Card,
   CardContent,
@@ -22,24 +22,27 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type QueryHistoryData = RouterOutputs["database"]["getQueryHistory"];
-type HistoryItem = QueryHistoryData[number];
-type DatabaseList = RouterOutputs["database"]["listDatabases"];
-type DatabaseItem = DatabaseList[number];
+// type QueryHistoryData = RouterOutputs["database"]["getQueryHistory"];
+// type HistoryItem = QueryHistoryData[number];
+// type DatabaseList = RouterOutputs["database"]["listDatabases"];
+// type DatabaseItem = DatabaseList[number];
 
 export function RecentActivity() {
   // Fetch Connections for metadata lookup (database name)
-  const { data: connectionsData } = useQuery(
-    trpc.database.listDatabases.queryOptions(),
-  );
-  const connections = connectionsData as DatabaseList | undefined;
+  // Fetch Connections for metadata lookup (database name)
+  const { data: connectionsData } = useQuery({
+    queryKey: ["databases"],
+    queryFn: () => databaseApi.list(),
+  });
+  const connections = connectionsData as any[] | undefined;
 
   // Fetch Recent Query History (Limit 5)
-  const { data: historyData, isLoading: isLoadingHistory } = useQuery(
-    trpc.database.getQueryHistory.queryOptions({ limit: 5 }),
-  );
+  const { data: historyData, isLoading: isLoadingHistory } = useQuery({
+    queryKey: ["queryHistory", "recent"],
+    queryFn: () => databaseApi.getHistory(),
+  });
 
-  const recentQueries = historyData as QueryHistoryData | undefined;
+  const recentQueries = (historyData as any[])?.slice(0, 5) || [];
 
   return (
     <Card className="col-span-4 shadow-sm flex flex-col h-full rounded-xl">
@@ -65,7 +68,7 @@ export function RecentActivity() {
             </div>
           ) : recentQueries && recentQueries.length > 0 ? (
             <div className="space-y-1">
-              {recentQueries.map((item: HistoryItem) => (
+              {recentQueries.map((item: any) => (
                 <div
                   key={item.id}
                   className="group flex flex-col gap-1 p-3 rounded-md hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50"
@@ -94,9 +97,8 @@ export function RecentActivity() {
                         className="text-[10px] h-5 px-1.5 rounded-sm font-normal bg-muted text-muted-foreground border-transparent"
                       >
                         <Database className="h-3 w-3 mr-1 opacity-70" />
-                        {connections?.find(
-                          (c: DatabaseItem) => c.id === item.databaseId,
-                        )?.databaseName || "Unknown DB"}
+                        {connections?.find((c: any) => c.id === item.databaseId)
+                          ?.databaseName || "Unknown DB"}
                       </Badge>
                     )}
                     <span className="text-[10px] text-muted-foreground">

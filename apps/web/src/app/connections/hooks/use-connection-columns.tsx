@@ -18,13 +18,14 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { DB_TYPES } from "../components/constants";
 import { toast } from "sonner";
-import { trpc } from "@/utils/trpc";
+import { databaseApi } from "@/lib/api-client";
 import { useMutation } from "@tanstack/react-query";
 
 function TestConnectionButton({ conn }: { conn: any }) {
-  const testConnectionMutation = useMutation(
-    trpc.database.testConnection.mutationOptions(),
-  );
+  const testConnectionMutation = useMutation({
+    mutationFn: (vars: any) =>
+      databaseApi.test({ ...conn.config, type: conn.type }),
+  });
 
   const handleTest = async (e: React.MouseEvent) => {
     e.stopPropagation();
