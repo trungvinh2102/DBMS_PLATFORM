@@ -3,7 +3,7 @@
  * @description Utility functions for parsing and building database connection URIs.
  */
 
-import { DB_URI_PROTOCOLS } from "../components/constants";
+import { DB_URI_PROTOCOLS } from "../database-connections/components/constants";
 
 /**
  * Parse a database connection URI into its individual components.

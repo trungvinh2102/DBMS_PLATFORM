@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { parseUri, buildUri } from "./uri-utils";
-import { DEFAULT_PORTS } from "../components/constants";
+import { DEFAULT_PORTS } from "../database-connections/components/constants";
 
 export interface ConnectionFormData {
   name: string;
