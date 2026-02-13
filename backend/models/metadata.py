@@ -1,4 +1,9 @@
 
+"""
+metadata.py
+
+SQLAlchemy models for the DBMS platform, including database connections, users, and privileges.
+"""
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, DateTime, JSON, ForeignKey, Enum
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -72,12 +77,29 @@ class QueryHistory(Base):
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+class PrivilegeCategory(enum.Enum):
+    DATA_ACCESS = "DATA_ACCESS"
+    DATA_MUTATION = "DATA_MUTATION"
+    QUERY_CAPABILITY = "QUERY_CAPABILITY"
+    DATA_EXFILTRATION = "DATA_EXFILTRATION"
+    SENSITIVE = "SENSITIVE"
+    SYSTEM = "SYSTEM"
+
+class ResourceTypeEnum(enum.Enum):
+    TABLE = "TABLE"
+    COLUMN = "COLUMN"
+    DATASET = "DATASET"
+    API = "API"
+    SYSTEM = "SYSTEM"
+
 class Role(Base):
     __tablename__ = "roles"
 
     id = Column(String, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     description = Column(Text)
+    
+    rolePrivileges = relationship("RolePrivilege", back_populates="role", cascade="all, delete-orphan")
     
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -107,6 +129,35 @@ class UserSetting(Base):
     
     user = relationship("User", back_populates="settings")
     
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+    changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class PrivilegeTypeModel(Base):
+    __tablename__ = "privilege_types"
+
+    id = Column(String, primary_key=True)
+    code = Column(String, unique=True, nullable=False)  # e.g., "READ_MASKED", "EXPORT_CSV"
+    category = Column(Enum(PrivilegeCategory, name="PrivilegeCategory"), nullable=False)
+    description = Column(Text)
+
+    rolePrivileges = relationship("RolePrivilege", back_populates="privilegeType", cascade="all, delete-orphan")
+
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+    changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class RolePrivilege(Base):
+    __tablename__ = "role_privileges"
+
+    id = Column(String, primary_key=True)
+    roleId = Column(String, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    privilegeTypeId = Column(String, ForeignKey("privilege_types.id", ondelete="CASCADE"), nullable=False)
+    resourceType = Column(Enum(ResourceTypeEnum, name="ResourceType"), nullable=False)
+    resourceId = Column(String, nullable=True)
+    conditionExpr = Column(Text, nullable=True)
+
+    role = relationship("Role", back_populates="rolePrivileges")
+    privilegeType = relationship("PrivilegeTypeModel", back_populates="rolePrivileges")
+
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 

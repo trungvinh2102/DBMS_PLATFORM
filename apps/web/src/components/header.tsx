@@ -49,7 +49,7 @@ const data = {
     },
     {
       title: "Connections",
-      url: "/connections",
+      url: "/connections/database-connections",
       icon: Database,
     },
     {

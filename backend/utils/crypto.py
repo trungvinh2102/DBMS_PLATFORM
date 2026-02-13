@@ -1,3 +1,8 @@
+"""
+crypto.py
+
+Symmetric encryption and decryption utilities for sensitive database configuration.
+"""
 import hashlib
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes

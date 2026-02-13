@@ -21,3 +21,18 @@ export interface DataSource {
   created_on?: string;
   changed_on?: string;
 }
+
+export interface PrivilegeType {
+  id: string;
+  code: string;
+  category: string;
+  description: string | null;
+  created_on: string | null;
+  changed_on: string | null;
+}
+
+export interface PrivilegeFormData {
+  code: string;
+  category: string;
+  description: string;
+}

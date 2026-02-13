@@ -1,7 +1,7 @@
-
 """
-backend/utils/auth_middleware.py
-Middleware for verifying JWT tokens.
+auth_middleware.py
+
+Middleware for verifying JWT tokens and handling role-based access control.
 """
 from functools import wraps
 from flask import request, jsonify, g

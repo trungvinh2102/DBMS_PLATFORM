@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 from models.metadata import SessionLocal, Role, User, Db
+from services.privilege_service import privilege_service
 from utils.crypto import encrypt
 import uuid
 import logging
@@ -111,6 +112,11 @@ def seed():
             logger.info("  Created local database connection: dbms_platform")
         else:
             logger.info("  Local database connection already exists, skipping.")
+
+        # ── 4. Seed Privilege Types ────────────────────────────────────
+        logger.info("Seeding Privilege Types...")
+        result = privilege_service.seed_defaults()
+        logger.info(f"  Privilege types: {result['created']} created, {result['total']} total")
 
         logger.info("Seeding completed successfully!")
 

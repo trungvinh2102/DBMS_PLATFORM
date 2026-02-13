@@ -1,5 +1,5 @@
 """
-backend/services/metadata.py
+metadata.py
 
 Service for retrieving database schema information.
 """

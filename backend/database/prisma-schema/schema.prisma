@@ -8,6 +8,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 /// Represents a connection to an external database (e.g., Postgres, MySQL, Snowflake).
@@ -129,8 +130,8 @@ model Role {
 
   users       User[]
   
-  // A role can have multiple permissions
-  permissions Permission[]
+  // A role can have multiple privileges
+  rolePrivileges RolePrivilege[]
 
   created_on   DateTime @default(now()) @map("created_on")
   changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
@@ -138,21 +139,59 @@ model Role {
   @@map("roles")
 }
 
-/// Granular permissions assigned to roles.
-model Permission {
-  id          String @id @default(uuid())
-  action      String // e.g., "create", "read", "update", "delete", "manage"
-  resource    String // e.g., "database", "query", "user", "all"
+/// Defines the types of privileges available in the system
+model PrivilegeType {
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g., "READ_MASKED", "EXPORT_CSV"
+  category    PrivilegeCategory
   description String?
 
-  // Permissions can belong to multiple roles
-  roles       Role[]
+  rolePrivileges RolePrivilege[]
 
   created_on   DateTime @default(now()) @map("created_on")
   changed_on   DateTime @default(now()) @updatedAt @map("changed_on")
 
-  @@unique([action, resource])
-  @@map("permissions")
+  @@map("privilege_types")
+}
+
+/// Maps roles to privilege types with specific resource constraints and conditions
+model RolePrivilege {
+  id              String   @id @default(uuid())
+  
+  roleId          String
+  role            Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  privilegeTypeId String
+  privilegeType   PrivilegeType @relation(fields: [privilegeTypeId], references: [id], onDelete: Cascade)
+  
+  resourceType    ResourceType
+  resourceId      String?   // specific resource ID or "*" for all
+  
+  conditionExpr   String?   // JSON or text based policy condition
+  
+  created_on      DateTime @default(now()) @map("created_on")
+  changed_on      DateTime @default(now()) @updatedAt @map("changed_on")
+
+  @@map("role_privileges")
+  @@index([roleId])
+  @@index([privilegeTypeId])
+}
+
+enum PrivilegeCategory {
+  DATA_ACCESS
+  DATA_MUTATION
+  QUERY_CAPABILITY
+  DATA_EXFILTRATION
+  SENSITIVE
+  SYSTEM
+}
+
+enum ResourceType {
+  TABLE
+  COLUMN
+  DATASET
+  API
+  SYSTEM
 }
 
 enum Environment {

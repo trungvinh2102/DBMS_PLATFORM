@@ -5,6 +5,7 @@
 
 import axios from "axios";
 import { useAuth } from "@/hooks/use-auth";
+import type { DataSource, PrivilegeType, PrivilegeFormData } from "./types";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
@@ -47,15 +48,18 @@ api.interceptors.request.use(
 );
 
 // Utility to cast response
-const req = (promise: Promise<any>) => promise as Promise<any>;
+const req = <T>(promise: Promise<any>) => promise as Promise<T>;
 
 export const databaseApi = {
-  list: () => req(api.get("/database/list")),
-  health: () => req(api.get("/health")),
-  create: (data: any) => req(api.post("/database/create", data)),
-  update: (data: any) => req(api.post("/database/update", data)),
-  delete: (id: string) => req(api.post("/database/delete", { id })),
-  test: (data: any) => req(api.post("/database/test", data)),
+  list: () => req<DataSource[]>(api.get("/database/list")),
+  health: () => req<any>(api.get("/health")),
+  create: (data: Partial<DataSource>) =>
+    req<DataSource>(api.post("/database/create", data)),
+  update: (data: Partial<DataSource>) =>
+    req<DataSource>(api.post("/database/update", data)),
+  delete: (id: string) => req<void>(api.post("/database/delete", { id })),
+  test: (data: Partial<DataSource>) =>
+    req<{ status: string; message: string }>(api.post("/database/test", data)),
 
   // Metadata
   getSchemas: (databaseId: string) =>
@@ -110,4 +114,30 @@ export const aiApi = {
   generateSQL: (data: any) => req(api.post("/ai/generate-sql", data)),
   explainSQL: (data: any) => req(api.post("/ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("/ai/optimize-sql", data)),
+};
+
+export const privilegeApi = {
+  // Privilege Types
+  listTypes: (category?: string) =>
+    req<PrivilegeType[]>(api.get("/privilege/types", { params: { category } })),
+  getType: (id: string) =>
+    req<PrivilegeType>(api.get(`/privilege/types/${id}`)),
+  createType: (data: PrivilegeFormData) =>
+    req<PrivilegeType>(api.post("/privilege/types", data)),
+  updateType: (id: string, data: PrivilegeFormData) =>
+    req<PrivilegeType>(api.put(`/privilege/types/${id}`, data)),
+  deleteType: (id: string) => req<void>(api.delete(`/privilege/types/${id}`)),
+
+  // Role Privileges
+  listRolePrivileges: (roleId?: string) =>
+    req(api.get("/privilege/role-privileges", { params: { roleId } })),
+  assignPrivilege: (data: any) =>
+    req(api.post("/privilege/role-privileges", data)),
+  revokePrivilege: (id: string) =>
+    req(api.delete(`/privilege/role-privileges/${id}`)),
+
+  // Utility
+  getCategories: () => req(api.get("/privilege/categories")),
+  getResourceTypes: () => req(api.get("/privilege/resource-types")),
+  seedDefaults: () => req(api.post("/privilege/seed")),
 };

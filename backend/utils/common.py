@@ -1,7 +1,7 @@
 """
-backend/utils/common.py
+common.py
 
-Utility functions for common operations like configuration masking and encryption wrappers.
+Utility functions for configuration masking and encryption wrappers.
 """
 
 from utils.crypto import encrypt, decrypt
