@@ -27,7 +27,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import Link from "next/link";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const formSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -135,7 +134,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-900/20 transition-all duration-300 transform hover:scale-[1.01]"
+              className="w-full h-11 rounded-xl bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-900/20 transition-all duration-300 transform hover:scale-[1.01]"
               disabled={loginMutation.isPending}
             >
               {loginMutation.isPending && (

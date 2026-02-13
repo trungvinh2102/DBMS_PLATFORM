@@ -35,6 +35,7 @@ import { ModeToggle } from "./mode-toggle";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { userApi } from "@/lib/api-client";
 
 // Sample data from app-sidebar.tsx
 const data = {
@@ -68,7 +69,8 @@ const data = {
 import { useEffect, useState } from "react";
 
 export default function Header() {
-  const { user, logout } = useAuth();
+  // Use destructured state for better control and access to actions
+  const { user, token, logout, setUser } = useAuth();
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
   const [mounted, setMounted] = useState(false);
@@ -76,6 +78,20 @@ export default function Header() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Hydrate user if token exists but user is missing
+  useEffect(() => {
+    if (token && !user) {
+      userApi
+        .getMe()
+        .then((userData) => {
+          setUser(userData);
+        })
+        .catch((error) => {
+          console.error("Failed to fetch user profile:", error);
+        });
+    }
+  }, [token, user, setUser]);
 
   if (isAuthPage) {
     return null;
@@ -117,79 +133,85 @@ export default function Header() {
           <ModeToggle />
 
           {/* User Profile */}
-          {mounted && user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className={cn(
-                  buttonVariants({ variant: "ghost" }),
-                  "relative h-8 w-8 rounded-full",
-                )}
-              >
-                <Avatar className="h-8 w-8">
-                  {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
-                  <AvatarFallback>
-                    {user.name
-                      ? user.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2)
-                      : user.email?.substring(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Avatar className="h-8 w-8">
-                        {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
-                        <AvatarFallback>
-                          {user.name
-                            ? user.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .toUpperCase()
-                                .slice(0, 2)
-                            : user.email?.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {user.name || "User"}
-                        </p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.email}
-                        </p>
-                      </div>
-                    </div>
-                  </DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem>
-                    <BadgeCheck className="mr-2 h-4 w-4" />
-                    Account
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Bell className="mr-2 h-4 w-4" />
-                    Notifications
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    logout();
-                    window.location.href = "/auth/login";
-                  }}
+          {mounted && (user || token) ? (
+            user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className={cn(
+                    buttonVariants({ variant: "ghost" }),
+                    "relative h-8 w-8 rounded-full",
+                  )}
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <Avatar className="h-8 w-8">
+                    {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {user.name && user.name.trim().length > 0
+                        ? user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .slice(0, 2)
+                        : (user.email || "U").substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Avatar className="h-8 w-8">
+                          {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
+                          <AvatarFallback>
+                            {user.name && user.name.trim().length > 0
+                              ? user.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")
+                                  .toUpperCase()
+                                  .slice(0, 2)
+                              : (user.email || "U")
+                                  .substring(0, 2)
+                                  .toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">
+                            {user.name || "User"}
+                          </p>
+                          <p className="text-xs leading-none text-muted-foreground">
+                            {user.email}
+                          </p>
+                        </div>
+                      </div>
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem>
+                      <BadgeCheck className="mr-2 h-4 w-4" />
+                      Account
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Bell className="mr-2 h-4 w-4" />
+                      Notifications
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      logout();
+                      window.location.href = "/auth/login";
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+            )
           ) : (
             <Link
               href="/auth/login"

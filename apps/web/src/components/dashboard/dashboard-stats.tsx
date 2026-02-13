@@ -9,6 +9,7 @@ import { Activity, Database, FileCode, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { databaseApi } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardTitle, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -20,15 +21,18 @@ export function DashboardStats() {
   });
 
   // Fetch Connections Count
+  const { token } = useAuth();
   const { data: connections, isLoading: isLoadingConnections } = useQuery({
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
+    enabled: !!token,
   });
 
   // Fetch Saved Queries
   const { data: savedQueries, isLoading: isLoadingSavedQueries } = useQuery({
     queryKey: ["savedQueries"],
     queryFn: () => databaseApi.listSavedQueries(),
+    enabled: !!token,
     retry: false,
   });
 

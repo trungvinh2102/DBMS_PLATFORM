@@ -18,6 +18,7 @@ interface AuthState {
   token: string | null;
   user: User | null;
   setAuth: (token: string, user: User) => void;
+  setUser: (user: User) => void;
   logout: () => void;
 }
 
@@ -28,13 +29,20 @@ export const useAuth = create<AuthState>()(
       user: null,
       setAuth: (token, user) => {
         // Set cookie for HTTP requests (middleware/server actions)
-        setCookie("auth-token", token, {
-          maxAge: 60 * 60 * 24 * 7, // 7 days
-          path: "/",
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-        });
+        try {
+          setCookie("auth-token", token, {
+            maxAge: 60 * 60 * 24 * 7, // 7 days
+            path: "/",
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+          });
+        } catch (e) {
+          console.error("useAuth: setCookie failed", e);
+        }
         set({ token, user });
+      },
+      setUser: (user) => {
+        set({ user });
       },
       logout: () => {
         deleteCookie("auth-token");

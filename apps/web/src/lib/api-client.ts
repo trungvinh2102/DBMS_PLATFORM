@@ -17,6 +17,8 @@ api.interceptors.response.use(
     // Check for 401 Unauthorized
     if (error.response?.status === 401) {
       // Clear auth state and redirect to login
+      // Clear auth state and redirect to login
+      console.warn("API 401: Unauthorized. Logging out.");
       useAuth.getState().logout();
       if (typeof window !== "undefined") {
         window.location.href = "/auth/login";
@@ -35,10 +37,6 @@ api.interceptors.response.use(
 // Request interceptor for auth token
 api.interceptors.request.use(
   (config) => {
-    // Dynamically import store to avoid circular issues or SSR init problems
-    // But since we need it sync, we rely on the fact that this runs on request
-    // Better to import at top if possible, but let's see.
-    // Actually, useAuth is a store, we can import it.
     const token = useAuth.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

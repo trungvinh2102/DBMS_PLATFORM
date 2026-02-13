@@ -10,6 +10,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Database, LayoutDashboard, Search } from "lucide-react";
 
 import { databaseApi } from "@/lib/api-client";
+import { useAuth } from "@/hooks/use-auth";
 
 import {
   Card,
@@ -29,10 +30,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function RecentActivity() {
   // Fetch Connections for metadata lookup (database name)
+  const { token } = useAuth();
+
   // Fetch Connections for metadata lookup (database name)
   const { data: connectionsData } = useQuery({
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
+    enabled: !!token,
   });
   const connections = connectionsData as any[] | undefined;
 
@@ -40,6 +44,7 @@ export function RecentActivity() {
   const { data: historyData, isLoading: isLoadingHistory } = useQuery({
     queryKey: ["queryHistory", "recent"],
     queryFn: () => databaseApi.getHistory(),
+    enabled: !!token,
   });
 
   const recentQueries = (historyData as any[])?.slice(0, 5) || [];

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Routes that require authentication
-const protectedRoutes = ["/dashboard", "/sqllab", "/connections", "/settings"];
+// Routes that require authentication
+const protectedRoutes = ["/sqllab", "/connections", "/settings"];
 // Routes that are public but should redirect to dashboard if logged in
 const authRoutes = ["/auth/login", "/auth/register"];
 
@@ -11,7 +12,11 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // 1. Protected Routes: If no token, redirect to login
-  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
+  const isProtected =
+    pathname === "/" ||
+    protectedRoutes.some((route) => pathname.startsWith(route));
+
+  if (isProtected) {
     if (!token) {
       const loginUrl = new URL("/auth/login", request.url);
       loginUrl.searchParams.set("from", pathname);
@@ -22,7 +27,7 @@ export function proxy(request: NextRequest) {
   // 2. Auth Routes: If token exists, redirect to dashboard
   if (authRoutes.some((route) => pathname.startsWith(route))) {
     if (token) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/", request.url));
     }
   }
 
