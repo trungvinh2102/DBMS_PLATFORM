@@ -5,7 +5,7 @@ metadata.py
 SQLAlchemy models for the DBMS platform, including database connections, users, and privileges.
 """
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, DateTime, JSON, ForeignKey, Enum
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, backref
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 import os
@@ -91,6 +91,7 @@ class ResourceTypeEnum(enum.Enum):
     DATASET = "DATASET"
     API = "API"
     SYSTEM = "SYSTEM"
+    DATABASE = "DATABASE"
 
 class Role(Base):
     __tablename__ = "roles"
@@ -99,10 +100,23 @@ class Role(Base):
     name = Column(String, unique=True, nullable=False)
     description = Column(Text)
     
+    item_type = Column(String, nullable=True) # e.g., 'SYSTEM', 'CUSTOM'
+    parentId = Column(String, ForeignKey("roles.id"), nullable=True)
+    
+    parent = relationship("Role", remote_side=[id], backref=backref("children", cascade="all,delete"))
     rolePrivileges = relationship("RolePrivilege", back_populates="role", cascade="all, delete-orphan")
+    users = relationship("User", secondary="user_roles", back_populates="roles")
     
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+    
+    userId = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    roleId = Column(String, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
 
 class User(Base):
     __tablename__ = "users"
@@ -112,9 +126,11 @@ class User(Base):
     username = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     name = Column(String)
-    roleId = Column(String, ForeignKey("roles.id"), nullable=False)
+    # roleId kept for backward compatibility but made nullable in model (DB migration needed)
+    roleId = Column(String, ForeignKey("roles.id"), nullable=True)
 
-    role = relationship("Role")
+    # role = relationship("Role") # Deprecated in favor of 'roles'
+    roles = relationship("Role", secondary="user_roles", back_populates="users")
     settings = relationship("UserSetting", uselist=False, back_populates="user")
     
     created_on = Column(DateTime, default=datetime.datetime.utcnow)

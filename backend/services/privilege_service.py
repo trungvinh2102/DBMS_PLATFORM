@@ -12,8 +12,10 @@ from models.metadata import (
     Role,
     PrivilegeCategory,
     ResourceTypeEnum,
+    User,
 )
 from utils.db_utils import with_session
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -129,11 +131,16 @@ class PrivilegeService:
     # ── Role Privileges ────────────────────────────────────────────
 
     @with_session
-    def list_role_privileges(self, session, role_id=None):
-        """List role privileges, optionally filtered by role."""
+    def list_role_privileges(self, session, role_id=None, resource_type=None, resource_id=None):
+        """List role privileges, optionally filtered by role and resource."""
         query = session.query(RolePrivilege)
         if role_id:
             query = query.filter(RolePrivilege.roleId == role_id)
+        if resource_type:
+            query = query.filter(RolePrivilege.resourceType == ResourceTypeEnum(resource_type))
+        if resource_id:
+            query = query.filter(RolePrivilege.resourceId == resource_id)
+            
         rps = query.all()
         return [self._serialize_role_privilege(rp, session) for rp in rps]
 
@@ -236,6 +243,68 @@ class PrivilegeService:
             "conditionExpr": rp.conditionExpr,
             "created_on": rp.created_on.isoformat() if rp.created_on else None,
         }
+
+    # ── User Privileges (Effective Resolution) ─────────────────────
+
+    @with_session
+    def get_user_privileges(self, session, user_id):
+        """
+        Resolve all effective privileges for a user, including:
+        - Direct role assignments
+        - Inherited roles (parent roles)
+        """
+        # 1. Get user with roles
+        user = session.query(User).options(joinedload(User.roles)).filter(User.id == user_id).first()
+        if not user:
+            raise Exception("User not found")
+
+        # 2. Resolve role hierarchy (recursive)
+        all_roles = set()
+        queue = list(user.roles)
+        
+        # Add backward compatibility for roleId if roles is empty but roleId exists
+        if not queue and user.roleId:
+            legacy_role = session.query(Role).filter(Role.id == user.roleId).first()
+            if legacy_role:
+                queue.append(legacy_role)
+
+        while queue:
+            role = queue.pop(0)
+            if role.id in [r.id for r in all_roles]:
+                continue
+            all_roles.add(role)
+            
+            # Add parent role if exists
+            if role.parentId:
+                parent = session.query(Role).filter(Role.id == role.parentId).first()
+                if parent:
+                    queue.append(parent)
+
+        # 3. Get privileges for all resolved roles
+        if not all_roles:
+            return []
+
+        role_ids = [r.id for r in all_roles]
+        
+        # Fetch role privileges with eager loading of PrivilegeType
+        rps = session.query(RolePrivilege).options(
+            joinedload(RolePrivilege.privilegeType)
+        ).filter(
+            RolePrivilege.roleId.in_(role_ids)
+        ).all()
+
+        # 4. Serialize
+        # We might want to deduplicate or just return all entries
+        # Returns flat list of effective permissions
+        
+        results = []
+        for rp in rps:
+            item = self._serialize_role_privilege(rp, session)
+            # Add role name for context
+            item['inheritedFromRole'] = next((r.name for r in all_roles if r.id == rp.roleId), None)
+            results.append(item)
+            
+        return results
 
 
 privilege_service = PrivilegeService()

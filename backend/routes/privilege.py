@@ -77,7 +77,9 @@ def delete_privilege_type(privilege_id):
 def list_role_privileges():
     """List role privileges, optionally filtered by ?roleId=<id>"""
     role_id = request.args.get('roleId')
-    result = privilege_service.list_role_privileges(role_id=role_id)
+    resource_type = request.args.get('resourceType')
+    resource_id = request.args.get('resourceId')
+    result = privilege_service.list_role_privileges(role_id=role_id, resource_type=resource_type, resource_id=resource_id)
     return jsonify(result)
 
 

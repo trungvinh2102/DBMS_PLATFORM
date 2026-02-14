@@ -22,6 +22,26 @@ export interface DataSource {
   changed_on?: string;
 }
 
+export interface Role {
+  id: string;
+  name: string;
+  description: string | null;
+  parentId: string | null;
+  item_type: string;
+  children?: Role[];
+  created_on: string | null;
+  changed_on: string | null;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  name: string | null;
+  roles: string[]; // List of role names
+  role: string | null; // Primary role (legacy)
+}
+
 export interface PrivilegeType {
   id: string;
   code: string;
@@ -35,4 +55,18 @@ export interface PrivilegeFormData {
   code: string;
   category: string;
   description: string;
+}
+
+export interface RolePrivilege {
+  id: string;
+  roleId: string;
+  roleName: string | null;
+  privilegeTypeId: string;
+  privilegeCode: string | null;
+  privilegeCategory: string | null;
+  resourceType: string | null;
+  resourceId: string | null;
+  conditionExpr: string | null;
+  inheritedFromRole?: string | null;
+  created_on: string | null;
 }

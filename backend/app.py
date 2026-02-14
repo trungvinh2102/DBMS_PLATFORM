@@ -18,6 +18,7 @@ from routes.auth import auth_bp
 from routes.user import user_bp
 from routes.ai import ai_bp
 from routes.privilege import privilege_bp
+from routes.role import role_bp
 
 def create_app():
     """Application factory for Flask."""
@@ -30,7 +31,7 @@ def create_app():
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(privilege_bp, url_prefix='/api/privilege')
-
+    app.register_blueprint(role_bp, url_prefix='/api/roles')
 
     @app.route('/api/health')
     @app.route('/health')

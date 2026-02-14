@@ -12,6 +12,7 @@ export interface User {
   username: string;
   name: string | null;
   role: string;
+  roles?: string[];
 }
 
 interface AuthState {

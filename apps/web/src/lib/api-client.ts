@@ -5,7 +5,14 @@
 
 import axios from "axios";
 import { useAuth } from "@/hooks/use-auth";
-import type { DataSource, PrivilegeType, PrivilegeFormData } from "./types";
+import type {
+  DataSource,
+  Role,
+  User,
+  PrivilegeType,
+  PrivilegeFormData,
+  RolePrivilege,
+} from "./types";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
@@ -18,11 +25,11 @@ api.interceptors.response.use(
     // Check for 401 Unauthorized
     if (error.response?.status === 401) {
       // Clear auth state and redirect to login
-      // Clear auth state and redirect to login
       console.warn("API 401: Unauthorized. Logging out.");
       useAuth.getState().logout();
       if (typeof window !== "undefined") {
-        window.location.href = "/auth/login";
+        // Optionally force redirect
+        // window.location.href = "/auth/login";
       }
     }
 
@@ -108,6 +115,26 @@ export const userApi = {
   getMe: () => req(api.get("/user/me")),
   getSettings: () => req(api.get("/user/settings")),
   updateSettings: (data: any) => req(api.post("/user/settings", data)),
+
+  // New: Privilege Check
+  getMyPrivileges: () => req<any[]>(api.get("/user/me/privileges")),
+
+  // Admin: User Mgmt
+  list: () => req<User[]>(api.get("/user/")),
+  addRole: (userId: string, roleId: string) =>
+    req(api.post(`/user/${userId}/roles`, { roleId })),
+  removeRole: (userId: string, roleId: string) =>
+    req(api.delete(`/user/${userId}/roles/${roleId}`)),
+};
+
+export const roleApi = {
+  list: () => req<Role[]>(api.get("/roles/")),
+  getHierarchy: () => req<Role[]>(api.get("/roles/hierarchy")),
+  get: (id: string) => req<Role>(api.get(`/roles/${id}`)),
+  create: (data: Partial<Role>) => req<Role>(api.post("/roles/", data)),
+  update: (id: string, data: Partial<Role>) =>
+    req<Role>(api.put(`/roles/${id}`, data)),
+  delete: (id: string) => req<{ success: boolean }>(api.delete(`/roles/${id}`)),
 };
 
 export const aiApi = {
@@ -130,11 +157,24 @@ export const privilegeApi = {
 
   // Role Privileges
   listRolePrivileges: (roleId?: string) =>
-    req(api.get("/privilege/role-privileges", { params: { roleId } })),
-  assignPrivilege: (data: any) =>
-    req(api.post("/privilege/role-privileges", data)),
+    req<RolePrivilege[]>(
+      api.get("/privilege/role-privileges", { params: { roleId } }),
+    ),
+  listByResource: (resourceType: string, resourceId?: string) =>
+    req<RolePrivilege[]>(
+      api.get("/privilege/role-privileges", {
+        params: { resourceType, resourceId },
+      }),
+    ),
+  assignPrivilege: (data: {
+    roleId: string;
+    privilegeTypeId: string;
+    resourceType?: string;
+    resourceId?: string;
+    conditionExpr?: string;
+  }) => req<RolePrivilege>(api.post("/privilege/role-privileges", data)),
   revokePrivilege: (id: string) =>
-    req(api.delete(`/privilege/role-privileges/${id}`)),
+    req<{ success: boolean }>(api.delete(`/privilege/role-privileges/${id}`)),
 
   // Utility
   getCategories: () => req(api.get("/privilege/categories")),

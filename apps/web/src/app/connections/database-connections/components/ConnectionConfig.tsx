@@ -1,10 +1,10 @@
 /**
  * @file ConnectionConfig.tsx
- * @description Connection configuration and detail view component.
- *
- * @example
- * <ConnectionConfig activeConn={conn} onBack={() => ...} />
+ * @description Connection configuration component utilizing clean architecture and tabs.
+ * Manages general settings, access control, and security for a database connection.
  */
+
+"use client";
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Database } from "lucide-react";
@@ -26,6 +26,8 @@ import {
   GeneralSection,
 } from "./ConfigSections";
 import type { DataSource } from "@/lib/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DatabaseAccessControl } from "./DatabaseAccessControl";
 
 interface ConnectionConfigProps {
   activeConn: DataSource;
@@ -78,95 +80,109 @@ export function ConnectionConfig({
         </div>
       </div>
 
-      <section className="space-y-8 w-full">
-        <GeneralSection activeConn={activeConn} />
-        <EnvironmentSection />
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="mb-8">
+          <TabsTrigger value="general">General Configuration</TabsTrigger>
+          <TabsTrigger value="access">Access Control</TabsTrigger>
+          <TabsTrigger value="security">Security & Tunneling</TabsTrigger>
+        </TabsList>
 
-        <div className="grid grid-cols-2 gap-8">
-          <div className="space-y-2">
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
-              Access End Time
-            </Label>
-            <div className="relative">
-              <Input
-                placeholder="SELECT TIME_WINDOW"
-                className="h-10 border-border bg-muted/10 rounded-md font-medium text-sm placeholder:text-muted-foreground/40"
-              />
-              <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-40 text-foreground" />
+        <TabsContent value="general" className="space-y-8">
+          <GeneralSection activeConn={activeConn} />
+          <EnvironmentSection />
+
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-2">
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Access End Time
+              </Label>
+              <div className="relative">
+                <Input
+                  placeholder="SELECT TIME_WINDOW"
+                  className="h-10 border-border bg-muted/10 rounded-md font-medium text-sm placeholder:text-muted-foreground/40"
+                />
+                <Clock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-40 text-foreground" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Weekday Access Denied
+              </Label>
+              <Input className="h-10 border-border bg-muted/10 rounded-md font-medium text-xm" />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Maximum Login Failures
+              </Label>
+              <Select defaultValue="disabled">
+                <SelectTrigger className="h-9 font-medium border-border bg-muted/10 rounded-md text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border-border">
+                  <SelectItem value="disabled" className="font-medium text-xs">
+                    DISABLED
+                  </SelectItem>
+                  <SelectItem value="1" className="font-medium text-xs">
+                    1 ATTEMPT
+                  </SelectItem>
+                  <SelectItem value="5" className="font-medium text-xs">
+                    5 ATTEMPTS
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Lockout Interval
+              </Label>
+              <Select defaultValue="disabled">
+                <SelectTrigger className="h-9 font-medium border-border bg-muted/10 rounded-md text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-background border-border">
+                  <SelectItem value="disabled" className="font-medium text-xs">
+                    DISABLED
+                  </SelectItem>
+                  <SelectItem value="5" className="font-medium text-xs">
+                    5 MINUTES
+                  </SelectItem>
+                  <SelectItem value="60" className="font-medium text-xs">
+                    1 HOUR
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
-              Weekday Access Denied
+              Database Engine Version
             </Label>
-            <Input className="h-10 border-border bg-muted/10 rounded-md font-medium text-xm" />
+            <Input
+              placeholder="V14.5.2-STABLE"
+              className="h-9 border-border bg-muted/10 rounded-md font-medium max-w-sm placeholder:text-muted-foreground/40 text-xs"
+            />
           </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
-              Maximum Login Failures
-            </Label>
-            <Select defaultValue="disabled">
-              <SelectTrigger className="h-9 font-medium border-border bg-muted/10 rounded-md text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-background border-border">
-                <SelectItem value="disabled" className="font-medium text-xs">
-                  DISABLED
-                </SelectItem>
-                <SelectItem value="1" className="font-medium text-xs">
-                  1 ATTEMPT
-                </SelectItem>
-                <SelectItem value="5" className="font-medium text-xs">
-                  5 ATTEMPTS
-                </SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-8 py-2">
+            <ToggleField label="Query Audit Logs" />
+            <ToggleField label="DML Snapshot" />
           </div>
-          <div className="space-y-2">
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
-              Lockout Interval
-            </Label>
-            <Select defaultValue="disabled">
-              <SelectTrigger className="h-9 font-medium border-border bg-muted/10 rounded-md text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-background border-border">
-                <SelectItem value="disabled" className="font-medium text-xs">
-                  DISABLED
-                </SelectItem>
-                <SelectItem value="5" className="font-medium text-xs">
-                  5 MINUTES
-                </SelectItem>
-                <SelectItem value="60" className="font-medium text-xs">
-                  1 HOUR
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
-            Database Engine Version
-          </Label>
-          <Input
-            placeholder="V14.5.2-STABLE"
-            className="h-9 border-border bg-muted/10 rounded-md font-medium max-w-sm placeholder:text-muted-foreground/40 text-xs"
-          />
-        </div>
+          <PermissionsSection />
+        </TabsContent>
 
-        <div className="grid grid-cols-2 gap-8 py-2">
-          <ToggleField label="Query Audit Logs" />
-          <ToggleField label="DML Snapshot" />
-        </div>
+        <TabsContent value="access">
+          <DatabaseAccessControl activeConn={activeConn} />
+        </TabsContent>
 
-        <PermissionsSection />
-      </section>
-
-      <SecuritySection />
+        <TabsContent value="security">
+          <SecuritySection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
