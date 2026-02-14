@@ -13,3 +13,7 @@ pyjwt
 passlib[bcrypt]
 # AI
 google-generativeai
+
+# Masking
+sqlglot
+faker

@@ -12,7 +12,17 @@ import type {
   PrivilegeType,
   PrivilegeFormData,
   RolePrivilege,
+  MaskingPreviewResponse,
+  MaskingPattern,
 } from "./types";
+import type {
+  DataResource,
+  MaskingPolicy,
+  DataAccessPolicy,
+  MaskingType,
+  SensitivityLevel,
+  PolicySubjectType,
+} from "./data-access-types";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
@@ -180,4 +190,54 @@ export const privilegeApi = {
   getCategories: () => req(api.get("/privilege/categories")),
   getResourceTypes: () => req(api.get("/privilege/resource-types")),
   seedDefaults: () => req(api.post("/privilege/seed")),
+};
+
+export const dataAccessApi = {
+  // Resources
+  listResources: (databaseId?: string) =>
+    req<DataResource[]>(
+      api.get("/data-access/resources", { params: { databaseId } }),
+    ),
+  createResource: (data: Partial<DataResource>) =>
+    req<{ id: string; status: string }>(
+      api.post("/data-access/resources", data),
+    ),
+
+  // Masking Policies
+  listMaskingPolicies: () =>
+    req<MaskingPolicy[]>(api.get("/data-access/masking-policies")),
+  createMaskingPolicy: (data: Partial<MaskingPolicy>) =>
+    req<{ id: string; status: string }>(
+      api.post("/data-access/masking-policies", data),
+    ),
+
+  // Access Policies
+  listAccessPolicies: () =>
+    req<DataAccessPolicy[]>(api.get("/data-access/policies")),
+  createAccessPolicy: (data: Partial<DataAccessPolicy>) =>
+    req<{ id: string; status: string }>(
+      api.post("/data-access/policies", data),
+    ),
+};
+
+export const maskingApi = {
+  list: () => req<MaskingPolicy[]>(api.get("/masking/policies")),
+  create: (data: Partial<MaskingPolicy>) =>
+    req<MaskingPolicy>(api.post("/masking/policies", data)),
+  update: (id: string, data: Partial<MaskingPolicy>) =>
+    req<MaskingPolicy>(api.put(`/masking/policies/${id}`, data)),
+  delete: (id: string) => req<void>(api.delete(`/masking/policies/${id}`)),
+  previewSQL: (sql: string, roleId?: string) =>
+    req<MaskingPreviewResponse>(
+      api.post("/masking/preview/sql", { sql, roleId }),
+    ),
+
+  // Patterns
+  listPatterns: () => req<MaskingPattern[]>(api.get("/masking/patterns")),
+  createPattern: (data: Partial<MaskingPattern>) =>
+    req<MaskingPattern>(api.post("/masking/patterns", data)),
+  updatePattern: (id: string, data: Partial<MaskingPattern>) =>
+    req<MaskingPattern>(api.put(`/masking/patterns/${id}`, data)),
+  deletePattern: (id: string) =>
+    req<void>(api.delete(`/masking/patterns/${id}`)),
 };

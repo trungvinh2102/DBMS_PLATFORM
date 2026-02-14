@@ -70,3 +70,45 @@ export interface RolePrivilege {
   inheritedFromRole?: string | null;
   created_on: string | null;
 }
+
+export enum MaskingRuleType {
+  PARTIAL = "PARTIAL",
+  FULL = "FULL",
+  HASH = "HASH",
+  EMAIL = "EMAIL",
+  REGEX = "REGEX",
+  NULL = "NULL",
+}
+
+export interface MaskingPolicy {
+  id: string;
+  name: string;
+  description?: string;
+  resourceSchema?: string;
+  resourceTable: string;
+  resourceColumn: string;
+  roleId?: string;
+  roleName?: string;
+  maskingType: MaskingRuleType;
+  maskingArgs?: string;
+  isEnabled: boolean;
+  priority: number;
+  created_on?: string;
+  changed_on?: string;
+}
+
+export interface MaskingPreviewResponse {
+  originalSQL: string;
+  rewrittenSQL: string;
+  appliedPolicies: string[];
+}
+
+export interface MaskingPattern {
+  id: string;
+  name: string;
+  description?: string;
+  maskingType: MaskingRuleType;
+  maskingArgs?: string;
+  created_on?: string;
+  changed_on?: string;
+}

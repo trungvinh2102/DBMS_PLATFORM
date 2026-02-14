@@ -32,6 +32,12 @@ def create_app():
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(privilege_bp, url_prefix='/api/privilege')
     app.register_blueprint(role_bp, url_prefix='/api/roles')
+    
+    from routes.data_access import data_access_bp
+    app.register_blueprint(data_access_bp, url_prefix='/api/data-access')
+    
+    from routes.masking import masking_bp
+    app.register_blueprint(masking_bp, url_prefix='/api/masking')
 
     @app.route('/api/health')
     @app.route('/health')
