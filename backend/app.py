@@ -38,6 +38,9 @@ def create_app():
     
     from routes.masking import masking_bp
     app.register_blueprint(masking_bp, url_prefix='/api/masking')
+    
+    from routes.sensitive_data import sensitive_data_bp
+    app.register_blueprint(sensitive_data_bp, url_prefix='/api/sensitive-data')
 
     @app.route('/api/health')
     @app.route('/health')

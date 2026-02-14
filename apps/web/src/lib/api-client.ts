@@ -17,6 +17,10 @@ import type {
   MaskingPolicy as AppMaskingPolicy,
 } from "./types";
 import type {
+  SensitiveResource,
+  SensitivePolicy,
+} from "./sensitive-data-types";
+import type {
   DataResource,
   MaskingPolicy as DataAccessMaskingPolicy,
   DataAccessPolicy,
@@ -241,4 +245,30 @@ export const maskingApi = {
     req<MaskingPattern>(api.put(`/masking/patterns/${id}`, data)),
   deletePattern: (id: string) =>
     req<void>(api.delete(`/masking/patterns/${id}`)),
+};
+
+export const sensitiveDataApi = {
+  // Resources
+  listResources: (databaseId?: string) =>
+    req<SensitiveResource[]>(
+      api.get("/sensitive-data/resources", { params: { databaseId } }),
+    ),
+  createResource: (data: Partial<SensitiveResource>) =>
+    req<SensitiveResource>(api.post("/sensitive-data/resources", data)),
+  updateResource: (id: string, data: Partial<SensitiveResource>) =>
+    req<SensitiveResource>(api.patch(`/sensitive-data/resources/${id}`, data)),
+  deleteResource: (id: string) =>
+    req<{ status: string }>(api.delete(`/sensitive-data/resources/${id}`)),
+
+  // Policies
+  listPolicies: (resourceId?: string) =>
+    req<SensitivePolicy[]>(
+      api.get("/sensitive-data/policies", { params: { resourceId } }),
+    ),
+  createPolicy: (data: Partial<SensitivePolicy>) =>
+    req<SensitivePolicy>(api.post("/sensitive-data/policies", data)),
+  updatePolicy: (id: string, data: Partial<SensitivePolicy>) =>
+    req<SensitivePolicy>(api.patch(`/sensitive-data/policies/${id}`, data)),
+  deletePolicy: (id: string) =>
+    req<{ status: string }>(api.delete(`/sensitive-data/policies/${id}`)),
 };
