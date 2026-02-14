@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { maskingApi } from "@/lib/api-client";
-import { MaskingPreviewResponse } from "@/lib/types";
+import { type MaskingPreviewResponse } from "@/lib/types";
 
 export function MaskingPreview() {
   const [sql, setSql] = useState("SELECT name, email, phone FROM users");

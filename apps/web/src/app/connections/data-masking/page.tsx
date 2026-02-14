@@ -13,7 +13,7 @@ import { MaskingPolicyTable } from "./components/masking-policy-table";
 import { MaskingPolicyDialog } from "./components/masking-policy-dialog";
 import { MaskingPreview } from "./components/masking-preview";
 import { maskingApi } from "@/lib/api-client";
-import { MaskingPolicy } from "@/lib/types";
+import { type MaskingPolicy } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner"; // Assuming sonner is installed/configured as per list_dir

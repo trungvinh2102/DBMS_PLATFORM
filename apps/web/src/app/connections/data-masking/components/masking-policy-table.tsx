@@ -1,6 +1,6 @@
 "use client";
 
-import { MaskingPolicy, MaskingRuleType } from "@/lib/types";
+import { type MaskingPolicy } from "@/lib/types";
 import {
   Table,
   TableBody,

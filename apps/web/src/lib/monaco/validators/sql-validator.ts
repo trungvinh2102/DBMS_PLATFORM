@@ -54,20 +54,13 @@ export function validateSQL(
         markers.push(...errors.map((err: any) => mapDtErrorToMarker(err)));
       }
     } catch (error: any) {
-      console.error("dt-sql-parser error:", error);
-      // If dt-sql-parser fails internally, we might want to fallback or just report it
-      markers.push({
-        startLineNumber: 1,
-        startColumn: 1,
-        endLineNumber: 1,
-        endColumn: 1,
-        message: "Validator error: " + (error.message || "Unknown error"),
-        severity: MarkerSeverity.Warning,
-        source: "dt-sql-parser-internal",
-      });
+      console.warn("dt-sql-parser error:", error);
     }
-  } else {
-    // 2. Fallback to node-sql-parser for other dialects (e.g. SQLite)
+  }
+
+  // 2. Fallback to node-sql-parser if no markers found yet OR dt-parser wasn't available
+  // We check markers.length === 0 to avoid duplicates if dt-parser already found errors
+  if (markers.length === 0) {
     try {
       const parserDialect = SQL_DIALECT_MAP[dialect] || "PostgreSQL";
       nodeSqlParser.astify(code, { database: parserDialect });

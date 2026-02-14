@@ -14,10 +14,11 @@ import type {
   RolePrivilege,
   MaskingPreviewResponse,
   MaskingPattern,
+  MaskingPolicy as AppMaskingPolicy,
 } from "./types";
 import type {
   DataResource,
-  MaskingPolicy,
+  MaskingPolicy as DataAccessMaskingPolicy,
   DataAccessPolicy,
   MaskingType,
   SensitivityLevel,
@@ -205,8 +206,8 @@ export const dataAccessApi = {
 
   // Masking Policies
   listMaskingPolicies: () =>
-    req<MaskingPolicy[]>(api.get("/data-access/masking-policies")),
-  createMaskingPolicy: (data: Partial<MaskingPolicy>) =>
+    req<DataAccessMaskingPolicy[]>(api.get("/data-access/masking-policies")),
+  createMaskingPolicy: (data: Partial<DataAccessMaskingPolicy>) =>
     req<{ id: string; status: string }>(
       api.post("/data-access/masking-policies", data),
     ),
@@ -221,11 +222,11 @@ export const dataAccessApi = {
 };
 
 export const maskingApi = {
-  list: () => req<MaskingPolicy[]>(api.get("/masking/policies")),
-  create: (data: Partial<MaskingPolicy>) =>
-    req<MaskingPolicy>(api.post("/masking/policies", data)),
-  update: (id: string, data: Partial<MaskingPolicy>) =>
-    req<MaskingPolicy>(api.put(`/masking/policies/${id}`, data)),
+  list: () => req<AppMaskingPolicy[]>(api.get("/masking/policies")),
+  create: (data: Partial<AppMaskingPolicy>) =>
+    req<AppMaskingPolicy>(api.post("/masking/policies", data)),
+  update: (id: string, data: Partial<AppMaskingPolicy>) =>
+    req<AppMaskingPolicy>(api.put(`/masking/policies/${id}`, data)),
   delete: (id: string) => req<void>(api.delete(`/masking/policies/${id}`)),
   previewSQL: (sql: string, roleId?: string) =>
     req<MaskingPreviewResponse>(
