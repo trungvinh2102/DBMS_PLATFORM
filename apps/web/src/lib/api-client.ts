@@ -21,6 +21,10 @@ import type {
   SensitivePolicy,
 } from "./sensitive-data-types";
 import type {
+  PolicyException,
+  PolicyExceptionRequest,
+} from "./policy-exception-types";
+import type {
   DataResource,
   MaskingPolicy as DataAccessMaskingPolicy,
   DataAccessPolicy,
@@ -271,4 +275,22 @@ export const sensitiveDataApi = {
     req<SensitivePolicy>(api.patch(`/sensitive-data/policies/${id}`, data)),
   deletePolicy: (id: string) =>
     req<{ status: string }>(api.delete(`/sensitive-data/policies/${id}`)),
+};
+
+export const policyExceptionApi = {
+  list: (status?: string, subjectId?: string) =>
+    req<PolicyException[]>(
+      api.get("/policy-exception/", { params: { status, subjectId } }),
+    ),
+  get: (id: string) => req<PolicyException>(api.get(`/policy-exception/${id}`)),
+  request: (data: PolicyExceptionRequest) =>
+    req<PolicyException>(api.post("/policy-exception/", data)),
+  approve: (id: string) =>
+    req<PolicyException>(api.post(`/policy-exception/${id}/approve`)),
+  reject: (id: string, reason?: string) =>
+    req<PolicyException>(
+      api.post(`/policy-exception/${id}/reject`, { reason }),
+    ),
+  revoke: (id: string) =>
+    req<PolicyException>(api.post(`/policy-exception/${id}/revoke`)),
 };

@@ -129,7 +129,7 @@ class User(Base):
     # roleId kept for backward compatibility but made nullable in model (DB migration needed)
     roleId = Column(String, ForeignKey("roles.id"), nullable=True)
 
-    # role = relationship("Role") # Deprecated in favor of 'roles'
+    role = relationship("Role", foreign_keys=[roleId])
     roles = relationship("Role", secondary="user_roles", back_populates="users")
     settings = relationship("UserSetting", uselist=False, back_populates="user")
     

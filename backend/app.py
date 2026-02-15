@@ -8,9 +8,13 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables BEFORE importing routes/services
-# because models/metadata.py reads DATABASE_URL at import time
 load_dotenv()
 
 from routes.database import database_bp
@@ -41,6 +45,9 @@ def create_app():
     
     from routes.sensitive_data import sensitive_data_bp
     app.register_blueprint(sensitive_data_bp, url_prefix='/api/sensitive-data')
+
+    from routes.policy_exception import policy_exception_bp
+    app.register_blueprint(policy_exception_bp, url_prefix='/api/policy-exception')
 
     @app.route('/api/health')
     @app.route('/health')

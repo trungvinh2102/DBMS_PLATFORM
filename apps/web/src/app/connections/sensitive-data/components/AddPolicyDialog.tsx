@@ -36,11 +36,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  SensitivePolicy,
+  type SensitivePolicy,
   ProtectionStrategy,
-  SensitiveResource,
+  type SensitiveResource,
 } from "@/lib/sensitive-data-types";
-import { Role } from "@/lib/types";
+import { type Role } from "@/lib/types";
 
 const formSchema = z.object({
   resource_id: z.string().min(1, "Resource is required"),

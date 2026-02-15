@@ -12,6 +12,8 @@
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
+    "db:push": "npx prisma db push --schema=backend/database/prisma-schema/schema.prisma",
+    "db:migrate": "npx prisma migrate dev --schema=backend/database/prisma-schema/schema.prisma",
     "db:seed": "cd backend && python scripts/seed.py",
     "backend:dev": "cd backend && python app.py",
     "format": "prettier --write ."

@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  SensitiveResource,
+  type SensitiveResource,
   SensitivityLevel,
   ResourceType,
 } from "@/lib/sensitive-data-types";
