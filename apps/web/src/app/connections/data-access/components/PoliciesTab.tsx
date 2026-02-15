@@ -7,7 +7,10 @@
 
 import { useState, useEffect } from "react";
 import { dataAccessApi } from "@/lib/api-client";
-import { DataAccessPolicy, PolicySubjectType } from "@/lib/data-access-types";
+import {
+  type DataAccessPolicy,
+  PolicySubjectType,
+} from "@/lib/data-access-types";
 import {
   Table,
   TableBody,

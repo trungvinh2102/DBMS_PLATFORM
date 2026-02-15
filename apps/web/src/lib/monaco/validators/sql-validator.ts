@@ -54,7 +54,32 @@ export function validateSQL(
         markers.push(...errors.map((err: any) => mapDtErrorToMarker(err)));
       }
     } catch (error: any) {
-      console.warn("dt-sql-parser error:", error);
+      const msg = error.message || String(error);
+
+      // Handle thrown syntax errors from ANTLR
+      if (
+        msg.includes("extraneous input") ||
+        msg.includes("mismatched input") ||
+        msg.includes("no viable alternative") ||
+        msg.includes("missing") ||
+        msg.includes("expecting")
+      ) {
+        const locMatch = msg.match(/line (\d+):(\d+)/);
+        const startLine = locMatch ? parseInt(locMatch[1], 10) : 1;
+        const startColumn = locMatch ? parseInt(locMatch[2], 10) : 1;
+
+        markers.push(
+          mapDtErrorToMarker({
+            message: msg,
+            startLine,
+            startColumn,
+            endLine: startLine,
+            endColumn: startColumn + 1,
+          }),
+        );
+      } else {
+        console.warn("dt-sql-parser error:", error);
+      }
     }
   }
 
@@ -110,6 +135,11 @@ function mapDtErrorToMarker(error: any): ValidationMarker {
     const match = message.match(/missing '([^']+)'/);
     if (match) {
       message = `Missing '${match[1]}'`;
+    }
+  } else if (message.includes("extraneous input")) {
+    const match = message.match(/extraneous input '([^']+)'/);
+    if (match) {
+      message = `Unexpected input '${match[1]}'`;
     }
   }
 
