@@ -12,6 +12,12 @@ import os
 import datetime
 import enum
 
+class RequestStatus(enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
 Base = declarative_base()
 
 class Environment(enum.Enum):
@@ -116,7 +122,33 @@ class UserRole(Base):
     userId = Column(String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     roleId = Column(String, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
     
+    valid_from = Column(DateTime, nullable=True)
+    valid_until = Column(DateTime, nullable=True)
+    
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
+
+class AccessRequest(Base):
+    __tablename__ = "access_requests"
+
+    id = Column(String, primary_key=True)
+    userId = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    roleId = Column(String, ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Enum(RequestStatus, name="RequestStatus"), default=RequestStatus.PENDING)
+    requestReason = Column(Text, nullable=True)
+    
+    valid_from = Column(DateTime, nullable=True)
+    valid_until = Column(DateTime, nullable=True)
+    
+    reviewerId = Column(String, ForeignKey("users.id"), nullable=True)
+    reviewedAt = Column(DateTime, nullable=True)
+    rejectionReason = Column(Text, nullable=True)
+
+    user = relationship("User", foreign_keys=[userId], backref="access_requests")
+    role = relationship("Role")
+    reviewer = relationship("User", foreign_keys=[reviewerId])
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+    changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 class User(Base):
     __tablename__ = "users"

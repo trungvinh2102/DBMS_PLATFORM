@@ -178,7 +178,9 @@ export function DatabaseAccessControl({
                 value={selectedRoleToAdd}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a role..." />
+                  <SelectValue placeholder="Select a role...">
+                    {roles?.find((r) => r.id === selectedRoleToAdd)?.name}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {roles

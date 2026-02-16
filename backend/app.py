@@ -24,10 +24,16 @@ from routes.ai import ai_bp
 from routes.privilege import privilege_bp
 from routes.role import role_bp
 
+
+from extensions import socketio
+
 def create_app():
     """Application factory for Flask."""
     app = Flask(__name__)
     CORS(app)
+    
+    # Initialize SocketIO
+    socketio.init_app(app)
 
     # Register Blueprints
     app.register_blueprint(database_bp, url_prefix='/api/database')
@@ -48,6 +54,12 @@ def create_app():
 
     from routes.policy_exception import policy_exception_bp
     app.register_blueprint(policy_exception_bp, url_prefix='/api/policy-exception')
+    
+    from routes.access_requests import access_requests_bp
+    app.register_blueprint(access_requests_bp, url_prefix='/api/access-requests')
+    
+    from routes.notification import notification_bp
+    app.register_blueprint(notification_bp, url_prefix='/api/notifications')
 
     @app.route('/api/health')
     @app.route('/health')
@@ -60,4 +72,5 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(port=5000, debug=debug)
+    # host='0.0.0.0' allows external access (e.g. from WSL/Docker/Network)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=debug, allow_unsafe_werkzeug=True)

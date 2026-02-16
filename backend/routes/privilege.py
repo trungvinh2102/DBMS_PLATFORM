@@ -132,3 +132,18 @@ def seed_defaults():
     """Seed default privilege types (Admin only)."""
     result = privilege_service.seed_defaults()
     return jsonify(result)
+
+@privilege_bp.route('/user-permissions/<user_id>', methods=['GET'])
+@login_required
+@handle_api_exceptions
+def get_user_permissions(user_id):
+    """Get all effective permissions for a user."""
+    # Only allow checking own permissions or if Admin
+    current_user_id = g.user['userId']
+    role = g.user.get('role')
+    
+    if current_user_id != user_id and role != 'Admin':
+         return jsonify({'error': 'Unauthorized'}), 403
+         
+    result = privilege_service.get_user_privileges(user_id)
+    return jsonify(result)

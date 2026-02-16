@@ -81,7 +81,7 @@ class AuthService:
             raise Exception("User already exists")
         
         # Get default role
-        default_role = session.query(Role).filter(Role.name == "Default").first()
+        default_role = session.query(Role).filter(Role.name == "Viewer").first()
         if not default_role:
              raise Exception("Default role not found")
 

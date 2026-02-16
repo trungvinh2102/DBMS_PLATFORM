@@ -4,11 +4,12 @@ database.py
 API endpoints for database operations, mapping to services.
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from services.connection import connection_service
 from services.metadata import metadata_service
 from services.execution import execution_service
 from utils.db_utils import handle_api_exceptions
+from utils.auth_middleware import login_required
 
 database_bp = Blueprint('database', __name__)
 
@@ -121,13 +122,15 @@ def get_ddl():
     return jsonify(ddl)
 
 @database_bp.route('/execute', methods=['POST'])
+@login_required
 @handle_api_exceptions
 def execute_query():
     """Execute a SQL query."""
     data = request.json
     db_id = data.get('databaseId')
     sql = data.get('sql')
-    result = execution_service.execute_query(db_id, sql)
+    user_id = g.user.get('userId')
+    result = execution_service.execute_query(db_id, sql, user_id=user_id)
     return jsonify(result)
 
 @database_bp.route('/history', methods=['GET'])

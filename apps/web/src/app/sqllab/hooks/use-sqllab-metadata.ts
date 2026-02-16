@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
+import type { DataSource } from "@/lib/types";
 import { toast } from "sonner";
 
 interface MetadataProps {
@@ -18,7 +19,7 @@ export function useSQLLabMetadata({
     queryKey: ["databases"],
     queryFn: async () => {
       const res = await databaseApi.list();
-      return (res as any).data || res;
+      return ((res as any).data || res) as DataSource[];
     },
   });
 
@@ -28,16 +29,17 @@ export function useSQLLabMetadata({
     error: schemasError,
   } = useQuery({
     queryKey: ["schemas", selectedDS],
-    queryFn: () => databaseApi.getSchemas(selectedDS),
+    queryFn: () => databaseApi.getSchemas(selectedDS) as Promise<string[]>,
     enabled: !!selectedDS,
   });
 
   const tablesQuery = useQuery({
     queryKey: ["tables", selectedDS, selectedSchema],
-    queryFn: () => databaseApi.getTables(selectedDS, selectedSchema),
+    queryFn: () =>
+      databaseApi.getTables(selectedDS, selectedSchema) as Promise<string[]>,
     enabled: !!selectedDS,
   });
-  const tables = (tablesQuery.data as any) || [];
+  const tables = (tablesQuery.data as string[]) || [];
 
   // Views not yet implemented in backend strictly, using tables endpoint for now or empty
   // TODO: Add separate views endpoint if needed or filter tables

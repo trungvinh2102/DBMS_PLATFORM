@@ -6,7 +6,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BadgeCheck,
   Bell,
@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "./mode-toggle";
+import { NotificationBell } from "./notification-bell";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -72,6 +73,7 @@ export default function Header() {
   // Use destructured state for better control and access to actions
   const { user, token, logout, setUser } = useAuth();
   const pathname = usePathname();
+  const router = useRouter(); // Initialize router
   const isAuthPage = pathname?.startsWith("/auth");
   const [mounted, setMounted] = useState(false);
 
@@ -130,6 +132,7 @@ export default function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <NotificationBell />
           <ModeToggle />
 
           {/* User Profile */}
@@ -188,13 +191,12 @@ export default function Header() {
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() => router.push("/profile")}
+                    >
                       <BadgeCheck className="mr-2 h-4 w-4" />
                       Account
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Bell className="mr-2 h-4 w-4" />
-                      Notifications
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />

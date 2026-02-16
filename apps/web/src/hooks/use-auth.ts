@@ -11,7 +11,7 @@ export interface User {
   email: string;
   username: string;
   name: string | null;
-  role: string;
+  role: string | null;
   roles?: string[];
 }
 

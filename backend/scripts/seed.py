@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-from models.metadata import SessionLocal, Role, User, Db
+from models.metadata import SessionLocal, Role, User, Db, PrivilegeTypeModel, RolePrivilege
 from services.privilege_service import privilege_service
 from utils.crypto import encrypt
 import uuid
@@ -118,6 +118,27 @@ def seed():
         result = privilege_service.seed_defaults()
         logger.info(f"  Privilege types: {result['created']} created, {result['total']} total")
 
+        # ── 5. Assign Default Privileges to Admin ──────────────────────
+        logger.info("Assigning default privileges to Admin...")
+        admin_role = session.query(Role).filter(Role.name == "Admin").first()
+        if admin_role:
+            default_privs = ["SQLLab_ACCESS", "CONNECTIONS_ACCESS"]
+            for code in default_privs:
+                priv = session.query(PrivilegeTypeModel).filter(PrivilegeTypeModel.code == code).first()
+                if priv:
+                    existing = session.query(RolePrivilege).filter(
+                        RolePrivilege.roleId == admin_role.id,
+                        RolePrivilege.privilegeTypeId == priv.id
+                    ).first()
+                    
+                    if not existing:
+                         privilege_service.assign_privilege({
+                            "roleId": admin_role.id,
+                            "privilegeTypeId": priv.id,
+                            "resourceType": "SYSTEM"
+                        })
+                         logger.info(f"  Granted {code} to Admin")
+        
         logger.info("Seeding completed successfully!")
 
     except Exception as e:

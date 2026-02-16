@@ -12,10 +12,15 @@ from models.metadata import (
     Role,
     PrivilegeCategory,
     ResourceTypeEnum,
+    Role,
+    PrivilegeCategory,
+    ResourceTypeEnum,
     User,
+    UserRole,
 )
 from utils.db_utils import with_session
 from sqlalchemy.orm import joinedload
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +63,9 @@ DEFAULT_PRIVILEGES = [
     {"code": "MASKING_CONFIG", "category": "SYSTEM", "description": "Configure data masking rules"},
     {"code": "SCHEMA_MODIFY", "category": "SYSTEM", "description": "Modify database schema (DDL operations)"},
     {"code": "AUDIT_VIEW", "category": "SYSTEM", "description": "View audit logs and compliance reports"},
+    # ACCESS
+    {"code": "SQLLab_ACCESS", "category": "SYSTEM", "description": "Access to SQLLab interface"},
+    {"code": "CONNECTIONS_ACCESS", "category": "SYSTEM", "description": "Access to Connections management interface (Admin only)"},
 ]
 
 
@@ -250,24 +258,46 @@ class PrivilegeService:
     def get_user_privileges(self, session, user_id):
         """
         Resolve all effective privileges for a user, including:
-        - Direct role assignments
+        - Direct role assignments (checking valid_from/valid_until)
         - Inherited roles (parent roles)
         """
-        # 1. Get user with roles
-        user = session.query(User).options(joinedload(User.roles)).filter(User.id == user_id).first()
+        # 1. Get user and their DIRECT roles with validity check
+        user = session.query(User).filter(User.id == user_id).first()
         if not user:
             raise Exception("User not found")
 
-        # 2. Resolve role hierarchy (recursive)
-        all_roles = set()
-        queue = list(user.roles)
+        # Fetch active UserRoles
+        now = datetime.utcnow()
+        active_user_roles = session.query(UserRole).filter(
+            UserRole.userId == user_id,
+        ).all()
         
-        # Add backward compatibility for roleId if roles is empty but roleId exists
-        if not queue and user.roleId:
-            legacy_role = session.query(Role).filter(Role.id == user.roleId).first()
-            if legacy_role:
-                queue.append(legacy_role)
+        # Filter in python for complex logic if needed, but SQL is fine
+        valid_role_ids = []
+        for ur in active_user_roles:
+            # Check valid_from
+            if ur.valid_from and ur.valid_from > now:
+                continue
+            # Check valid_until
+            if ur.valid_until and ur.valid_until < now:
+                continue
+            valid_role_ids.append(ur.roleId)
+            
+        # Also include legacy roleId if not in user_roles
+        if user.roleId and user.roleId not in valid_role_ids:
+             # Legacy role is considered permanent
+             valid_role_ids.append(user.roleId)
 
+        if not valid_role_ids:
+            return []
+
+        # 2. Resolve role hierarchy (recursive) for all valid roles
+        all_roles = set()
+        
+        # Initial roles
+        initial_roles = session.query(Role).filter(Role.id.in_(valid_role_ids)).all()
+        queue = list(initial_roles)
+        
         while queue:
             role = queue.pop(0)
             if role.id in [r.id for r in all_roles]:
@@ -294,16 +324,38 @@ class PrivilegeService:
         ).all()
 
         # 4. Serialize
-        # We might want to deduplicate or just return all entries
-        # Returns flat list of effective permissions
-        
         results = []
+        has_sqllab_access = False
         for rp in rps:
             item = self._serialize_role_privilege(rp, session)
             # Add role name for context
             item['inheritedFromRole'] = next((r.name for r in all_roles if r.id == rp.roleId), None)
+            if item.get('privilegeCode') == 'SQLLab_ACCESS':
+                has_sqllab_access = True
             results.append(item)
             
+        # 5. Implicitly grant SQLLab_ACCESS if user has any active role
+        if not has_sqllab_access:
+             # Find 'SQLLab_ACCESS' type definition
+             sqllab_type = session.query(PrivilegeTypeModel).filter(PrivilegeTypeModel.code == 'SQLLab_ACCESS').first()
+             if sqllab_type:
+                 # Check if user has explicitly blocked via some other mechanism? No.
+                 # Just inject it.
+                 synthetic_priv = {
+                     "id": "implicit-sqllab-access",
+                     "roleId": "implicit", # No specific role
+                     "roleName": "Implicit Access",
+                     "privilegeTypeId": sqllab_type.id,
+                     "privilegeCode": "SQLLab_ACCESS",
+                     "privilegeCategory": "SYSTEM",
+                     "resourceType": "SYSTEM",
+                     "resourceId": None,
+                     "conditionExpr": None,
+                     "created_on": datetime.utcnow().isoformat(),
+                     "inheritedFromRole": "Any Active Role"
+                 }
+                 results.append(synthetic_priv)
+
         return results
 
 

@@ -98,7 +98,7 @@ export function useSQLLab() {
     if (ds && ds.length > 0) {
       if (initialConnectionId) {
         const target = ds.find((d: any) => d.id === initialConnectionId);
-        if (target) {
+        if (target && activeTab.selectedDS !== target.id) {
           updateActiveTab({ selectedDS: target.id });
           return;
         }
@@ -115,7 +115,9 @@ export function useSQLLab() {
     if (s && s.length > 0) {
       if (!activeTab.selectedSchema || !s.includes(activeTab.selectedSchema)) {
         const def = s.includes("public") ? "public" : s[0];
-        updateActiveTab({ selectedSchema: def });
+        if (activeTab.selectedSchema !== def) {
+          updateActiveTab({ selectedSchema: def });
+        }
       }
     }
   }, [schemas, activeTab.selectedSchema, updateActiveTab]);

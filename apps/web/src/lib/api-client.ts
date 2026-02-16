@@ -131,7 +131,7 @@ export const authApi = {
 };
 
 export const userApi = {
-  getMe: () => req(api.get("/user/me")),
+  getMe: () => req<User>(api.get("/user/me")),
   getSettings: () => req(api.get("/user/settings")),
   updateSettings: (data: any) => req(api.post("/user/settings", data)),
 
@@ -293,4 +293,36 @@ export const policyExceptionApi = {
     ),
   revoke: (id: string) =>
     req<PolicyException>(api.post(`/policy-exception/${id}/revoke`)),
+};
+
+export const accessRequestApi = {
+  create: (data: {
+    roleId: string;
+    reason: string;
+    valid_from?: string;
+    valid_until?: string;
+  }) => req(api.post("/access-requests/", data)),
+  list: (status?: string) =>
+    req(api.get("/access-requests/", { params: { status } })),
+  approve: (requestId: string) =>
+    req(api.post(`/access-requests/${requestId}/approve`)),
+  reject: (requestId: string, reason?: string) =>
+    req(api.post(`/access-requests/${requestId}/reject`, { reason })),
+  getPendingCount: () =>
+    req<{ count: number }>(api.get("/access-requests/pending-count")),
+};
+
+import type { Notification } from "@/types/notification";
+
+export const notificationApi = {
+  list: (limit = 20, offset = 0) =>
+    req<Notification[]>(
+      api.get("/notifications/", { params: { limit, offset } }),
+    ),
+  getUnreadCount: () =>
+    req<{ count: number }>(api.get("/notifications/unread-count")),
+  markAsRead: (id: string) =>
+    req<{ success: boolean }>(api.put(`/notifications/${id}/read`)),
+  markAllAsRead: () =>
+    req<{ success: boolean }>(api.put("/notifications/read-all")),
 };

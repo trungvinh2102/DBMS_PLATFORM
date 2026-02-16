@@ -12,7 +12,7 @@ import type { RolePrivilege, DataSource, Role } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Database, UserCog } from "lucide-react";
+import { Loader2, Database, UserCog, Inbox } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Breadcrumb,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useState } from "react";
 import { RoleManagementTab } from "./components/RoleManagementTab";
+import { AccessRequestsTab } from "./components/AccessRequestsTab";
 
 export default function AccessControlPage() {
   const router = useRouter();
@@ -103,6 +104,10 @@ export default function AccessControlPage() {
             <UserCog className="h-4 w-4" />
             By Role
           </TabsTrigger>
+          <TabsTrigger value="requests" className="gap-2">
+            <Inbox className="h-4 w-4" />
+            Requests
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resources" className="space-y-4">
@@ -160,6 +165,10 @@ export default function AccessControlPage() {
 
         <TabsContent value="roles" className="space-y-4">
           <RoleManagementTab />
+        </TabsContent>
+
+        <TabsContent value="requests" className="space-y-4">
+          <AccessRequestsTab />
         </TabsContent>
       </Tabs>
     </div>
