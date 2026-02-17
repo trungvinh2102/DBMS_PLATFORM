@@ -227,7 +227,7 @@ export function AccessRequestGuard({
 
   // --- PENDING / WAITING STATE ---
   // If user has a pending request, show status instead of form
-  if (status === "PENDING" || status === "WAITING" || status === "WATTING") {
+  if (status === "PENDING" || status === "WAITING") {
     return (
       <div className="flex items-center justify-center h-full bg-muted/10 p-4">
         <Card className="max-w-md w-full">
@@ -244,7 +244,7 @@ export function AccessRequestGuard({
             <div className="rounded-md bg-muted p-3 text-sm">
               <p>
                 <strong>Role:</strong>{" "}
-                {latestRequest.roleName || latestRequest.role_id || "Unknown"}
+                {latestRequest.roleName || latestRequest.roleId || "Unknown"}
               </p>
               <p>
                 <strong>Requested:</strong>{" "}
@@ -284,16 +284,14 @@ export function AccessRequestGuard({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Rejection Alert */}
-          {(status === "REJECTED" || status === "REJEECT") && (
+          {status === "REJECTED" && (
             <div className="flex flex-col gap-2 p-3 border border-destructive/50 bg-destructive/10 rounded-md text-destructive mb-4">
               <div className="flex items-center gap-2 font-semibold">
                 <XCircle className="w-5 h-5" />
                 Request Rejected
               </div>
               <p className="text-sm text-destructive-foreground/90">
-                {latestRequest.reason_reject ||
-                  latestRequest.rejectionReason ||
-                  "No reason provided."}
+                {latestRequest.rejectionReason || "No reason provided."}
               </p>
             </div>
           )}

@@ -85,7 +85,9 @@ export const databaseApi = {
     req<DataSource>(api.post("/database/update", data)),
   delete: (id: string) => req<void>(api.post("/database/delete", { id })),
   test: (data: Partial<DataSource>) =>
-    req<{ status: string; message: string }>(api.post("/database/test", data)),
+    req<{ success: boolean; message: string }>(
+      api.post("/database/test", data),
+    ),
 
   // Metadata
   getSchemas: (databaseId: string) =>

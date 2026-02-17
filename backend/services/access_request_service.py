@@ -62,6 +62,9 @@ class AccessRequestService:
 
         session.commit()
         
+        # Refresh to get relations for serialization
+        session.refresh(new_req)
+        
         # Emit general socket event for the access requests tab
         try:
             from extensions import socketio
@@ -218,12 +221,12 @@ class AccessRequestService:
             "roleDescription": req.role.description if req.role else None,
             "status": req.status.value,
             "requestReason": req.requestReason,
-            "valid_from": req.valid_from.isoformat() if req.valid_from else None,
-            "valid_until": req.valid_until.isoformat() if req.valid_until else None,
+            "valid_from": req.valid_from.isoformat() + "Z" if req.valid_from else None,
+            "valid_until": req.valid_until.isoformat() + "Z" if req.valid_until else None,
             "reviewerId": req.reviewerId,
-            "reviewedAt": req.reviewedAt.isoformat() if req.reviewedAt else None,
+            "reviewedAt": req.reviewedAt.isoformat() + "Z" if req.reviewedAt else None,
             "rejectionReason": req.rejectionReason,
-            "created_on": req.created_on.isoformat() if req.created_on else None,
+            "created_on": req.created_on.isoformat() + "Z" if req.created_on else None,
         }
 
 access_request_service = AccessRequestService()

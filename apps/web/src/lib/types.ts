@@ -112,3 +112,22 @@ export interface MaskingPattern {
   created_on?: string;
   changed_on?: string;
 }
+
+export interface AccessRequest {
+  id: string;
+  userId: string;
+  username?: string;
+  fullName?: string;
+  userEmail?: string;
+  roleId: string;
+  roleName?: string;
+  roleDescription?: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED";
+  requestReason?: string;
+  valid_from?: string;
+  valid_until?: string;
+  reviewerId?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+  created_on?: string;
+}

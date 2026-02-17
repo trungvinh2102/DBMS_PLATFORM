@@ -46,11 +46,17 @@ export function useSQLLabMetadata({
   const views = [];
 
   const allColumnsQuery = useQuery({
-    queryKey: ["columns", selectedDS, selectedSchema],
-    // Backend doesn't have getAllColumns yet, maybe implement or loop tables?
-    // For now returning empty or we need to add endpoint
-    queryFn: async () => [],
-    enabled: !!selectedDS,
+    queryKey: ["columns", selectedDS, selectedSchema, selectedTable],
+    queryFn: async () => {
+      if (!selectedTable) return [];
+      const cols = (await databaseApi.getColumns(
+        selectedDS,
+        selectedTable,
+        selectedSchema,
+      )) as any[];
+      return cols.map((c) => ({ ...c, table: selectedTable }));
+    },
+    enabled: !!selectedDS && !!selectedTable,
   });
   const allColumns = (allColumnsQuery.data as any[]) || [];
 

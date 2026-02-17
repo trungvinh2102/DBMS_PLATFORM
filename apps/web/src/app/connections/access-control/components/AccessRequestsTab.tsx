@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { AccessRequest } from "@/lib/types";
 import { Loader2, Check, X, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -55,7 +56,7 @@ export function AccessRequestsTab() {
 
   const { data: requests, isLoading } = useQuery({
     queryKey: ["accessRequests"],
-    queryFn: () => accessRequestApi.list() as Promise<any[]>,
+    queryFn: () => accessRequestApi.list() as Promise<AccessRequest[]>,
   });
 
   const { data: roles } = useQuery({
@@ -101,7 +102,7 @@ export function AccessRequestsTab() {
     }
   };
 
-  const statusColor = (status: string) => {
+  const statusColor = (status: AccessRequest["status"]) => {
     switch (status) {
       case "APPROVED":
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
@@ -147,7 +148,7 @@ export function AccessRequestsTab() {
                 </TableCell>
               </TableRow>
             )}
-            {requests?.map((req: any) => (
+            {requests?.map((req: AccessRequest) => (
               <TableRow key={req.id}>
                 <TableCell className="font-medium">
                   <div className="flex flex-col">
@@ -199,16 +200,26 @@ export function AccessRequestsTab() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    className={statusColor(req.status)}
-                    variant="secondary"
-                  >
-                    {req.status}
-                  </Badge>
+                  <div className="flex flex-col gap-1">
+                    <Badge
+                      className={statusColor(req.status)}
+                      variant="secondary"
+                    >
+                      {req.status}
+                    </Badge>
+                    {req.status === "REJECTED" && req.rejectionReason && (
+                      <span
+                        className="text-[10px] text-red-600 dark:text-red-400 max-w-40 truncate"
+                        title={req.rejectionReason}
+                      >
+                        Reason: {req.rejectionReason}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
-                <TableCell className="text-muted-foreground text-xs">
+                <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                   {req.created_on &&
-                    format(new Date(req.created_on), "MMM d, yyyy")}
+                    format(new Date(req.created_on), "MMM d, yyyy HH:mm")}
                 </TableCell>
                 <TableCell className="text-right">
                   {req.status === "PENDING" && (

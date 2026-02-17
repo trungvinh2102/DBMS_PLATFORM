@@ -75,7 +75,7 @@ export function ConnectionDialog({
         config,
       });
 
-      if (result.status === "success") {
+      if (result.success) {
         toast.success(result.message);
       } else {
         toast.error(result.message);
