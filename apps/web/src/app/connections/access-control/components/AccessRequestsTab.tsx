@@ -26,6 +26,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -37,6 +47,17 @@ export function AccessRequestsTab() {
   }>({
     open: false,
     requestId: null,
+  });
+  const [approveDialog, setApproveDialog] = useState<{
+    open: boolean;
+    requestId: string | null;
+    requestUser: string | null;
+    requestRole: string | null;
+  }>({
+    open: false,
+    requestId: null,
+    requestUser: null,
+    requestRole: null,
   });
   const [rejectReason, setRejectReason] = useState("");
 
@@ -88,6 +109,27 @@ export function AccessRequestsTab() {
     },
     onError: (err: any) => toast.error(err.message),
   });
+
+  const handleApproveClick = (req: AccessRequest) => {
+    setApproveDialog({
+      open: true,
+      requestId: req.id,
+      requestUser: req.fullName || req.username || req.userId,
+      requestRole: req.roleName || req.roleId,
+    });
+  };
+
+  const confirmApprove = () => {
+    if (approveDialog.requestId) {
+      approveMutation.mutate(approveDialog.requestId);
+      setApproveDialog({
+        open: false,
+        requestId: null,
+        requestUser: null,
+        requestRole: null,
+      });
+    }
+  };
 
   const handleRejectClick = (id: string) => {
     setRejectDialog({ open: true, requestId: id });
@@ -228,7 +270,7 @@ export function AccessRequestsTab() {
                         size="sm"
                         variant="outline"
                         className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                        onClick={() => approveMutation.mutate(req.id)}
+                        onClick={() => handleApproveClick(req)}
                         disabled={approveMutation.isPending}
                       >
                         <Check className="w-4 h-4" />
@@ -290,6 +332,42 @@ export function AccessRequestsTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={approveDialog.open}
+        onOpenChange={(open) =>
+          !open &&
+          setApproveDialog({
+            open: false,
+            requestId: null,
+            requestUser: null,
+            requestRole: null,
+          })
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve Access Request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will grant <strong>{approveDialog.requestUser}</strong> the
+              role{" "}
+              <Badge variant="outline" className="text-xs align-middle">
+                {approveDialog.requestRole}
+              </Badge>
+              . This action cannot be undone immediately via this interface.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={confirmApprove}
+            >
+              Approve Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
