@@ -52,6 +52,7 @@ class MetadataService(BaseDatabaseService):
             query = text("""
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_schema = :schema AND table_type = 'BASE TABLE'
+                  AND table_name NOT LIKE '\_\_%' ESCAPE '\\'
                 ORDER BY table_name
             """)
             result = conn.execute(query, {"schema": schema})
@@ -132,21 +133,24 @@ class MetadataService(BaseDatabaseService):
         Gets detailed table statistics.
         """
         def _op(conn):
-            query = text("""
-                SELECT
-                  pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as total_size,
-                  pg_size_pretty(pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as data_size,
-                  pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table)) - pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as index_size,
-                  (SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = :schema AND relname = :table) as row_count
-            """)
-            result = conn.execute(query, {"schema": schema, "table": table}).fetchone()
-            if result:
-                 return {
-                     "total_size": result[0],
-                     "data_size": result[1],
-                     "index_size": result[2],
-                     "row_count": result[3]
-                 }
+            try:
+                query = text("""
+                    SELECT
+                      pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as total_size,
+                      pg_size_pretty(pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as data_size,
+                      pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table)) - pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as index_size,
+                      (SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = :schema AND relname = :table) as row_count
+                """)
+                result = conn.execute(query, {"schema": schema, "table": table}).fetchone()
+                if result:
+                     return {
+                         "total_size": result[0],
+                         "data_size": result[1],
+                         "index_size": result[2],
+                         "row_count": result[3]
+                     }
+            except Exception as e:
+                logger.warning(f"Could not get table info for {schema}.{table}: {e}")
             return {}
         return self.run_dynamic_query(database_id, _op)
 

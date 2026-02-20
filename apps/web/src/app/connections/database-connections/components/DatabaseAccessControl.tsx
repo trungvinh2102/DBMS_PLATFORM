@@ -238,16 +238,119 @@ export function DatabaseAccessControl({
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
+                  {/* Global Select All */}
+                  {(() => {
+                    const totalRelevant = relevantPrivileges?.length ?? 0;
+                    const assignedCount =
+                      relevantPrivileges?.filter((p) =>
+                        rolePerms.some((rp) => rp.privilegeTypeId === p.id),
+                      ).length ?? 0;
+                    const allChecked =
+                      totalRelevant > 0 && assignedCount === totalRelevant;
+                    const isIndeterminate =
+                      assignedCount > 0 && assignedCount < totalRelevant;
+
+                    return (
+                      <div className="flex items-center space-x-2 mb-4 pb-3 border-b">
+                        <Checkbox
+                          id={`${roleId}-select-all`}
+                          className="cursor-pointer"
+                          checked={
+                            isIndeterminate ? "indeterminate" : allChecked
+                          }
+                          onCheckedChange={(checked) => {
+                            const shouldAssign = checked === true;
+                            relevantPrivileges?.forEach((priv) => {
+                              const isAssigned = rolePerms.some(
+                                (rp) => rp.privilegeTypeId === priv.id,
+                              );
+                              if (shouldAssign && !isAssigned) {
+                                assignMutation.mutate({
+                                  roleId,
+                                  privilegeTypeId: priv.id,
+                                });
+                              } else if (!shouldAssign && isAssigned) {
+                                const assignment = rolePerms.find(
+                                  (rp) => rp.privilegeTypeId === priv.id,
+                                );
+                                if (assignment)
+                                  revokeMutation.mutate(assignment.id);
+                              }
+                            });
+                          }}
+                        />
+                        <label
+                          htmlFor={`${roleId}-select-all`}
+                          className="text-sm font-semibold leading-none cursor-pointer"
+                        >
+                          Select All
+                        </label>
+                        <span className="text-xs text-muted-foreground">
+                          ({assignedCount}/{totalRelevant})
+                        </span>
+                      </div>
+                    );
+                  })()}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {RELEVANT_CATEGORIES.map((category) => (
-                      <div key={category} className="space-y-2">
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase">
-                          {category.replace("_", " ")}
-                        </h4>
-                        <div className="space-y-1">
-                          {relevantPrivileges
-                            ?.filter((p) => p.category === category)
-                            .map((priv) => {
+                    {RELEVANT_CATEGORIES.map((category) => {
+                      const categoryPrivileges =
+                        relevantPrivileges?.filter(
+                          (p) => p.category === category,
+                        ) ?? [];
+                      const categoryAssignedCount = categoryPrivileges.filter(
+                        (p) =>
+                          rolePerms.some((rp) => rp.privilegeTypeId === p.id),
+                      ).length;
+                      const categoryAllChecked =
+                        categoryPrivileges.length > 0 &&
+                        categoryAssignedCount === categoryPrivileges.length;
+                      const categoryIndeterminate =
+                        categoryAssignedCount > 0 &&
+                        categoryAssignedCount < categoryPrivileges.length;
+
+                      return (
+                        <div key={category} className="space-y-2">
+                          {/* Category Select All */}
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`${roleId}-${category}-select-all`}
+                              className="cursor-pointer"
+                              checked={
+                                categoryIndeterminate
+                                  ? "indeterminate"
+                                  : categoryAllChecked
+                              }
+                              onCheckedChange={(checked) => {
+                                const shouldAssign = checked === true;
+                                categoryPrivileges.forEach((priv) => {
+                                  const isAssigned = rolePerms.some(
+                                    (rp) => rp.privilegeTypeId === priv.id,
+                                  );
+                                  if (shouldAssign && !isAssigned) {
+                                    assignMutation.mutate({
+                                      roleId,
+                                      privilegeTypeId: priv.id,
+                                    });
+                                  } else if (!shouldAssign && isAssigned) {
+                                    const assignment = rolePerms.find(
+                                      (rp) => rp.privilegeTypeId === priv.id,
+                                    );
+                                    if (assignment)
+                                      revokeMutation.mutate(assignment.id);
+                                  }
+                                });
+                              }}
+                            />
+                            <label
+                              htmlFor={`${roleId}-${category}-select-all`}
+                              className="text-xs font-semibold text-muted-foreground uppercase cursor-pointer"
+                            >
+                              {category.replace(/_/g, " ")}
+                            </label>
+                          </div>
+                          <div className="space-y-1 pl-6">
+                            {categoryPrivileges.map((priv) => {
                               const isAssigned = rolePerms.some(
                                 (rp) => rp.privilegeTypeId === priv.id,
                               );
@@ -258,6 +361,7 @@ export function DatabaseAccessControl({
                                 >
                                   <Checkbox
                                     id={`${roleId}-${priv.id}`}
+                                    className="cursor-pointer"
                                     checked={isAssigned}
                                     onCheckedChange={(checked) =>
                                       handleToggle(
@@ -269,16 +373,17 @@ export function DatabaseAccessControl({
                                   />
                                   <label
                                     htmlFor={`${roleId}-${priv.id}`}
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    className="text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                   >
                                     {priv.code}
                                   </label>
                                 </div>
                               );
                             })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="mt-6 flex justify-end">
                     <Button

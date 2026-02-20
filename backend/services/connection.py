@@ -126,22 +126,33 @@ class ConnectionService(BaseDatabaseService):
         try:
             config = data.get('config')
             db_type = data.get('type')
+            
+            # If config is not nested, build it from top-level fields
+            # (frontend sends flat: {host, port, user, password, database, uri, type})
+            if not config and not data.get('id'):
+                flat_keys = ['uri', 'host', 'port', 'user', 'password', 'database']
+                if any(data.get(k) for k in flat_keys):
+                    config = {k: data[k] for k in flat_keys if data.get(k) is not None}
+            
+            logger.info(f"Testing connection. ID provided: {data.get('id')}")
 
             # Fetch existing if ID provided
             if data.get('id'):
-                # Handle session locally for this specific test case
                 from models.metadata import SessionLocal
                 session = SessionLocal()
                 try:
-                    db = session.query(Db).filter(Db.id == data['id']).first()
-                    if db:
-                         db_type = db.type
-                         config = db.config.copy()
+                    # Use get_db_config to handle decryption and fetch details
+                    fetched_type, fetched_config = self.get_db_config(data['id'], session)
+                    if fetched_config:
+                         db_type = fetched_type
+                         config = fetched_config
+                except Exception as e:
+                    logger.warning(f"Could not load config for ID {data.get('id')}: {e}")
                 finally:
                     session.close()
 
             if not config:
-                return {"success": False, "message": "Missing config"}
+                return {"success": False, "message": "Missing config: Database not found or no configuration provided"}
 
             engine = self.create_connection_engine(db_type, config)
             with engine.connect() as conn:
@@ -149,6 +160,7 @@ class ConnectionService(BaseDatabaseService):
             
             return {"success": True, "message": "Connection successful"}
         except Exception as e:
+            logger.error(f"Test connection failed: {e}")
             return {"success": False, "message": str(e)}
 
 connection_service = ConnectionService()

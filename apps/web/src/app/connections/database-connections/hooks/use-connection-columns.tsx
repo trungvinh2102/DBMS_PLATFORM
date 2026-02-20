@@ -23,8 +23,7 @@ import { useMutation } from "@tanstack/react-query";
 
 function TestConnectionButton({ conn }: { conn: any }) {
   const testConnectionMutation = useMutation({
-    mutationFn: (vars: any) =>
-      databaseApi.test({ ...conn.config, type: conn.type }),
+    mutationFn: (vars: any) => databaseApi.test(vars),
   });
 
   const handleTest = async (e: React.MouseEvent) => {

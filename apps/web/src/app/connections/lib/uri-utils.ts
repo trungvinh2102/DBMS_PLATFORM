@@ -16,7 +16,7 @@ export function parseUri(uri: string) {
       port: url.port || "",
       user: decodeURIComponent(url.username || ""),
       password: decodeURIComponent(url.password || ""),
-      database: url.pathname.replace(/^\//, "") || "",
+      database: decodeURIComponent(url.pathname.replace(/^\//, "") || ""),
     };
   } catch {
     return null;
@@ -42,15 +42,19 @@ export function buildUri(
   }
 
   try {
-    // Use URL constructor to properly encode values
-    const url = new URL(`${protocol}://localhost`);
-    url.hostname = host || "localhost";
-    if (port) url.port = port;
-    if (user) url.username = user;
-    if (password) url.password = password;
-    url.pathname = `/${database}`;
+    // Build URI manually to avoid URL-encoding the database name
+    // (URL API encodes spaces and special chars in pathname)
+    const encodedUser = user ? encodeURIComponent(user) : "";
+    const encodedPassword = password ? encodeURIComponent(password) : "";
+    const userPart = encodedUser
+      ? encodedPassword
+        ? `${encodedUser}:${encodedPassword}@`
+        : `${encodedUser}@`
+      : "";
+    const hostPart = host || "localhost";
+    const portPart = port ? `:${port}` : "";
 
-    return url.toString();
+    return `${protocol}://${userPart}${hostPart}${portPart}/${database}`;
   } catch {
     // Fallback to manual construction for non-standard URI formats if needed
     const userPart = user
