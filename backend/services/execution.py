@@ -18,13 +18,14 @@ class ExecutionService(BaseDatabaseService):
     Handles SQL execution and query history.
     """
 
-    def execute_query(self, database_id: str, sql: str):
+    def execute_query(self, database_id: str, sql: str, auto_commit: bool = True):
         """
         Executes a SQL query on the target database.
 
         Args:
             database_id (str): The target database ID.
             sql (str): The SQL query string.
+            auto_commit (bool): Whether to auto-commit the transaction.
 
         Returns:
             dict: {data, columns, executionTime, error}
@@ -41,7 +42,12 @@ class ExecutionService(BaseDatabaseService):
             
             def _op(conn):
                 # Using execution options for autocommit if needed
-                result = conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(sql))
+                if auto_commit:
+                    result = conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(sql))
+                else:
+                    result = conn.execute(text(sql))
+                    # Intentionally not calling conn.commit(), changes will only 
+                    # persist if there's an explicit COMMIT in the SQL itself.
                 if result.returns_rows:
                     keys = list(result.keys())
                     data = [dict(zip(keys, row)) for row in result]

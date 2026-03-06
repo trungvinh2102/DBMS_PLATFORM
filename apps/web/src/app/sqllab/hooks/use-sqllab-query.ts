@@ -7,6 +7,7 @@ import { format } from "sql-formatter";
 interface QueryProps {
   selectedDS: string;
   sql: string;
+  autoCommit?: boolean;
   onSuccess: (response: any) => void;
   onError: (error: string) => void;
 }
@@ -14,14 +15,18 @@ interface QueryProps {
 export function useSQLLabQuery({
   selectedDS,
   sql,
+  autoCommit = true,
   onSuccess,
   onError,
 }: QueryProps) {
   const queryClient = useQueryClient();
 
   const runSQLMutation = useMutation({
-    mutationFn: (vars: { databaseId: string; sql: string }) =>
-      databaseApi.execute(vars.databaseId, vars.sql),
+    mutationFn: (vars: {
+      databaseId: string;
+      sql: string;
+      autoCommit?: boolean;
+    }) => databaseApi.execute(vars.databaseId, vars.sql, vars.autoCommit),
   });
 
   const saveQueryMutation = useMutation({
@@ -45,6 +50,7 @@ export function useSQLLabQuery({
         const response: any = await runSQLMutation.mutateAsync({
           databaseId: selectedDS,
           sql: sqlOverride || sql,
+          autoCommit,
         });
 
         // Axios returns data in data prop usually, but our client interceptor returns response.data
@@ -59,7 +65,15 @@ export function useSQLLabQuery({
         });
       }
     },
-    [selectedDS, sql, runSQLMutation, onSuccess, onError, queryClient],
+    [
+      selectedDS,
+      sql,
+      autoCommit,
+      runSQLMutation,
+      onSuccess,
+      onError,
+      queryClient,
+    ],
   );
 
   const handleFormat = useCallback(

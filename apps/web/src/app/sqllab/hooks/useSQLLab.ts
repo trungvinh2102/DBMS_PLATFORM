@@ -76,6 +76,7 @@ export function useSQLLab() {
   } = useSQLLabQuery({
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
+    autoCommit: autoCommit,
     onSuccess: (res: any) => {
       // Adapt response shape if needed
       updateActiveTab({
@@ -226,8 +227,42 @@ export function useSQLLab() {
     handleOpen: () => setIsOpenDialogOpen(true),
     handleUndo: () => setUndoTrigger((v) => v + 1),
     handleRedo: () => setRedoTrigger((v) => v + 1),
-    handleImport: () => toast.info("Import feature coming soon"),
-    handleExport: () => toast.info("Export feature coming soon"),
+    handleImport: () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".sql,.txt";
+      input.onchange = (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const content = evt.target?.result as string;
+          updateActiveTab({ sql: content });
+          toast.success("File imported successfully");
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    },
+    handleExport: () => {
+      if (!activeTab.sql) {
+        toast.error("No SQL to export");
+        return;
+      }
+      const element = document.createElement("a");
+      const file = new Blob([activeTab.sql], { type: "text/plain" });
+      element.href = URL.createObjectURL(file);
+      element.download = `query_${activeTab.selectedDS || "export"}_${new Date().getTime()}.sql`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      toast.success("SQL script exported");
+    },
+    handleRollback: () => {
+      const run = handleRun("ROLLBACK;");
+      toast.info("Rollback command sent");
+      return run;
+    },
     addTab: () => addTab(activeTab.selectedDS, activeTab.selectedSchema),
     closeTab,
     renameTab,

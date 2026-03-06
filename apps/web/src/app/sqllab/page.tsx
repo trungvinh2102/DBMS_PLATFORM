@@ -160,6 +160,7 @@ export default function SQLLabPage() {
     setShowAISidebar,
     setSelectedText,
     selectedObjectType,
+    handleRollback,
   } = useSQLLab();
 
   // Syntax validation errors from the editor
@@ -206,6 +207,7 @@ export default function SQLLabPage() {
             onExport={handleExport}
             onUndo={handleUndo}
             onRedo={handleRedo}
+            onRollback={handleRollback}
             showAISidebar={showAISidebar}
             setShowAISidebar={setShowAISidebar}
           />
