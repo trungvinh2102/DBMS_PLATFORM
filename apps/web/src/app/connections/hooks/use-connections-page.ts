@@ -7,13 +7,18 @@
  * const { connections, handleSubmit, ... } = useConnectionsPage();
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { DEFAULT_PORTS } from "../components/constants";
 
 export function useConnectionsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const connIdFromUrl = searchParams.get("id");
+
   const [selectedType, setSelectedType] = useState<string>("postgres");
   const [formData, setFormData] = useState({
     host: "localhost",
@@ -27,15 +32,7 @@ export function useConnectionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [activeConn, setActiveConn] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState("DB Connections");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Clear active connection when switching away from DB Connections
-  useEffect(() => {
-    if (activeTab !== "DB Connections") {
-      setActiveConn(null);
-    }
-  }, [activeTab]);
 
   const {
     data: connections,
@@ -143,10 +140,30 @@ export function useConnectionsPage() {
     }
   };
 
-  const handleEdit = (conn: any) => {
-    setActiveConn(conn);
-    setActiveTab("DB Connections");
-  };
+  // Sync activeConn from URL param when connections are loaded
+  useEffect(() => {
+    if (connIdFromUrl && connections && !activeConn) {
+      const found = (connections as any[]).find(
+        (c: any) => c.id === connIdFromUrl,
+      );
+      if (found) {
+        setActiveConn(found);
+      }
+    }
+  }, [connIdFromUrl, connections, activeConn]);
+
+  const handleEdit = useCallback(
+    (conn: any) => {
+      setActiveConn(conn);
+      router.push(`/connections?id=${conn.id}`);
+    },
+    [router],
+  );
+
+  const handleBack = useCallback(() => {
+    setActiveConn(null);
+    router.push("/connections");
+  }, [router]);
 
   const filteredConnections = ((connections as any) || []).filter(
     (conn: any) =>
@@ -170,8 +187,7 @@ export function useConnectionsPage() {
       setDeleteId,
       activeConn,
       setActiveConn,
-      activeTab,
-      setActiveTab,
+
       searchQuery,
       setSearchQuery,
       isFetching,
@@ -188,6 +204,7 @@ export function useConnectionsPage() {
       handleDelete,
       confirmDelete,
       handleEdit,
+      handleBack,
       refetch,
       resetForm,
     },

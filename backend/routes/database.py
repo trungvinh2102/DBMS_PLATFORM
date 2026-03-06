@@ -82,6 +82,61 @@ def get_tables():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@database_bp.route('/views', methods=['GET'])
+def get_views():
+    """Get views for a specific schema."""
+    db_id = request.args.get('databaseId')
+    schema = request.args.get('schema', 'public')
+    try:
+        views = metadata_service.get_views(db_id, schema)
+        return jsonify(views)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@database_bp.route('/functions', methods=['GET'])
+def get_functions():
+    """Get functions for a specific schema."""
+    db_id = request.args.get('databaseId')
+    schema = request.args.get('schema', 'public')
+    try:
+        functions = metadata_service.get_functions(db_id, schema)
+        return jsonify(functions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@database_bp.route('/procedures', methods=['GET'])
+def get_procedures():
+    """Get procedures for a specific schema."""
+    db_id = request.args.get('databaseId')
+    schema = request.args.get('schema', 'public')
+    try:
+        procedures = metadata_service.get_procedures(db_id, schema)
+        return jsonify(procedures)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@database_bp.route('/triggers', methods=['GET'])
+def get_triggers():
+    """Get triggers for a specific schema."""
+    db_id = request.args.get('databaseId')
+    schema = request.args.get('schema', 'public')
+    try:
+        triggers = metadata_service.get_triggers(db_id, schema)
+        return jsonify(triggers)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@database_bp.route('/events', methods=['GET'])
+def get_events():
+    """Get events for a specific schema."""
+    db_id = request.args.get('databaseId')
+    schema = request.args.get('schema', 'public')
+    try:
+        events = metadata_service.get_events(db_id, schema)
+        return jsonify(events)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @database_bp.route('/columns', methods=['GET'])
 def get_columns():
     """Get columns for a specific table."""

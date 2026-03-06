@@ -66,7 +66,15 @@ export function EnvironmentSection() {
   );
 }
 
-export function SecuritySection() {
+interface SecuritySectionProps {
+  sslMode?: string;
+  onSslModeChange?: (value: string) => void;
+}
+
+export function SecuritySection({
+  sslMode,
+  onSslModeChange,
+}: SecuritySectionProps = {}) {
   return (
     <div className="pt-8 border-t border-border">
       <div className="flex items-center gap-3">
@@ -88,7 +96,10 @@ export function SecuritySection() {
           <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
             SSL Mode
           </Label>
-          <Select defaultValue="DISABLE">
+          <Select
+            value={sslMode || "DISABLE"}
+            onValueChange={(val) => val && onSslModeChange?.(val)}
+          >
             <SelectTrigger className="h-9 font-medium border-border bg-muted/10 rounded-md text-xs">
               <SelectValue />
             </SelectTrigger>

@@ -16,6 +16,11 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  Eye,
+  CalendarClock,
+  FunctionSquare,
+  Settings2,
+  Zap,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,6 +41,7 @@ interface SQLLabObjectPanelProps {
   setActiveRightTab: (tab: string) => void;
   selectedSchema: string;
   selectedTable: string | null;
+  selectedObjectType?: string;
   onRefreshTables: () => void;
   loadingTData: boolean;
   currentTData: any[];
@@ -55,6 +61,7 @@ export function SQLLabObjectPanel({
   setActiveRightTab,
   selectedSchema,
   selectedTable,
+  selectedObjectType,
   onRefreshTables,
   loadingTData,
   currentTData,
@@ -69,19 +76,61 @@ export function SQLLabObjectPanel({
   triggers,
 }: SQLLabObjectPanelProps) {
   const [structureSearch, setStructureSearch] = useState("");
+  const React_useEffect = require("react").useEffect;
+
+  let availableTabs = [
+    "Data",
+    "Structure",
+    "Index",
+    "Relation",
+    "Trigger",
+    "Info",
+    "Script",
+  ];
+  if (selectedObjectType === "view") {
+    availableTabs = ["Data", "Structure", "Info", "Script"];
+  } else if (
+    ["event", "function", "procedure", "trigger"].includes(
+      selectedObjectType || "",
+    )
+  ) {
+    availableTabs = ["Info", "Script"];
+  }
+
+  React_useEffect(() => {
+    if (selectedTable) {
+      const lowerTabs = availableTabs.map((t) => t.toLowerCase());
+      if (!lowerTabs.includes(activeRightTab)) {
+        setActiveRightTab(lowerTabs[0]);
+      }
+    }
+  }, [selectedTable, selectedObjectType]);
+
+  const ObjectIcon = () => {
+    switch (selectedObjectType) {
+      case "view":
+        return <Eye className="h-3.5 w-3.5 text-purple-500 shrink-0" />;
+      case "event":
+        return (
+          <CalendarClock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+        );
+      case "function":
+        return (
+          <FunctionSquare className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+        );
+      case "procedure":
+        return <Settings2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />;
+      case "trigger":
+        return <Zap className="h-3.5 w-3.5 text-green-500 shrink-0" />;
+      default:
+        return <Table className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+    }
+  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center h-10 border-b overflow-x-auto no-scrollbar bg-muted/5 shrink-0">
-        {[
-          "Data",
-          "Structure",
-          "Index",
-          "Relation",
-          "Trigger",
-          "Info",
-          "Script",
-        ].map((t) => (
+        {availableTabs.map((t) => (
           <button
             key={t}
             onClick={() => setActiveRightTab(t.toLowerCase())}
@@ -101,7 +150,7 @@ export function SQLLabObjectPanel({
         <Database className="h-3.5 w-3.5 opacity-40 shrink-0" />
         <span className="text-foreground/80 truncate">{selectedSchema}</span>
         <ChevronRight className="h-3 w-3 opacity-20 shrink-0" />
-        <Table className="h-3.5 w-3.5 opacity-40 shrink-0" />
+        <ObjectIcon />
         <span className="text-foreground/80 truncate">
           {selectedTable || "UNSELECTED"}
         </span>
@@ -194,7 +243,7 @@ export function SQLLabObjectPanel({
         ) : activeRightTab === "structure" ? (
           <div className="p-5 h-full flex flex-col">
             <div className="flex items-center justify-between mb-4 shrink-0">
-              <h4 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">
+              <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em]">
                 Schema Definition
               </h4>
               <Badge
@@ -228,8 +277,7 @@ export function SQLLabObjectPanel({
                 </div>
               ) : (
                 columnsData
-                  ?.filter((col: any) => col.table === selectedTable)
-                  .filter(
+                  ?.filter(
                     (col: any) =>
                       !structureSearch ||
                       col.name
@@ -252,15 +300,14 @@ export function SQLLabObjectPanel({
                       </div>
                       <Badge
                         variant="outline"
-                        className="text-[9px] font-mono font-black opacity-40 bg-background h-5 px-1.5 group-hover:opacity-100 transition-opacity"
+                        className="text-[9px] font-mono font-black opacity-70 border-border/60 bg-muted/10 h-5 px-1.5 group-hover:opacity-100 transition-opacity"
                       >
                         {col.type}
                       </Badge>
                     </div>
                   ))
               )}
-              {columnsData?.filter((col: any) => col.table === selectedTable)
-                .length === 0 && (
+              {(!columnsData || columnsData.length === 0) && (
                 <div className="text-center py-10 opacity-30 text-xs italic">
                   No columns found
                 </div>
@@ -269,15 +316,20 @@ export function SQLLabObjectPanel({
           </div>
         ) : activeRightTab === "index" ? (
           <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] mb-4">
+            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
               Indexes
             </h4>
             <div className="space-y-2">
               {indexes && indexes.length > 0 ? (
                 indexes.map((idx, i) => (
-                  <div key={i} className="p-3 bg-muted/20 rounded-lg text-xs">
-                    <div className="font-bold mb-1">{idx.indexname}</div>
-                    <div className="font-mono text-[10px] opacity-60 break-all">
+                  <div
+                    key={i}
+                    className="p-3 bg-muted/20 border border-border/30 rounded-lg text-xs"
+                  >
+                    <div className="font-bold text-foreground/90 mb-1">
+                      {idx.indexname}
+                    </div>
+                    <div className="font-mono text-muted-foreground text-[10px] break-all">
                       {idx.indexdef}
                     </div>
                   </div>
@@ -291,16 +343,21 @@ export function SQLLabObjectPanel({
           </div>
         ) : activeRightTab === "relation" ? (
           <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] mb-4">
+            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
               Foreign Keys
             </h4>
             <div className="space-y-2">
               {foreignKeys && foreignKeys.length > 0 ? (
                 foreignKeys.map((fk, i) => (
-                  <div key={i} className="p-3 bg-muted/20 rounded-lg text-xs">
-                    <div className="font-bold mb-1">{fk.constraint}</div>
-                    <div className="flex items-center gap-2 opacity-70">
-                      <span className="font-mono">{fk.column}</span>
+                  <div
+                    key={i}
+                    className="p-3 bg-muted/20 border border-border/30 rounded-lg text-xs"
+                  >
+                    <div className="font-bold text-foreground/90 mb-1">
+                      {fk.constraint}
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <span className="font-mono text-[11px]">{fk.column}</span>
                       <ChevronRight className="h-3 w-3" />
                       <span className="font-mono">
                         {fk.foreignTable}.{fk.foreignColumn}
@@ -317,7 +374,7 @@ export function SQLLabObjectPanel({
           </div>
         ) : activeRightTab === "trigger" ? (
           <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] mb-4">
+            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
               Triggers
             </h4>
             <div className="space-y-2">
@@ -336,7 +393,7 @@ export function SQLLabObjectPanel({
           </div>
         ) : activeRightTab === "info" ? (
           <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] mb-4">
+            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
               Table Statistics
             </h4>
             {tableInfo ? (
@@ -383,12 +440,12 @@ export function SQLLabObjectPanel({
         ) : activeRightTab === "script" ? (
           <div className="h-full flex flex-col">
             <div className="p-3 border-b bg-muted/5 flex justify-between items-center">
-              <h4 className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">
+              <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em]">
                 DDL Script
               </h4>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <pre className="text-xs font-mono bg-muted/30 p-4 rounded-lg overflow-auto whitespace-pre-wrap select-text">
+              <pre className="text-xs font-mono text-foreground/90 bg-muted/30 border border-border/60 shadow-sm p-4 rounded-lg overflow-auto whitespace-pre-wrap select-text">
                 {tableDDL || "-- No DDL available"}
               </pre>
             </div>

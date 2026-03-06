@@ -189,24 +189,20 @@ export function SQLLabSidebar({
                     // Only tables are selectable for now in main view logic, but we can allow selecting others if needed
                     // For now, only highlight if it matches selectedTable AND we are in the tables folder?
                     // Or just generic selection if we want to show details for other objects.
-                    selectedTable === item && id === "tables"
+                    selectedTable === item
                       ? "bg-primary/10 text-primary font-bold shadow-sm"
                       : "text-muted-foreground/80 hover:bg-muted/30 hover:text-foreground",
                   )}
                   onClick={() => {
-                    // Allow selecting tables and views
-                    if (id === "tables" || id === "views")
-                      setSelectedTable(item);
+                    setSelectedTable(item);
                   }}
                 >
-                  {/* Reuse Table icon or passed icon? Passed icon is better but small size */}
                   <div
                     className={cn(
-                      "h-3 w-3 shrink-0 transition-colors opacity-70",
-                      selectedTable === item &&
-                        (id === "tables" || id === "views")
-                        ? "text-primary"
-                        : "text-muted-foreground/40",
+                      "h-3.5 w-3.5 shrink-0 transition-all",
+                      selectedTable === item
+                        ? "opacity-100 scale-110 drop-shadow-sm"
+                        : "opacity-70 grayscale-30",
                     )}
                   >
                     {icon}
@@ -316,7 +312,7 @@ export function SQLLabSidebar({
         {folderItem(
           "tables",
           "Tables",
-          <Table2 className="h-3.5 w-3.5" />,
+          <Table2 className="h-4 w-4 text-blue-500" />,
           filteredTables,
           filteredTables?.length,
           true,
@@ -324,35 +320,35 @@ export function SQLLabSidebar({
         {folderItem(
           "views",
           "Views",
-          <Eye className="h-3.5 w-3.5" />,
+          <Eye className="h-4 w-4 text-purple-500" />,
           filteredViews,
           filteredViews?.length,
         )}
         {folderItem(
           "events",
           "Events",
-          <CalendarClock className="h-3.5 w-3.5" />,
+          <CalendarClock className="h-4 w-4 text-orange-500" />,
           filteredEvents,
           filteredEvents?.length,
         )}
         {folderItem(
           "functions",
           "Functions",
-          <FunctionSquare className="h-3.5 w-3.5" />,
+          <FunctionSquare className="h-4 w-4 text-yellow-500" />,
           filteredFunctions,
           filteredFunctions?.length,
         )}
         {folderItem(
           "procedures",
           "Procedures",
-          <Settings2 className="h-3.5 w-3.5" />,
+          <Settings2 className="h-4 w-4 text-slate-500" />,
           filteredProcedures,
           filteredProcedures?.length,
         )}
         {folderItem(
           "triggers",
           "Triggers",
-          <Zap className="h-3.5 w-3.5" />,
+          <Zap className="h-4 w-4 text-green-500" />,
           filteredTriggers,
           filteredTriggers?.length,
         )}

@@ -3,7 +3,7 @@
  * @description Hook to manage SQL Lab query tabs and their persistence.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
 export interface QueryTab {
   id: string;
@@ -53,44 +53,57 @@ export function useSQLLabTabs() {
     localStorage.setItem("sqllab_active_tab", activeTabId);
   }, [tabs, activeTabId]);
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+  const activeTab = useMemo(
+    () => tabs.find((t) => t.id === activeTabId) || tabs[0],
+    [tabs, activeTabId],
+  );
 
-  const addTab = (selectedDS: string, selectedSchema: string) => {
+  const addTab = useCallback((selectedDS: string, selectedSchema: string) => {
     const newId = Math.random().toString(36).substring(7);
-    const newTab: QueryTab = {
-      id: newId,
-      name: `SQL-${tabs.length + 1}`,
-      sql: "",
-      selectedDS,
-      selectedSchema,
-      results: [],
-      columns: [],
-      error: null,
-    };
-    setTabs((prev) => [...prev, newTab]);
+    setTabs((prev) => {
+      const newTab: QueryTab = {
+        id: newId,
+        name: `SQL-${prev.length + 1}`,
+        sql: "",
+        selectedDS,
+        selectedSchema,
+        results: [],
+        columns: [],
+        error: null,
+      };
+      return [...prev, newTab];
+    });
     setActiveTabId(newId);
-  };
+  }, []);
 
-  const closeTab = (id: string) => {
-    if (tabs.length === 1) return;
-    const newTabs = tabs.filter((t) => t.id !== id);
-    setTabs(newTabs);
-    if (activeTabId === id) {
-      setActiveTabId(newTabs[newTabs.length - 1].id);
-    }
-  };
+  const closeTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      if (prev.length === 1) return prev;
+      const newTabs = prev.filter((t) => t.id !== id);
+      setActiveTabId((prevActiveId) => {
+        if (prevActiveId === id) {
+          return newTabs[newTabs.length - 1].id;
+        }
+        return prevActiveId;
+      });
+      return newTabs;
+    });
+  }, []);
 
-  const renameTab = (id: string, newName: string) => {
+  const renameTab = useCallback((id: string, newName: string) => {
     setTabs((prev) =>
       prev.map((t) => (t.id === id ? { ...t, name: newName } : t)),
     );
-  };
+  }, []);
 
-  const updateActiveTab = (updates: Partial<QueryTab>) => {
-    setTabs((prev) =>
-      prev.map((t) => (t.id === activeTabId ? { ...t, ...updates } : t)),
-    );
-  };
+  const updateActiveTab = useCallback(
+    (updates: Partial<QueryTab>) => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === activeTabId ? { ...t, ...updates } : t)),
+      );
+    },
+    [activeTabId],
+  );
 
   return {
     tabs,

@@ -39,27 +39,47 @@ export function useSQLLabMetadata({
   });
   const tables = (tablesQuery.data as any) || [];
 
-  // Views not yet implemented in backend strictly, using tables endpoint for now or empty
-  // TODO: Add separate views endpoint if needed or filter tables
-  const views = [];
-
-  const allColumnsQuery = useQuery({
-    queryKey: ["columns", selectedDS, selectedSchema],
-    // Backend doesn't have getAllColumns yet, maybe implement or loop tables?
-    // For now returning empty or we need to add endpoint
-    queryFn: async () => [],
+  const viewsQuery = useQuery({
+    queryKey: ["views", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getViews(selectedDS, selectedSchema),
     enabled: !!selectedDS,
   });
-  const allColumns = (allColumnsQuery.data as any[]) || [];
+  const views = (viewsQuery.data as any) || [];
 
-  // Functions, Procedures, Triggers, Events are placeholders in current backend implementation
-  // Returns empty arrays safely
+  const functionsQuery = useQuery({
+    queryKey: ["functions", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getFunctions(selectedDS, selectedSchema),
+    enabled: !!selectedDS,
+  });
+  const functions = (functionsQuery.data as any) || [];
+
+  const proceduresQuery = useQuery({
+    queryKey: ["procedures", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getProcedures(selectedDS, selectedSchema),
+    enabled: !!selectedDS,
+  });
+  const procedures = (proceduresQuery.data as any) || [];
+
+  const triggersQuery = useQuery({
+    queryKey: ["triggers", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getTriggers(selectedDS, selectedSchema),
+    enabled: !!selectedDS,
+  });
+  const triggers = (triggersQuery.data as any) || [];
+
+  const eventsQuery = useQuery({
+    queryKey: ["events", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getEvents(selectedDS, selectedSchema),
+    enabled: !!selectedDS,
+  });
+  const events = (eventsQuery.data as any) || [];
+
   const metadata = {
-    views: [],
-    functions: [],
-    procedures: [],
-    triggers: [],
-    events: [],
+    views,
+    functions,
+    procedures,
+    triggers,
+    events,
   };
 
   const indexesQuery = useQuery({
@@ -82,9 +102,18 @@ export function useSQLLabMetadata({
 
   const tableDDLQuery = useQuery({
     queryKey: ["ddl", selectedDS, selectedTable],
-    queryFn: () => databaseApi.getDDL(selectedDS, selectedTable!),
+    queryFn: () =>
+      databaseApi.getDDL(selectedDS, selectedTable!, selectedSchema),
     enabled: !!selectedDS && !!selectedTable,
   });
+
+  const allColumnsQuery = useQuery({
+    queryKey: ["columns", selectedDS, selectedTable],
+    queryFn: () =>
+      databaseApi.getColumns(selectedDS, selectedTable!, selectedSchema),
+    enabled: !!selectedDS && !!selectedTable,
+  });
+  const allColumns = (allColumnsQuery.data as any[]) || [];
 
   useEffect(() => {
     const error = schemasError || tablesQuery.error;
@@ -102,6 +131,7 @@ export function useSQLLabMetadata({
         foreignKeysQuery.refetch(),
         tableInfoQuery.refetch(),
         tableDDLQuery.refetch(),
+        allColumnsQuery.refetch(),
       ]);
     }
     await tablesQuery.refetch();
@@ -114,6 +144,7 @@ export function useSQLLabMetadata({
     tables,
     refetchTables: refetchAll,
     isLoadingTables: tablesQuery.isLoading,
+    isLoadingColumns: allColumnsQuery.isLoading,
     allColumns,
     ...metadata,
     indexes: (indexesQuery.data as any[]) || [],

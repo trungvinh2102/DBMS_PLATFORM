@@ -58,6 +58,76 @@ class MetadataService(BaseDatabaseService):
             return [row[0] for row in result]
         return self.run_dynamic_query(database_id, _op)
 
+    def get_views(self, database_id: str, schema: str = 'public'):
+        def _op(conn):
+            query = text("""
+                SELECT table_name FROM information_schema.views 
+                WHERE table_schema = :schema
+                ORDER BY table_name
+            """)
+            try:
+                result = conn.execute(query, {"schema": schema})
+                return [row[0] for row in result]
+            except Exception:
+                return []
+        return self.run_dynamic_query(database_id, _op)
+
+    def get_functions(self, database_id: str, schema: str = 'public'):
+        def _op(conn):
+            query = text("""
+                SELECT routine_name FROM information_schema.routines 
+                WHERE routine_schema = :schema AND routine_type = 'FUNCTION'
+                ORDER BY routine_name
+            """)
+            try:
+                result = conn.execute(query, {"schema": schema})
+                return list(set([row[0] for row in result]))
+            except Exception:
+                return []
+        return self.run_dynamic_query(database_id, _op)
+
+    def get_procedures(self, database_id: str, schema: str = 'public'):
+        def _op(conn):
+            query = text("""
+                SELECT routine_name FROM information_schema.routines 
+                WHERE routine_schema = :schema AND routine_type = 'PROCEDURE'
+                ORDER BY routine_name
+            """)
+            try:
+                result = conn.execute(query, {"schema": schema})
+                return list(set([row[0] for row in result]))
+            except Exception:
+                return []
+        return self.run_dynamic_query(database_id, _op)
+
+    def get_triggers(self, database_id: str, schema: str = 'public'):
+        def _op(conn):
+            query = text("""
+                SELECT trigger_name FROM information_schema.triggers 
+                WHERE trigger_schema = :schema
+                ORDER BY trigger_name
+            """)
+            try:
+                result = conn.execute(query, {"schema": schema})
+                return [row[0] for row in result]
+            except Exception:
+                return []
+        return self.run_dynamic_query(database_id, _op)
+
+    def get_events(self, database_id: str, schema: str = 'public'):
+        def _op(conn):
+            query = text("""
+                SELECT event_name FROM information_schema.events 
+                WHERE event_schema = :schema
+                ORDER BY event_name
+            """)
+            try:
+                result = conn.execute(query, {"schema": schema})
+                return [row[0] for row in result]
+            except Exception:
+                return []
+        return self.run_dynamic_query(database_id, _op)
+
     def get_columns(self, database_id: str, schema: str, table: str):
         """
         Lists columns for a table.
@@ -139,14 +209,17 @@ class MetadataService(BaseDatabaseService):
                   pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table)) - pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as index_size,
                   (SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = :schema AND relname = :table) as row_count
             """)
-            result = conn.execute(query, {"schema": schema, "table": table}).fetchone()
-            if result:
-                 return {
-                     "total_size": result[0],
-                     "data_size": result[1],
-                     "index_size": result[2],
-                     "row_count": result[3]
-                 }
+            try:
+                result = conn.execute(query, {"schema": schema, "table": table}).fetchone()
+                if result:
+                     return {
+                         "total_size": result[0] if result[0] else "0 bytes",
+                         "data_size": result[1] if result[1] else "0 bytes",
+                         "index_size": result[2] if result[2] else "0 bytes",
+                         "row_count": result[3] if result[3] is not None else 0
+                     }
+            except Exception as e:
+                logger.warning(f"Could not get table info for {schema}.{table}: {e}")
             return {}
         return self.run_dynamic_query(database_id, _op)
 

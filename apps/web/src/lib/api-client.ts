@@ -62,6 +62,16 @@ export const databaseApi = {
     req(api.get("/database/schemas", { params: { databaseId } })),
   getTables: (databaseId: string, schema?: string) =>
     req(api.get("/database/tables", { params: { databaseId, schema } })),
+  getViews: (databaseId: string, schema?: string) =>
+    req(api.get("/database/views", { params: { databaseId, schema } })),
+  getFunctions: (databaseId: string, schema?: string) =>
+    req(api.get("/database/functions", { params: { databaseId, schema } })),
+  getProcedures: (databaseId: string, schema?: string) =>
+    req(api.get("/database/procedures", { params: { databaseId, schema } })),
+  getTriggers: (databaseId: string, schema?: string) =>
+    req(api.get("/database/triggers", { params: { databaseId, schema } })),
+  getEvents: (databaseId: string, schema?: string) =>
+    req(api.get("/database/events", { params: { databaseId, schema } })),
   getColumns: (databaseId: string, table: string, schema?: string) =>
     req(
       api.get("/database/columns", { params: { databaseId, table, schema } }),

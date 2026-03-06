@@ -50,6 +50,7 @@ export function useSQLLab() {
     tables,
     refetchTables,
     isLoadingTables,
+    isLoadingColumns: isMetadataLoadingColumns,
     allColumns,
     indexes,
     foreignKeys,
@@ -98,7 +99,7 @@ export function useSQLLab() {
     if (ds && ds.length > 0) {
       if (initialConnectionId) {
         const target = ds.find((d: any) => d.id === initialConnectionId);
-        if (target) {
+        if (target && activeTab.selectedDS !== target.id) {
           updateActiveTab({ selectedDS: target.id });
           return;
         }
@@ -125,14 +126,31 @@ export function useSQLLab() {
       databaseApi.execute(vars.databaseId, vars.sql),
   });
 
+  const getSelectedObjectType = useCallback(() => {
+    if (!selectedTable) return "table";
+    if (metadata.views?.includes(selectedTable)) return "view";
+    if (metadata.events?.includes(selectedTable)) return "event";
+    if (metadata.functions?.includes(selectedTable)) return "function";
+    if (metadata.procedures?.includes(selectedTable)) return "procedure";
+    if (metadata.triggers?.includes(selectedTable)) return "trigger";
+    return "table";
+  }, [selectedTable, metadata]);
+
+  const selectedObjectType = getSelectedObjectType();
+
   useEffect(() => {
-    if (selectedTable && activeTab.selectedDS && activeRightTab === "data") {
+    if (
+      selectedTable &&
+      activeTab.selectedDS &&
+      activeRightTab === "data" &&
+      (selectedObjectType === "table" || selectedObjectType === "view")
+    ) {
       tableDataMutation.mutate({
         databaseId: activeTab.selectedDS,
         sql: `SELECT * FROM "${selectedTable}" LIMIT 100`,
       });
     }
-  }, [selectedTable, activeTab.selectedDS, activeRightTab]);
+  }, [selectedTable, activeTab.selectedDS, activeRightTab, selectedObjectType]);
 
   return {
     tabs,
@@ -156,6 +174,7 @@ export function useSQLLab() {
     setAutoCommit,
     showRightPanel,
     setShowRightPanel,
+    selectedObjectType,
     cursorPos,
     setCursorPos,
     tabSize,
@@ -184,15 +203,16 @@ export function useSQLLab() {
     currentTColumns: (tableDataMutation.data as any)?.columns || [],
     loadingTData: tableDataMutation.isPending,
     columnsData: allColumns,
-    isLoadingColumns: isLoadingSchemas || isLoadingTables,
+    isLoadingColumns:
+      isLoadingSchemas || isLoadingTables || isMetadataLoadingColumns,
     indexes,
     foreignKeys,
     tableInfo,
     tableDDL,
     executionTime: (runSQLMutation as any).data?.executionTime || 0,
     selectedDSName:
-      dataSources.find((ds) => ds.id === activeTab.selectedDS)?.databaseName ||
-      "",
+      dataSources.find((ds: any) => ds.id === activeTab.selectedDS)
+        ?.databaseName || "",
     handleRun: (sqlOverride?: string | React.SyntheticEvent) => {
       const actualSql =
         typeof sqlOverride === "string" ? sqlOverride : undefined;

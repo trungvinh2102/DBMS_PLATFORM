@@ -159,6 +159,7 @@ export default function SQLLabPage() {
     showAISidebar,
     setShowAISidebar,
     setSelectedText,
+    selectedObjectType,
   } = useSQLLab();
 
   // Syntax validation errors from the editor
@@ -280,6 +281,7 @@ export default function SQLLabPage() {
                       setActiveRightTab={setActiveRightTab}
                       selectedSchema={selectedSchema}
                       selectedTable={selectedTable}
+                      selectedObjectType={selectedObjectType}
                       onRefreshTables={refetchTables}
                       loadingTData={loadingTData}
                       currentTData={currentTData}
