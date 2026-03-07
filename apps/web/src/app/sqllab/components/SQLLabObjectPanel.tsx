@@ -79,8 +79,8 @@ export function SQLLabObjectPanel({
 }: SQLLabObjectPanelProps) {
   const [structureSearch, setStructureSearch] = useState("");
   const { theme } = useTheme();
-  // Safe default for SSR/early render
-  const monacoTheme = theme === "light" ? "vs-light" : "vs-dark";
+  // Use the same custom themes as the main SQLEditor to prevent global theme override
+  const monacoTheme = theme === "dark" ? "querypie-dark" : "querypie-light";
   const React_useEffect = require("react").useEffect;
 
   let availableTabs = [
