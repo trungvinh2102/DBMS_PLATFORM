@@ -178,7 +178,7 @@ export const registerSqlAutocomplete = (
   >,
 ) => {
   return monaco.languages.registerCompletionItemProvider("sql", {
-    triggerCharacters: [" ", ".", '"'],
+    triggerCharacters: [".", '"'],
     provideCompletionItems: (
       model: monacoEditor.editor.ITextModel,
       position: monacoEditor.Position,

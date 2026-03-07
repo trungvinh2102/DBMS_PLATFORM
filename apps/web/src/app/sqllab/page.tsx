@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 
 import { toast } from "sonner";
@@ -78,6 +78,20 @@ const OpenQueryDialog = dynamic(
 import { useSQLLab } from "./hooks/useSQLLab";
 
 export default function SQLLabPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex items-center justify-center">
+          Loading SQL Lab...
+        </div>
+      }
+    >
+      <SQLLabContent />
+    </Suspense>
+  );
+}
+
+function SQLLabContent() {
   const {
     // State
     sql,
@@ -96,6 +110,8 @@ export default function SQLLabPage() {
     setSelectedTable,
     autoCommit,
     setAutoCommit,
+    limit,
+    setLimit,
     showRightPanel,
     setShowRightPanel,
     cursorPos,
@@ -167,7 +183,7 @@ export default function SQLLabPage() {
   const [syntaxErrors, setSyntaxErrors] = useState<SyntaxError[]>([]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-background text-foreground select-none">
+    <div className="flex flex-col h-full overflow-hidden bg-background text-foreground">
       <div className="flex-1 flex overflow-hidden">
         <SQLLabSidebar
           dataSources={dataSources}
@@ -201,6 +217,8 @@ export default function SQLLabPage() {
             handleStop={handleStop}
             autoCommit={autoCommit}
             setAutoCommit={setAutoCommit}
+            limit={limit}
+            setLimit={setLimit}
             onSave={handleSave}
             onOpen={handleOpen}
             onImport={handleImport}
@@ -259,6 +277,7 @@ export default function SQLLabPage() {
                       syntaxErrors={syntaxErrors}
                       activeTab={activeResultTab}
                       onTabChange={setActiveResultTab}
+                      sql={sql}
                     />
                   </ResizablePanel>
                 </ResizablePanelGroup>

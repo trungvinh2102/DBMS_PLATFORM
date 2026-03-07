@@ -14,6 +14,7 @@
 
 "use client";
 
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 
 import { ConnectionTable } from "./components/ConnectionTable";
@@ -51,6 +52,20 @@ const DeleteConnectionDialog = dynamic(
 );
 
 export default function ConnectionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex items-center justify-center">
+          Loading connections...
+        </div>
+      }
+    >
+      <ConnectionsContent />
+    </Suspense>
+  );
+}
+
+function ConnectionsContent() {
   const { state, data, handlers } = useConnectionsPage();
 
   const {

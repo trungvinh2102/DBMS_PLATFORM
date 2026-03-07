@@ -205,8 +205,9 @@ def execute_query():
     db_id = data.get('databaseId')
     sql = data.get('sql')
     auto_commit = data.get('autoCommit', True)
+    limit = data.get('limit', 1000)
     try:
-        result = execution_service.execute_query(db_id, sql, auto_commit)
+        result = execution_service.execute_query(db_id, sql, auto_commit, limit)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

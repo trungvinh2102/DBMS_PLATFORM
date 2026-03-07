@@ -8,6 +8,12 @@ from flask import request, jsonify, g
 import jwt
 import os
 
+from functools import wraps
+from flask import request, jsonify, g
+import jwt
+import os
+from models.metadata import User, SessionLocal
+
 SECRET_KEY = os.getenv("JWT_SECRET", "secret")
 ALGORITHM = "HS256"
 
@@ -25,11 +31,22 @@ def login_required(f):
         
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            if 'userId' not in payload:
+            user_id = payload.get('userId')
+            if not user_id:
                 raise Exception("Invalid token payload")
-            g.user = payload # {userId, email, role}
-        except:
-            return jsonify({'message': 'Token is invalid'}), 401
+                
+            # Verify user exists in database
+            session = SessionLocal()
+            try:
+                user = session.query(User).filter(User.id == user_id).first()
+                if not user:
+                    return jsonify({'message': 'User no longer exists'}), 401
+                g.user = payload # {userId, email, role}
+            finally:
+                session.close()
+                
+        except Exception as e:
+            return jsonify({'message': f'Token is invalid: {str(e)}'}), 401
         
         return f(*args, **kwargs)
     return decorated

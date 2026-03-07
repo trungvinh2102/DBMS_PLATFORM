@@ -17,8 +17,7 @@ class ExecutionService(BaseDatabaseService):
     """
     Handles SQL execution and query history.
     """
-
-    def execute_query(self, database_id: str, sql: str, auto_commit: bool = True):
+    def execute_query(self, database_id: str, sql: str, auto_commit: bool = True, limit: int = 1000):
         """
         Executes a SQL query on the target database.
 
@@ -41,11 +40,23 @@ class ExecutionService(BaseDatabaseService):
             if not sql: raise Exception("SQL required")
             
             def _op(conn):
+                # Apply default limit for simple SELECT queries to prevent massive data transfers
+                final_sql = sql.strip()
+                
+                # Strip trailing semicolon if it exists before appending LIMIT
+                if final_sql.endswith(';'):
+                    final_sql = final_sql[:-1].strip()
+                    
+                upper_sql = final_sql.upper()
+                if upper_sql.startswith('SELECT') and 'LIMIT' not in upper_sql:
+                    # Very basic check, proper SQL parsing would be better but this works for simple cases
+                    final_sql = f"{final_sql} LIMIT {limit}"
+
                 # Using execution options for autocommit if needed
                 if auto_commit:
-                    result = conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(sql))
+                    result = conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(final_sql))
                 else:
-                    result = conn.execute(text(sql))
+                    result = conn.execute(text(final_sql))
                     # Intentionally not calling conn.commit(), changes will only 
                     # persist if there's an explicit COMMIT in the SQL itself.
                 if result.returns_rows:

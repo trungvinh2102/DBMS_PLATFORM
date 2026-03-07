@@ -26,7 +26,7 @@ export function useSQLLab() {
   // Basic UI States
   const [activeRightTab, setActiveRightTab] = useState("data");
   const [activeResultTab, setActiveResultTab] = useState<
-    "results" | "messages" | "problems"
+    "results" | "messages" | "problems" | "charts" | "lineage"
   >("results");
   const [rightPanelMode, setRightPanelMode] = useState<"object" | "history">(
     "object",
@@ -34,6 +34,7 @@ export function useSQLLab() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [autoCommit, setAutoCommit] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [limit, setLimit] = useState(1000);
   const [cursorPos, setCursorPos] = useState({ lineNumber: 1, column: 1 });
   const [tabSize, setTabSize] = useState(4);
   const [undoTrigger, setUndoTrigger] = useState(0);
@@ -77,6 +78,7 @@ export function useSQLLab() {
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
     autoCommit: autoCommit,
+    limit: limit,
     onSuccess: (res: any) => {
       // Adapt response shape if needed
       updateActiveTab({
@@ -173,6 +175,8 @@ export function useSQLLab() {
     setSelectedTable,
     autoCommit,
     setAutoCommit,
+    limit,
+    setLimit,
     showRightPanel,
     setShowRightPanel,
     selectedObjectType,

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToolbarButton } from "./ToolbarButton";
+import { Input } from "@/components/ui/input";
 
 interface SQLLabToolbarProps {
   handleRun: () => void;
@@ -31,6 +32,8 @@ interface SQLLabToolbarProps {
   handleStop?: () => void;
   autoCommit: boolean;
   setAutoCommit: (auto: boolean) => void;
+  limit: number;
+  setLimit: (limit: number) => void;
   onSave?: () => void;
   onImport?: () => void;
   onExport?: () => void;
@@ -54,6 +57,8 @@ export function SQLLabToolbar({
   handleStop,
   autoCommit,
   setAutoCommit,
+  limit,
+  setLimit,
   onSave,
   onImport,
   onExport,
@@ -145,6 +150,22 @@ export function SQLLabToolbar({
         <span className="text-[10px] font-bold uppercase tracking-tight opacity-70">
           Auto Commit
         </span>
+      </div>
+
+      <div className="w-px h-6 bg-border/60 mx-1" />
+
+      {/* Limit Configuration */}
+      <div className="flex items-center gap-1.5 px-2 text-xs">
+        <span className="text-muted-foreground whitespace-nowrap opacity-70 font-bold uppercase tracking-tight text-[10px]">
+          Limit
+        </span>
+        <Input
+          type="number"
+          value={limit}
+          onChange={(e) => setLimit(Number(e.target.value) || 0)}
+          className="h-7 w-20 px-2 text-xs bg-muted/30"
+          min={0}
+        />
       </div>
 
       <ToolbarButton

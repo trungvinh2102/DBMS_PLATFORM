@@ -8,6 +8,7 @@ interface QueryProps {
   selectedDS: string;
   sql: string;
   autoCommit?: boolean;
+  limit?: number;
   onSuccess: (response: any) => void;
   onError: (error: string) => void;
 }
@@ -16,6 +17,7 @@ export function useSQLLabQuery({
   selectedDS,
   sql,
   autoCommit = true,
+  limit = 100,
   onSuccess,
   onError,
 }: QueryProps) {
@@ -26,7 +28,14 @@ export function useSQLLabQuery({
       databaseId: string;
       sql: string;
       autoCommit?: boolean;
-    }) => databaseApi.execute(vars.databaseId, vars.sql, vars.autoCommit),
+      limit?: number;
+    }) =>
+      databaseApi.execute(
+        vars.databaseId,
+        vars.sql,
+        vars.autoCommit,
+        vars.limit,
+      ),
   });
 
   const saveQueryMutation = useMutation({
@@ -51,6 +60,7 @@ export function useSQLLabQuery({
           databaseId: selectedDS,
           sql: sqlOverride || sql,
           autoCommit,
+          limit,
         });
 
         // Axios returns data in data prop usually, but our client interceptor returns response.data
@@ -69,6 +79,7 @@ export function useSQLLabQuery({
       selectedDS,
       sql,
       autoCommit,
+      limit,
       runSQLMutation,
       onSuccess,
       onError,

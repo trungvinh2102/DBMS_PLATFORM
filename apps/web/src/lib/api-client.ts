@@ -96,8 +96,13 @@ export const databaseApi = {
     req(api.get("/database/ddl", { params: { databaseId, table, schema } })),
 
   // Execution
-  execute: (databaseId: string, sql: string, autoCommit: boolean = true) =>
-    req(api.post("/database/execute", { databaseId, sql, autoCommit })),
+  execute: (
+    databaseId: string,
+    sql: string,
+    autoCommit: boolean = true,
+    limit?: number,
+  ) =>
+    req(api.post("/database/execute", { databaseId, sql, autoCommit, limit })),
   saveQuery: (data: any) => req(api.post("/database/save-query", data)),
   getHistory: (databaseId?: string) =>
     req(api.get("/database/history", { params: { databaseId } })),

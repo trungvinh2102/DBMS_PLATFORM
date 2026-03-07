@@ -25,6 +25,8 @@ import {
 import { SQLLabDataTable } from "./SQLLabDataTable";
 import { exportData } from "@/lib/export";
 import { ProblemsList } from "./ProblemsList";
+import { ChartViewer } from "./ChartViewer";
+import { LineageViewer } from "./LineageViewer";
 
 interface SQLLabResultPanelProps {
   executing: boolean;
@@ -37,9 +39,10 @@ interface SQLLabResultPanelProps {
   onErrorClick?: (line: number, column: number) => void;
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  sql: string;
 }
 
-type TabType = "results" | "messages" | "problems";
+type TabType = "results" | "messages" | "problems" | "charts" | "lineage";
 
 export function SQLLabResultPanel({
   executing,
@@ -52,6 +55,7 @@ export function SQLLabResultPanel({
   onErrorClick,
   activeTab,
   onTabChange,
+  sql,
 }: SQLLabResultPanelProps) {
   // const [activeTab, setActiveTab] = useState<TabType>("results");
 
@@ -89,6 +93,18 @@ export function SQLLabResultPanel({
           >
             Problems
           </TabButton>
+          <TabButton
+            active={effectiveTab === "charts"}
+            onClick={() => onTabChange("charts")}
+          >
+            Charts
+          </TabButton>
+          <TabButton
+            active={effectiveTab === "lineage"}
+            onClick={() => onTabChange("lineage")}
+          >
+            Lineage
+          </TabButton>
         </div>
 
         {results.length > 0 && effectiveTab === "results" && (
@@ -107,6 +123,7 @@ export function SQLLabResultPanel({
             error={error}
             syntaxErrors={syntaxErrors}
             onErrorClick={onErrorClick}
+            sql={sql}
           />
         )}
       </div>
@@ -177,6 +194,7 @@ function PanelContent({
   error,
   syntaxErrors,
   onErrorClick,
+  sql,
 }: any) {
   if (tab === "results") {
     return results.length > 0 ? (
@@ -188,6 +206,20 @@ function PanelContent({
         desc="Ready to execute your SQL statement."
       />
     );
+  }
+  if (tab === "charts") {
+    return results.length > 0 ? (
+      <ChartViewer results={results} columns={columns} />
+    ) : (
+      <EmptyState
+        icon={<Terminal className="h-12 w-12 mb-6" />}
+        title="No Data for Charts"
+        desc="Execute a query returning data to generate charts."
+      />
+    );
+  }
+  if (tab === "lineage") {
+    return <LineageViewer sql={sql} />;
   }
   if (tab === "messages") {
     return error ? (
