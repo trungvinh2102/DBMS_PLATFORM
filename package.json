@@ -1,7 +1,9 @@
 {
   "name": "dbms-platform",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "type": "module",
   "scripts": {
     "dev": "turbo dev",

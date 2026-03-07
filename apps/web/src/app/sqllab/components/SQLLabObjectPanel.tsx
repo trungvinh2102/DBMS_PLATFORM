@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SQLLabDataTable } from "./SQLLabDataTable";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import { useTheme } from "next-themes";
 
@@ -57,6 +57,29 @@ interface SQLLabObjectPanelProps {
   tableDDL?: string;
   triggers?: string[];
 }
+
+const ObjectIcon = ({
+  selectedObjectType,
+}: {
+  selectedObjectType?: string;
+}) => {
+  switch (selectedObjectType) {
+    case "view":
+      return <Eye className="h-3.5 w-3.5 text-purple-500 shrink-0" />;
+    case "event":
+      return <CalendarClock className="h-3.5 w-3.5 text-orange-500 shrink-0" />;
+    case "function":
+      return (
+        <FunctionSquare className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+      );
+    case "procedure":
+      return <Settings2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />;
+    case "trigger":
+      return <Zap className="h-3.5 w-3.5 text-green-500 shrink-0" />;
+    default:
+      return <Table className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+  }
+};
 
 export function SQLLabObjectPanel({
   activeRightTab,
@@ -81,7 +104,6 @@ export function SQLLabObjectPanel({
   const { theme } = useTheme();
   // Use the same custom themes as the main SQLEditor to prevent global theme override
   const monacoTheme = theme === "dark" ? "querypie-dark" : "querypie-light";
-  const React_useEffect = require("react").useEffect;
 
   let availableTabs = [
     "Data",
@@ -102,7 +124,7 @@ export function SQLLabObjectPanel({
     availableTabs = ["Info", "Script"];
   }
 
-  React_useEffect(() => {
+  useEffect(() => {
     if (selectedTable) {
       const lowerTabs = availableTabs.map((t) => t.toLowerCase());
       if (!lowerTabs.includes(activeRightTab)) {
@@ -110,27 +132,6 @@ export function SQLLabObjectPanel({
       }
     }
   }, [selectedTable, selectedObjectType]);
-
-  const ObjectIcon = () => {
-    switch (selectedObjectType) {
-      case "view":
-        return <Eye className="h-3.5 w-3.5 text-purple-500 shrink-0" />;
-      case "event":
-        return (
-          <CalendarClock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-        );
-      case "function":
-        return (
-          <FunctionSquare className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
-        );
-      case "procedure":
-        return <Settings2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />;
-      case "trigger":
-        return <Zap className="h-3.5 w-3.5 text-green-500 shrink-0" />;
-      default:
-        return <Table className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
-    }
-  };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -155,7 +156,7 @@ export function SQLLabObjectPanel({
         <Database className="h-3.5 w-3.5 opacity-40 shrink-0" />
         <span className="text-foreground/80 truncate">{selectedSchema}</span>
         <ChevronRight className="h-3 w-3 opacity-20 shrink-0" />
-        <ObjectIcon />
+        <ObjectIcon selectedObjectType={selectedObjectType} />
         <span className="text-foreground/80 truncate">
           {selectedTable || "UNSELECTED"}
         </span>
