@@ -159,7 +159,7 @@ class ConnectionService(BaseDatabaseService):
         Tests connectivity to a database without saving.
 
         Args:
-            data (dict): Connection parameters (id, type, config).
+            data (dict): Connection parameters (id, type, and either config or direct connection fields).
             
         Returns:
             dict: {success: bool, message: str}
@@ -170,19 +170,15 @@ class ConnectionService(BaseDatabaseService):
 
             # Fetch existing if ID provided
             if data.get('id'):
-                # We can reuse get_db_config logic but need session management localized
-                # Or create a minimal session here
                 session = SessionLocal()
-                # ... get config logic ...
-                # Reusing existing method might be tricky if it requires session as arg
-                # Refactor base class if time permits, for now localized:
-                db = session.query(Db).filter(Db.id == data['id']).first()
-                if db:
-                     # Decrypt logic duplication - ideally in util
-                     db_type = db.type
-                     config = db.config.copy()
-                     # ... decryption ... (simplified for now assuming provided config is raw/user input usually on test)
-                session.close()
+                try:
+                    db_type, config = self.get_db_config(data['id'], session)
+                finally:
+                    session.close()
+            else:
+                if not config:
+                    # If config is missing, assume the fields are directly in data
+                    config = {k: v for k, v in data.items() if k not in ('id', 'type')}
 
             if not config:
                 return {"success": False, "message": "Missing config"}
