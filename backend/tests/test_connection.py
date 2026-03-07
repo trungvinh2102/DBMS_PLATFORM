@@ -62,7 +62,8 @@ def test_test_connection_success(client, mock_engine):
     assert response.json['success'] is True
     
     # Verify we executed SELECT 1
-    mock_conn.execute.assert_called_with("SELECT 1")
+    assert mock_conn.execute.called
+    assert "SELECT 1" in str(mock_conn.execute.call_args[0][0])
 
 def test_test_connection_failure(client, mock_engine):
     """Test connection endpoint handles errors gracefully."""

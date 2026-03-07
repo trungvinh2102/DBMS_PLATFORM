@@ -35,12 +35,9 @@ def mock_session(mocker):
     mock_session_cls = mocker.patch("services.base_service.SessionLocal")
     mock_session_inst = MagicMock()
     mock_session_cls.return_value = mock_session_inst
-    
     # Also patch it in other service files where imported
     mocker.patch("services.connection.SessionLocal", return_value=mock_session_inst)
     mocker.patch("services.execution.SessionLocal", return_value=mock_session_inst)
-    mocker.patch("services.metadata.SessionLocal", return_value=mock_session_inst)
-    
     return mock_session_inst
 
 @pytest.fixture
@@ -52,8 +49,9 @@ def mock_engine(mocker):
     engine_inst = MagicMock()
     mock_engine.return_value = engine_inst
     
-    # Setup connection context manager
+    # Setup connection context manager and standard return
     conn = MagicMock()
-    engine_inst.connect.return_value.__enter__.return_value = conn
+    engine_inst.connect.return_value = conn
+    conn.__enter__.return_value = conn
     
     return engine_inst, conn
