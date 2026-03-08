@@ -12,6 +12,7 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
+  CardAction,
 } from "@/components/ui/card";
 
 describe("Card Component", () => {
@@ -20,12 +21,14 @@ describe("Card Component", () => {
     const DESC_TEXT = "Description Content";
     const CONTENT_TEXT = "Body Content";
     const FOOT_TEXT = "Footer Area";
+    const ACTION_TEXT = "Action";
 
     render(
       <Card>
         <CardHeader>
           <CardTitle>{TIT_TEXT}</CardTitle>
           <CardDescription>{DESC_TEXT}</CardDescription>
+          <CardAction>{ACTION_TEXT}</CardAction>
         </CardHeader>
         <CardContent>{CONTENT_TEXT}</CardContent>
         <CardFooter>{FOOT_TEXT}</CardFooter>
@@ -36,6 +39,7 @@ describe("Card Component", () => {
     expect(screen.getByText(DESC_TEXT)).toBeInTheDocument();
     expect(screen.getByText(CONTENT_TEXT)).toBeInTheDocument();
     expect(screen.getByText(FOOT_TEXT)).toBeInTheDocument();
+    expect(screen.getByText(ACTION_TEXT)).toBeInTheDocument();
   });
 
   it("applies the size attribute correctly", () => {

@@ -106,7 +106,7 @@ export function ChartAxisControls({
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-3 bg-muted/20 px-3 py-1.5 rounded-lg border backdrop-blur-sm">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">
+          <span className="text-[9px] font-black text-foreground/60 dark:text-foreground/70 uppercase tracking-[0.2em]">
             X-Axis
           </span>
           <Select
@@ -133,23 +133,17 @@ export function ChartAxisControls({
         <div className="w-px h-4 bg-border/50 mx-1" />
 
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">
+          <span className="text-[9px] font-black text-foreground/60 dark:text-foreground/70 uppercase tracking-[0.2em]">
             Y-Axis
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-[10px] font-bold gap-1.5 hover:bg-background/50"
-              >
-                <Layers className="h-3 w-3 text-primary/60" />
-                <span className="truncate max-w-25">
-                  {yAxisKeys.length === 1
-                    ? yAxisKeys[0]
-                    : `${yAxisKeys.length} selected`}
-                </span>
-              </Button>
+            <DropdownMenuTrigger className="flex items-center justify-center whitespace-nowrap rounded-md text-[10px] font-bold gap-1.5 h-7 px-2 hover:bg-background/50 text-foreground bg-transparent ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              <Layers className="h-3 w-3 text-primary/60" />
+              <span className="truncate max-w-25">
+                {yAxisKeys.length === 1
+                  ? yAxisKeys[0]
+                  : `${yAxisKeys.length} selected`}
+              </span>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"

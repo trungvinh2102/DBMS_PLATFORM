@@ -6,8 +6,16 @@
 import axios from "axios";
 import { useAuth } from "@/hooks/use-auth";
 
+const getBaseURL = () => {
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url || url === "undefined") {
+    return "http://localhost:5000/api/";
+  }
+  return url.endsWith("/") ? url : `${url}/`;
+};
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
+  baseURL: getBaseURL(),
 });
 
 // Response interceptor for error handling
@@ -16,7 +24,6 @@ api.interceptors.response.use(
   (error: any) => {
     // Check for 401 Unauthorized
     if (error.response?.status === 401) {
-      // Clear auth state and redirect to login
       // Clear auth state and redirect to login
       console.warn("API 401: Unauthorized. Logging out.");
       useAuth.getState().logout();
@@ -50,50 +57,46 @@ api.interceptors.request.use(
 const req = (promise: Promise<any>) => promise as Promise<any>;
 
 export const databaseApi = {
-  list: () => req(api.get("/database/list")),
-  health: () => req(api.get("/health")),
-  create: (data: any) => req(api.post("/database/create", data)),
-  update: (data: any) => req(api.post("/database/update", data)),
-  delete: (id: string) => req(api.post("/database/delete", { id })),
-  test: (data: any) => req(api.post("/database/test", data)),
+  list: () => req(api.get("database/list")),
+  health: () => req(api.get("health")),
+  create: (data: any) => req(api.post("database/create", data)),
+  update: (data: any) => req(api.post("database/update", data)),
+  delete: (id: string) => req(api.post("database/delete", { id })),
+  test: (data: any) => req(api.post("database/test", data)),
 
   // Metadata
   getSchemas: (databaseId: string) =>
-    req(api.get("/database/schemas", { params: { databaseId } })),
+    req(api.get("database/schemas", { params: { databaseId } })),
   getTables: (databaseId: string, schema?: string) =>
-    req(api.get("/database/tables", { params: { databaseId, schema } })),
+    req(api.get("database/tables", { params: { databaseId, schema } })),
   getViews: (databaseId: string, schema?: string) =>
-    req(api.get("/database/views", { params: { databaseId, schema } })),
+    req(api.get("database/views", { params: { databaseId, schema } })),
   getFunctions: (databaseId: string, schema?: string) =>
-    req(api.get("/database/functions", { params: { databaseId, schema } })),
+    req(api.get("database/functions", { params: { databaseId, schema } })),
   getProcedures: (databaseId: string, schema?: string) =>
-    req(api.get("/database/procedures", { params: { databaseId, schema } })),
+    req(api.get("database/procedures", { params: { databaseId, schema } })),
   getTriggers: (databaseId: string, schema?: string) =>
-    req(api.get("/database/triggers", { params: { databaseId, schema } })),
+    req(api.get("database/triggers", { params: { databaseId, schema } })),
   getEvents: (databaseId: string, schema?: string) =>
-    req(api.get("/database/events", { params: { databaseId, schema } })),
+    req(api.get("database/events", { params: { databaseId, schema } })),
   getColumns: (databaseId: string, table: string, schema?: string) =>
-    req(
-      api.get("/database/columns", { params: { databaseId, table, schema } }),
-    ),
+    req(api.get("database/columns", { params: { databaseId, table, schema } })),
   getIndexes: (databaseId: string, table: string, schema?: string) =>
-    req(
-      api.get("/database/indexes", { params: { databaseId, table, schema } }),
-    ),
+    req(api.get("database/indexes", { params: { databaseId, table, schema } })),
   getForeignKeys: (databaseId: string, table: string, schema?: string) =>
     req(
-      api.get("/database/foreign-keys", {
+      api.get("database/foreign-keys", {
         params: { databaseId, table, schema },
       }),
     ),
   getTableInfo: (databaseId: string, table: string, schema?: string) =>
     req(
-      api.get("/database/table-info", {
+      api.get("database/table-info", {
         params: { databaseId, table, schema },
       }),
     ),
   getDDL: (databaseId: string, table: string, schema?: string) =>
-    req(api.get("/database/ddl", { params: { databaseId, table, schema } })),
+    req(api.get("database/ddl", { params: { databaseId, table, schema } })),
 
   // Execution
   execute: (
@@ -102,27 +105,31 @@ export const databaseApi = {
     autoCommit: boolean = true,
     limit?: number,
   ) =>
-    req(api.post("/database/execute", { databaseId, sql, autoCommit, limit })),
-  saveQuery: (data: any) => req(api.post("/database/save-query", data)),
+    req(api.post("database/execute", { databaseId, sql, autoCommit, limit })),
+  saveQuery: (data: any) => req(api.post("database/save-query", data)),
   getHistory: (databaseId?: string) =>
-    req(api.get("/database/history", { params: { databaseId } })),
+    req(api.get("database/history", { params: { databaseId } })),
   listSavedQueries: (databaseId?: string, userId?: string) =>
-    req(api.get("/database/saved-queries", { params: { databaseId, userId } })),
+    req(api.get("database/saved-queries", { params: { databaseId, userId } })),
+  getSavedQueries: (databaseId: string, userId: string) =>
+    req(api.get("database/saved-queries", { params: { databaseId, userId } })),
 };
 
 export const authApi = {
-  login: (data: any) => req(api.post("/auth/login", data)),
-  register: (data: any) => req(api.post("/auth/register", data)),
+  login: (data: any) => req(api.post("auth/login", data)),
+  register: (data: any) => req(api.post("auth/register", data)),
 };
 
 export const userApi = {
-  getMe: () => req(api.get("/user/me")),
-  getSettings: () => req(api.get("/user/settings")),
-  updateSettings: (data: any) => req(api.post("/user/settings", data)),
+  getMe: () => req(api.get("user/me")),
+  getSettings: () => req(api.get("user/settings")),
+  updateSettings: (data: any) => req(api.post("user/settings", data)),
 };
 
 export const aiApi = {
-  generateSQL: (data: any) => req(api.post("/ai/generate-sql", data)),
-  explainSQL: (data: any) => req(api.post("/ai/explain-sql", data)),
-  optimizeSQL: (data: any) => req(api.post("/ai/optimize-sql", data)),
+  generateSQL: (data: any) => req(api.post("ai/generate-sql", data)),
+  explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
+  optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
 };
+
+export { api };

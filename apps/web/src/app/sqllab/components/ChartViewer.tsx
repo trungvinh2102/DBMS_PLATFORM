@@ -222,7 +222,7 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
                 />
                 <Recharts.XAxis
                   dataKey={xAxisKey}
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--foreground) / 0.6)"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
@@ -230,7 +230,7 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
                   className="font-bold uppercase tracking-wider"
                 />
                 <Recharts.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--foreground) / 0.6)"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
@@ -278,7 +278,7 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
                 />
                 <Recharts.XAxis
                   dataKey={xAxisKey}
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--foreground) / 0.6)"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
@@ -286,7 +286,7 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
                   className="font-bold uppercase tracking-wider"
                 />
                 <Recharts.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--foreground) / 0.6)"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
@@ -355,7 +355,7 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
                 />
                 <Recharts.XAxis
                   dataKey={xAxisKey}
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--foreground) / 0.6)"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
@@ -363,7 +363,7 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
                   className="font-bold uppercase tracking-wider"
                 />
                 <Recharts.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="hsl(var(--foreground) / 0.6)"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}

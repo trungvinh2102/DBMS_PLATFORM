@@ -12,6 +12,8 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  TableFooter,
+  TableCaption,
 } from "@/components/ui/table";
 
 describe("Table Component", () => {
@@ -35,6 +37,32 @@ describe("Table Component", () => {
     expect(screen.getByText("Data Cell")).toBeInTheDocument();
   });
 
+  it("renders with footer and caption", () => {
+    render(
+      <Table>
+        <TableCaption>Test Caption</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Head</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>Body</TableCell>
+          </TableRow>
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell>Footer</TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>,
+    );
+
+    expect(screen.getByText("Test Caption")).toBeInTheDocument();
+    expect(screen.getByText("Footer")).toBeInTheDocument();
+  });
+
   it("renders with alternate classes passed to components", () => {
     render(
       <Table className="table-auto">
@@ -43,7 +71,6 @@ describe("Table Component", () => {
         </TableBody>
       </Table>,
     );
-    // Verify table has base-ui data attribute if present or custom class
     const table = screen.getByRole("table");
     expect(table).toHaveClass("table-auto");
   });

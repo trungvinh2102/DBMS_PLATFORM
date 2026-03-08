@@ -16,6 +16,8 @@ import {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuShortcut,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 
 describe("DropdownMenu", () => {
@@ -49,7 +51,6 @@ describe("DropdownMenu", () => {
       expect(screen.getByText("Settings")).toBeInTheDocument();
     });
 
-    // Kiểm tra accessibility cơ bản
     expect(screen.getByRole("menu")).toBeInTheDocument();
     expect(screen.getAllByRole("menuitem")).toHaveLength(2);
   });
@@ -123,7 +124,6 @@ describe("DropdownMenu", () => {
     await waitFor(() => {
       expect(screen.getByText("My Account")).toBeInTheDocument();
       expect(screen.getByText("Billing")).toBeInTheDocument();
-      // separator thường là <hr> hoặc div với height
       expect(screen.getByRole("separator")).toBeInTheDocument();
     });
   });
@@ -150,9 +150,7 @@ describe("DropdownMenu", () => {
 
     const item = await screen.findByTestId("checkbox");
     expect(item).toBeInTheDocument();
-
-    // Kiểm tra indicator (CheckIcon) có hiện không
-    expect(item.querySelector("svg")).toBeInTheDocument(); // CheckIcon
+    expect(item.querySelector("svg")).toBeInTheDocument();
 
     await user.click(item);
 
@@ -197,7 +195,6 @@ describe("DropdownMenu", () => {
     );
   });
 
-  // Bonus: test sub-menu (nếu bạn dùng nhiều)
   it("opens sub-menu on hover/click subtrigger", async () => {
     render(
       <DropdownMenu>
@@ -216,11 +213,33 @@ describe("DropdownMenu", () => {
     await user.click(screen.getByText("Open"));
     await waitFor(() => screen.getByText("More tools"));
 
-    // Base UI thường mở sub bằng hover hoặc ArrowRight
     await user.hover(screen.getByText("More tools"));
 
     await waitFor(() => {
       expect(screen.getByText("Redo")).toBeInTheDocument();
+    });
+  });
+
+  it("renders shortcut and uses portal correctly", async () => {
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Open</DropdownMenuTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuContent>
+            <DropdownMenuItem>
+              Save
+              <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
+      </DropdownMenu>,
+    );
+
+    await user.click(screen.getByText("Open"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Save")).toBeInTheDocument();
+      expect(screen.getByText("⌘S")).toBeInTheDocument();
     });
   });
 });

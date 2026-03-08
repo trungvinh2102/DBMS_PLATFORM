@@ -7,6 +7,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
+  BreadcrumbEllipsis,
 } from "@/components/ui/breadcrumb";
 
 describe("Breadcrumb", () => {
@@ -19,6 +20,10 @@ describe("Breadcrumb", () => {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
+            <BreadcrumbEllipsis data-testid="ellipsis" />
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>/</BreadcrumbSeparator>
+          <BreadcrumbItem>
             <BreadcrumbPage>Dashboard</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
@@ -27,6 +32,8 @@ describe("Breadcrumb", () => {
 
     expect(screen.getByText("Home")).toBeInTheDocument();
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("/")).toBeInTheDocument();
+    expect(screen.getByTestId("ellipsis")).toBeInTheDocument();
     expect(screen.getByRole("list")).toBeInTheDocument();
   });
 });

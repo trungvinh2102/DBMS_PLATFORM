@@ -1,11 +1,13 @@
-/**
- * @file avatar.test.tsx
- * @description Unit tests for the Avatar component, including base-ui fallback and image scenarios.
- */
-
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  AvatarBadge,
+  AvatarGroup,
+  AvatarGroupCount,
+} from "@/components/ui/avatar";
 
 describe("Avatar Component", () => {
   it("renders fallback text JD", () => {
@@ -29,5 +31,32 @@ describe("Avatar Component", () => {
     );
     const avatarContainer = container.querySelector('[data-slot="avatar"]');
     expect(avatarContainer).toHaveAttribute("data-size", "lg");
+  });
+
+  it("renders with badge", () => {
+    render(
+      <Avatar>
+        <AvatarFallback>JD</AvatarFallback>
+        <AvatarBadge data-testid="badge" />
+      </Avatar>,
+    );
+    expect(screen.getByTestId("badge")).toBeInTheDocument();
+  });
+
+  it("renders within a group", () => {
+    render(
+      <AvatarGroup>
+        <Avatar>
+          <AvatarFallback>A</AvatarFallback>
+        </Avatar>
+        <Avatar>
+          <AvatarFallback>B</AvatarFallback>
+        </Avatar>
+        <AvatarGroupCount data-testid="count">+2</AvatarGroupCount>
+      </AvatarGroup>,
+    );
+    expect(screen.getByText("A")).toBeInTheDocument();
+    expect(screen.getByText("B")).toBeInTheDocument();
+    expect(screen.getByTestId("count")).toHaveTextContent("+2");
   });
 });
