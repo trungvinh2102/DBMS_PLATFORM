@@ -5,6 +5,7 @@
 
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -66,21 +67,19 @@ const data = {
   ],
 };
 
-import { useEffect, useState } from "react";
-
-export default function Header() {
+export function Header() {
   // Use destructured state for better control and access to actions
   const { user, token, logout, setUser } = useAuth();
   const pathname = usePathname();
   const isAuthPage = pathname?.startsWith("/auth");
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     setMounted(true);
   }, []);
 
   // Hydrate user if token exists but user is missing
-  useEffect(() => {
+  React.useEffect(() => {
     if (token && !user) {
       userApi
         .getMe()

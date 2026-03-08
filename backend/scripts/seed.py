@@ -1,7 +1,7 @@
 """
 backend/scripts/seed.py
 
-Database seed script - Creates initial roles, admin user, and local database connection.
+Database seed script - Creates initial roles and admin user.
 Replaces the old Prisma seed.ts from packages/db.
 
 Usage:
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-from models.metadata import SessionLocal, Role, User, Db
+from models.metadata import SessionLocal, Role, User
 from utils.crypto import encrypt
 import uuid
 import logging
@@ -43,7 +43,7 @@ def seed():
         for role_data in roles_data:
             existing = session.query(Role).filter(Role.name == role_data["name"]).first()
             if existing:
-                existing.description = role_data["description"]
+                existing.description = role_data["description"] # type: ignore
                 logger.info(f"  Updated role: {role_data['name']}")
             else:
                 role = Role(
@@ -69,7 +69,7 @@ def seed():
         existing_admin = session.query(User).filter(User.email == admin_email).first()
         if existing_admin:
             existing_admin.roleId = admin_role.id
-            existing_admin.username = "admin"
+            existing_admin.username = "admin" # type: ignore
             logger.info(f"  Updated admin user: {admin_email}")
         else:
             from passlib.context import CryptContext
@@ -89,28 +89,7 @@ def seed():
 
         session.commit()
 
-        # ── 3. Seed Local Database Connection ──────────────────────────
-        logger.info("Seeding Local Database Connection...")
-        existing_db = session.query(Db).filter(Db.databaseName == "dbms_platform").first()
 
-        if not existing_db:
-            local_db = Db(
-                id=str(uuid.uuid4()),
-                databaseName="dbms_platform",
-                type="postgres",
-                config={
-                    "host": "localhost",
-                    "port": 5432,
-                    "user": "postgres",
-                    "password": encrypt("postgres"),
-                    "database": "dbms_platform",
-                },
-            )
-            session.add(local_db)
-            session.commit()
-            logger.info("  Created local database connection: dbms_platform")
-        else:
-            logger.info("  Local database connection already exists, skipping.")
 
         logger.info("Seeding completed successfully!")
 

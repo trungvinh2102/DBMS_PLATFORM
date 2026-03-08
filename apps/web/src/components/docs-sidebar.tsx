@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,16 +39,13 @@ function SidebarSection({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const isActive = (href: string) => {
-    // Extract hash from href (e.g., "/docs#quick-start" -> "#quick-start")
     const hrefHash = href.includes("#") ? "#" + href.split("#")[1] : "";
     const hrefPath = href.split("#")[0];
 
-    // If href has no hash (e.g., "/docs"), it's active only when there's no hash in URL
     if (!hrefHash) {
       return pathname === hrefPath && !currentHash;
     }
 
-    // If href has hash, check if current hash matches
     return currentHash === hrefHash;
   };
 
@@ -89,7 +87,6 @@ function SidebarSection({
   );
 }
 
-// Map section titles to icons
 const sectionIcons: Record<string, LucideIcon> = {
   "Getting Started": BookOpen,
   "Core Features": Database,
@@ -116,16 +113,13 @@ export function DocsSidebarNav({
   const pathname = usePathname();
   const [currentHash, setCurrentHash] = useState("");
 
-  // Track hash changes
   useEffect(() => {
     const updateHash = () => {
       setCurrentHash(window.location.hash);
     };
 
-    // Set initial hash
     updateHash();
 
-    // Listen for hash changes
     window.addEventListener("hashchange", updateHash);
     return () => window.removeEventListener("hashchange", updateHash);
   }, []);
