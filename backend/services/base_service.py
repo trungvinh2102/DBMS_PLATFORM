@@ -7,10 +7,13 @@ Base service for database operations providing shared functionality.
 from sqlalchemy.orm import Session
 from models.metadata import Db, SessionLocal
 from utils.common import decrypt_uri
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, pool
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Cache for database engines to manage connection pooling globally
+_engine_cache = {}
 
 class BaseDatabaseService:
     """
@@ -60,11 +63,9 @@ class BaseDatabaseService:
             db_type (str): The type of database (e.g., 'postgres').
             config (dict): The connection configuration.
 
-        Returns:
-            Engine: An SQLAlchemy engine instance.
         """
-        if db_type != 'postgres':
-            raise Exception(f"Database type '{db_type}' is not implemented yet.")
+        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite']:
+            raise Exception(f"Database type '{db_type}' is not currently supported.")
             
         conn_str = ""
         if config.get('uri'):
@@ -78,17 +79,39 @@ class BaseDatabaseService:
             password = config.get('password')
             host = config.get('host', 'localhost')
             if host == 'localhost': host = '127.0.0.1'
-            port = config.get('port', 5432)
-            dbname = config.get('database')
+            port = config.get('port')
+            dbname = config.get('database', '')
             
-            conn_str = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
-            if config.get('ssl'):
-                conn_str += "?sslmode=require"
-                
-        # Create engine
-        # NullPool could be used for short-lived connections, 
-        # but creating engine is expensive. Pooling is better generally.
-        return create_engine(conn_str)
+            if db_type == 'postgres':
+                port = port or 5432
+                conn_str = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
+                if config.get('ssl'):
+                    conn_str += "?sslmode=require"
+            elif db_type == 'mysql':
+                port = port or 3306
+                conn_str = f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
+            elif db_type == 'mssql':
+                port = port or 1433
+                conn_str = f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}?driver=ODBC+Driver+17+for+SQL+Server"
+            elif db_type == 'sqlite':
+                conn_str = f"sqlite:///{dbname}"
+
+        # Caching logic
+        cache_key = conn_str
+        if cache_key in _engine_cache:
+            return _engine_cache[cache_key]
+
+        # Create engine with connection pooling
+        engine = create_engine(
+            conn_str,
+            poolclass=pool.QueuePool,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_recycle=1800
+        )
+        _engine_cache[cache_key] = engine
+        return engine
 
     def run_dynamic_query(self, database_id: str, callback):
         """
@@ -115,6 +138,5 @@ class BaseDatabaseService:
         finally:
             if connection:
                 connection.close()
-            if engine:
-                engine.dispose()
+            # Engine is cached, so do not dispose it here
             session.close()

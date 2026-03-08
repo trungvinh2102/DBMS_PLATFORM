@@ -8,8 +8,15 @@ from flask import Blueprint, request, jsonify
 from services.connection import connection_service
 from services.metadata import metadata_service
 from services.execution import execution_service
+from utils.auth_middleware import login_required, admin_required
 
 database_bp = Blueprint('database', __name__)
+
+@database_bp.before_request
+@login_required
+def require_auth():
+    """Ensure all database routes require authentication."""
+    pass
 
 @database_bp.route('/list', methods=['GET'])
 def list_databases():
@@ -21,9 +28,11 @@ def list_databases():
         return jsonify({'error': str(e)}), 500
 
 @database_bp.route('/create', methods=['POST'])
+@admin_required
 def create_database():
     """Create a new database connection."""
     data = request.json
+    if not data: return jsonify({'error': 'Missing request body'}), 400
     try:
         result = connection_service.create_database(data)
         return jsonify(result)
@@ -31,29 +40,37 @@ def create_database():
         return jsonify({'error': str(e)}), 500
 
 @database_bp.route('/update', methods=['POST'])
+@admin_required
 def update_database():
     """Update an existing database connection."""
     data = request.json
+    if not data or 'id' not in data: return jsonify({'error': 'Database ID required'}), 400
     try:
         result = connection_service.update_database(data['id'], data)
         return jsonify(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/delete', methods=['POST'])
+@admin_required
 def delete_database():
     """Delete a database connection."""
     data = request.json
+    if not data or 'id' not in data: return jsonify({'error': 'Database ID required'}), 400
     try:
         connection_service.delete_database(data['id'])
         return jsonify({'success': True})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/test', methods=['POST'])
+@admin_required
 def test_connection():
     """Test a database connection."""
     data = request.json
+    if not data: return jsonify({'error': 'Missing request body'}), 400
     try:
         result = connection_service.test_connection(data)
         return jsonify(result)
@@ -69,78 +86,92 @@ def get_schemas():
         schemas = metadata_service.get_schemas(db_id)
         return jsonify(schemas)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/tables', methods=['GET'])
 def get_tables():
     """Get tables for a specific schema."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     try:
         tables = metadata_service.get_tables(db_id, schema)
         return jsonify(tables)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/views', methods=['GET'])
 def get_views():
     """Get views for a specific schema."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     try:
         views = metadata_service.get_views(db_id, schema)
         return jsonify(views)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/functions', methods=['GET'])
 def get_functions():
     """Get functions for a specific schema."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     try:
         functions = metadata_service.get_functions(db_id, schema)
         return jsonify(functions)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/procedures', methods=['GET'])
 def get_procedures():
     """Get procedures for a specific schema."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     try:
         procedures = metadata_service.get_procedures(db_id, schema)
         return jsonify(procedures)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/triggers', methods=['GET'])
 def get_triggers():
     """Get triggers for a specific schema."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     try:
         triggers = metadata_service.get_triggers(db_id, schema)
         return jsonify(triggers)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/events', methods=['GET'])
 def get_events():
     """Get events for a specific schema."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     try:
         events = metadata_service.get_events(db_id, schema)
         return jsonify(events)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/columns', methods=['GET'])
 def get_columns():
     """Get columns for a specific table."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     table = request.args.get('table')
     if not table: return jsonify({'error': 'table required'}), 400
@@ -148,69 +179,86 @@ def get_columns():
         columns = metadata_service.get_columns(db_id, schema, table)
         return jsonify(columns)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/indexes', methods=['GET'])
 def get_indexes():
     """Get indexes for a specific table."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     table = request.args.get('table')
+    if not table: return jsonify({'error': 'table required'}), 400
     try:
         indexes = metadata_service.get_indexes(db_id, schema, table)
         return jsonify(indexes)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/foreign-keys', methods=['GET'])
 def get_foreign_keys():
     """Get foreign keys for a specific table."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     table = request.args.get('table')
+    if not table: return jsonify({'error': 'table required'}), 400
     try:
         fks = metadata_service.get_foreign_keys(db_id, schema, table)
         return jsonify(fks)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/table-info', methods=['GET'])
 def get_table_info():
     """Get statistics for a specific table."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     table = request.args.get('table')
+    if not table: return jsonify({'error': 'table required'}), 400
     try:
         info = metadata_service.get_table_info(db_id, schema, table)
         return jsonify(info)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/ddl', methods=['GET'])
 def get_ddl():
     """Get CREATE TABLE DDL for a specific table."""
     db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     schema = request.args.get('schema', 'public')
     table = request.args.get('table')
+    if not table: return jsonify({'error': 'table required'}), 400
     try:
         ddl = metadata_service.get_table_ddl(db_id, schema, table)
         return jsonify(ddl)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/execute', methods=['POST'])
 def execute_query():
     """Execute a SQL query."""
     data = request.json
+    if not data: return jsonify({'error': 'Missing request body'}), 400
     db_id = data.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
     sql = data.get('sql')
+    if not sql: return jsonify({'error': 'sql required'}), 400
     auto_commit = data.get('autoCommit', True)
     limit = data.get('limit', 1000)
     try:
         result = execution_service.execute_query(db_id, sql, auto_commit, limit)
         return jsonify(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
 
 @database_bp.route('/history', methods=['GET'])
 def get_history():
@@ -226,6 +274,8 @@ def get_history():
 def save_query():
     """Save a query."""
     data = request.json
+    if not data or 'sql' not in data or 'name' not in data or 'databaseId' not in data:
+        return jsonify({'error': 'Missing required fields: sql, name, databaseId'}), 400
     try:
         result = execution_service.save_query(data)
         return jsonify(result)
@@ -233,7 +283,7 @@ def save_query():
         return jsonify({'error': str(e)}), 500
 
 @database_bp.route('/saved-queries', methods=['GET'])
-def list_saved_queries():
+def list_saved_queries_route():
     """List saved queries."""
     db_id = request.args.get('databaseId')
     user_id = request.args.get('userId')
@@ -242,5 +292,3 @@ def list_saved_queries():
         return jsonify(queries)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-

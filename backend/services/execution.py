@@ -40,25 +40,41 @@ class ExecutionService(BaseDatabaseService):
             if not sql: raise Exception("SQL required")
             
             def _op(conn):
-                # Apply default limit for simple SELECT queries to prevent massive data transfers
+                import re
                 final_sql = sql.strip()
                 
                 # Strip trailing semicolon if it exists before appending LIMIT
                 if final_sql.endswith(';'):
                     final_sql = final_sql[:-1].strip()
                     
+                dialect = conn.engine.dialect.name
                 upper_sql = final_sql.upper()
-                if upper_sql.startswith('SELECT') and 'LIMIT' not in upper_sql:
-                    # Very basic check, proper SQL parsing would be better but this works for simple cases
-                    final_sql = f"{final_sql} LIMIT {limit}"
+                
+                is_select = bool(re.match(r'^\s*SELECT\s', upper_sql))
+                
+                if is_select:
+                    if dialect == 'mssql':
+                        # Basic check for TOP clause in SQL Server
+                        if not re.search(r'^\s*SELECT\s+TOP\s+\d+', upper_sql):
+                            final_sql = re.sub(r'(?i)^\s*SELECT\s+', f'SELECT TOP {limit} ', final_sql)
+                    else:
+                        # Postgres, MySQL, SQLite
+                        if not re.search(r'\sLIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$', upper_sql):
+                            final_sql = f"{final_sql} LIMIT {limit}"
 
-                # Using execution options for autocommit if needed
+                # Prepare connection with autocommit if requested
+                exec_conn = conn
                 if auto_commit:
-                    result = conn.execution_options(isolation_level="AUTOCOMMIT").execute(text(final_sql))
-                else:
-                    result = conn.execute(text(final_sql))
-                    # Intentionally not calling conn.commit(), changes will only 
-                    # persist if there's an explicit COMMIT in the SQL itself.
+                    exec_conn = conn.execution_options(isolation_level="AUTOCOMMIT")
+
+                # Add basic timeouts for postgresql to prevent runaway queries
+                if dialect == 'postgresql':
+                     # 30 seconds timeout
+                     exec_conn.execute(text("SET statement_timeout = '30s'"))
+
+                result = exec_conn.execute(text(final_sql))
+                # Intentionally not calling conn.commit() if not autocommit, 
+                # changes will only persist if there's an explicit COMMIT in the SQL itself.
                 if result.returns_rows:
                     keys = list(result.keys())
                     data = [dict(zip(keys, row)) for row in result]

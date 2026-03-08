@@ -20,6 +20,9 @@ ALGORITHM = "HS256"
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+            
         token = None
         if 'Authorization' in request.headers:
             auth_header = request.headers['Authorization']
@@ -54,6 +57,9 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+            
         if not g.user or g.user.get('role') != 'Admin':
             return jsonify({'message': 'Admin access required'}), 403
         return f(*args, **kwargs)

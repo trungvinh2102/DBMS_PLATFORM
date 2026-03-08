@@ -5,8 +5,21 @@ Fixtures and configuration for pytest.
 """
 
 import pytest
-from app import create_app
 from unittest.mock import MagicMock
+from functools import wraps
+
+# Mock auth middleware decorators before application imports so tests bypass auth
+def mock_decorator(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        return f(*args, **kwargs)
+    return decorated
+
+import utils.auth_middleware
+utils.auth_middleware.login_required = mock_decorator
+utils.auth_middleware.admin_required = mock_decorator
+
+from app import create_app
 import services.base_service
 import services.connection
 import services.execution
@@ -45,6 +58,9 @@ def mock_engine(mocker):
     """
     Mock SQLAlchemy create_engine to verify connection logic without connecting.
     """
+    import services.base_service
+    services.base_service._engine_cache.clear()
+    
     mock_engine = mocker.patch("services.base_service.create_engine")
     engine_inst = MagicMock()
     mock_engine.return_value = engine_inst
@@ -53,5 +69,8 @@ def mock_engine(mocker):
     conn = MagicMock()
     engine_inst.connect.return_value = conn
     conn.__enter__.return_value = conn
+    
+    # Specifically for the new execution connection options
+    conn.execution_options.return_value = conn
     
     return engine_inst, conn
