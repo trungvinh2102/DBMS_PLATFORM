@@ -1,36 +1,9 @@
-import React, { useState, useMemo } from "react";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Settings2,
-  BarChart2,
-  PieChart as PieChartIcon,
-  LineChart as LineChartIcon,
-  AreaChart as AreaChartIcon,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState, useMemo, useRef, useCallback } from "react";
+import * as Recharts from "recharts";
+import { toPng } from "html-to-image";
+import { toast } from "sonner";
+import { ChartTypeControls, ChartAxisControls } from "./ChartControls";
+import type { ChartType } from "./ChartControls";
 
 interface ChartViewerProps {
   results: Record<string, unknown>[];
@@ -39,30 +12,32 @@ interface ChartViewerProps {
 
 const COLORS = [
   "#3b82f6", // blue-500
-  "#ef4444", // red-500
+  "#8b5cf6", // violet-500
   "#10b981", // emerald-500
   "#f59e0b", // amber-500
-  "#8b5cf6", // violet-500
+  "#ef4444", // red-500
   "#ec4899", // pink-500
   "#06b6d4", // cyan-500
   "#84cc16", // lime-500
 ];
 
-type ChartType = "bar" | "line" | "pie" | "area";
+const GRADIENTS = [
+  { start: "#3b82f6", end: "#60a5fa" },
+  { start: "#8b5cf6", end: "#a78bfa" },
+  { start: "#10b981", end: "#34d399" },
+  { start: "#f59e0b", end: "#fbbf24" },
+];
 
 export function ChartViewer({ results, columns }: ChartViewerProps) {
-  console.log("results", results);
-  console.log("columns", columns);
   const [chartType, setChartType] = useState<ChartType>("bar");
+  const chartRef = useRef<HTMLDivElement>(null);
 
   // Auto-detect numeric columns for Y axis and categorical for X axis
   const numericColumns = useMemo(() => {
     return columns.filter((col) => {
-      // Check first few rows to see if it's numeric
       for (let i = 0; i < Math.min(results.length, 5); i++) {
         const val = results[i][col];
         if (typeof val === "number") return true;
-        // Also allow strings that can be parsed as valid numbers
         if (typeof val === "string" && !isNaN(parseFloat(val))) return true;
       }
       return false;
@@ -73,31 +48,25 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
     return columns.filter((col) => !numericColumns.includes(col));
   }, [columns, numericColumns]);
 
-  // Default selections
   const defaultXAxis =
     categoricalColumns.length > 0 ? categoricalColumns[0] : columns[0];
   const defaultYAxis =
     numericColumns.length > 0
-      ? numericColumns[0]
+      ? [numericColumns[0]]
       : columns.length > 1
-        ? columns[1]
-        : columns[0];
+        ? [columns[1]]
+        : [columns[0]];
 
   const [xAxisKey, setXAxisKey] = useState<string>(defaultXAxis);
-  const [yAxisKey, setYAxisKey] = useState<string>(defaultYAxis);
+  const [yAxisKeys, setYAxisKeys] = useState<string[]>(defaultYAxis);
 
-  // Clean data for Recharts (convert string numbers to actual numbers, ensure labels are strings)
   const chartData = useMemo(() => {
     return results
       .map((row) => {
         const newRow: Record<string, any> = {};
-
-        // Clean all columns to ensure they are the correct type for Recharts
         columns.forEach((col) => {
           const val = row[col];
-
-          if (col === yAxisKey) {
-            // Y-Axis values MUST be numeric
+          if (yAxisKeys.includes(col)) {
             if (typeof val === "number") {
               newRow[col] = val;
             } else if (typeof val === "string") {
@@ -109,7 +78,6 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
               newRow[col] = 0;
             }
           } else {
-            // All other values (especially X-Axis/Name-Axis) MUST be string-safe
             if (val === null || typeof val === "boolean") {
               newRow[col] = String(val);
             } else {
@@ -117,262 +85,348 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
             }
           }
         });
-
         return newRow;
       })
       .slice(0, 100);
-  }, [results, columns, xAxisKey, yAxisKey]);
+  }, [results, columns, yAxisKeys]);
+
+  const handleDownload = useCallback(async () => {
+    if (!chartRef.current) return;
+
+    try {
+      const dataUrl = await toPng(chartRef.current, {
+        backgroundColor: "hsl(var(--background))",
+        cacheBust: true,
+      });
+      const link = document.createElement("a");
+      link.download = `sql-chart-${new Date().getTime()}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("Chart exported as PNG");
+    } catch (err) {
+      console.error("Chart export failed", err);
+      toast.error("Failed to export chart");
+    }
+  }, []);
 
   if (!results || results.length === 0) return null;
 
-  return (
-    <div className="flex flex-col h-full bg-background p-4 gap-4">
-      <div className="flex items-center justify-between border-b pb-4">
-        <div className="flex items-center gap-2">
-          <Button
-            variant={chartType === "bar" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setChartType("bar")}
-            className="h-8 gap-1.5 font-bold text-xs"
-          >
-            <BarChart2 className="h-4 w-4" /> Bar
-          </Button>
-          <Button
-            variant={chartType === "line" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setChartType("line")}
-            className="h-8 gap-1.5 font-bold text-xs"
-          >
-            <LineChartIcon className="h-4 w-4" /> Line
-          </Button>
-          <Button
-            variant={chartType === "area" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setChartType("area")}
-            className="h-8 gap-1.5 font-bold text-xs"
-          >
-            <AreaChartIcon className="h-4 w-4" /> Area
-          </Button>
-          <Button
-            variant={chartType === "pie" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setChartType("pie")}
-            className="h-8 gap-1.5 font-bold text-xs"
-          >
-            <PieChartIcon className="h-4 w-4" /> Pie
-          </Button>
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-background/90 backdrop-blur-xl border rounded-lg p-3 shadow-2xl ring-1 ring-black/5 animate-in fade-in zoom-in duration-200">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 mb-2 border-b pb-1.5 leading-none">
+            {xAxisKey}: {label}
+          </p>
+          <div className="space-y-1.5">
+            {payload.map((item: any, idx: number) => (
+              <div
+                key={idx}
+                className="flex items-center justify-between gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: item.color || item.fill }}
+                  />
+                  <span className="text-[11px] font-bold text-foreground/80">
+                    {item.name}
+                  </span>
+                </div>
+                <span className="text-[11px] font-black text-primary font-mono tabular-nums">
+                  {typeof item.value === "number"
+                    ? item.value.toLocaleString()
+                    : item.value}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
+      );
+    }
+    return null;
+  };
 
-        <div className="flex items-center gap-4 bg-muted/20 p-2 rounded-lg border">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              X-Axis
-            </span>
-            <Select
-              value={xAxisKey}
-              onValueChange={(val) => val && setXAxisKey(val)}
-            >
-              <SelectTrigger className="h-7 w-30 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {columns.map((col) => (
-                  <SelectItem key={col} value={col} className="text-xs">
-                    {col}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Y-Axis
-            </span>
-            <Select
-              value={yAxisKey}
-              onValueChange={(val) => val && setYAxisKey(val)}
-            >
-              <SelectTrigger className="h-7 w-30 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {numericColumns.length > 0
-                  ? numericColumns.map((col) => (
-                      <SelectItem key={col} value={col} className="text-xs">
-                        {col}
-                      </SelectItem>
-                    ))
-                  : columns.map((col) => (
-                      <SelectItem key={col} value={col} className="text-xs">
-                        {col}
-                      </SelectItem>
-                    ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+  return (
+    <div className="flex flex-col h-full bg-background/50 overflow-hidden">
+      <div className="flex items-center justify-between p-4 border-b bg-muted/5 backdrop-blur-sm shrink-0">
+        <ChartTypeControls chartType={chartType} setChartType={setChartType} />
+        <ChartAxisControls
+          columns={columns}
+          numericColumns={numericColumns}
+          xAxisKey={xAxisKey}
+          setXAxisKey={setXAxisKey}
+          yAxisKeys={yAxisKeys}
+          setYAxisKeys={setYAxisKeys}
+          onDownload={handleDownload}
+        />
       </div>
 
-      <div className="flex-1 min-h-0 bg-muted/5 rounded-xl border p-4">
-        {numericColumns.length === 0 && (
-          <div className="mb-4 text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-md border border-amber-200 dark:border-amber-900">
-            Note: No numeric columns detected. Charts may not render correctly.
-            Try converting strings to numbers in your SQL query.
-          </div>
-        )}
+      <div
+        ref={chartRef}
+        className="flex-1 min-h-0 p-6 relative group overflow-hidden"
+      >
+        {/* Abstract Background Element for Premium Feel */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-[100px] -mr-32 -mt-32 transition-all duration-1000 group-hover:bg-primary/10" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-500/5 rounded-full blur-[100px] -ml-32 -mb-32 transition-all duration-1000 group-hover:bg-violet-500/10" />
 
-        <ResponsiveContainer width="100%" height="100%">
-          {chartType === "bar" ? (
-            <BarChart
-              data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                opacity={0.2}
-                vertical={false}
-              />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fontSize: 11 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  border: "1px solid var(--border)",
-                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                }}
-                formatter={(value: any) => [value, String(yAxisKey)]}
-                labelFormatter={(label: any) => `Category: ${String(label)}`}
-                cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-              />
-              <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
-              <Bar
-                dataKey={yAxisKey}
-                name={String(yAxisKey)}
-                fill={COLORS[0]}
-                radius={[4, 4, 0, 0]}
-                animationDuration={1000}
-              />
-            </BarChart>
-          ) : chartType === "line" ? (
-            <LineChart
-              data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                opacity={0.2}
-                vertical={false}
-              />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fontSize: 11 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  border: "1px solid var(--border)",
-                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                }}
-                formatter={(value: any) => [value, String(yAxisKey)]}
-                labelFormatter={(label: any) => `Time/Label: ${String(label)}`}
-              />
-              <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
-              <Line
-                type="monotone"
-                dataKey={yAxisKey}
-                name={String(yAxisKey)}
-                stroke={COLORS[0]}
-                strokeWidth={3}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-                animationDuration={1000}
-              />
-            </LineChart>
-          ) : chartType === "area" ? (
-            <AreaChart
-              data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                opacity={0.2}
-                vertical={false}
-              />
-              <XAxis
-                dataKey={xAxisKey}
-                tick={{ fontSize: 11 }}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  border: "1px solid var(--border)",
-                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                }}
-                formatter={(value: any) => [value, String(yAxisKey)]}
-                labelFormatter={(label: any) => `Area: ${String(label)}`}
-              />
-              <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "20px" }} />
-              <Area
-                type="monotone"
-                dataKey={yAxisKey}
-                name={String(yAxisKey)}
-                stroke={COLORS[0]}
-                fill={COLORS[0]}
-                fillOpacity={0.3}
-                strokeWidth={2}
-                animationDuration={1000}
-              />
-            </AreaChart>
-          ) : (
-            <PieChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-              <Tooltip
-                contentStyle={{
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  border: "1px solid var(--border)",
-                  boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                }}
-                formatter={(value: any, name: any) => [value, String(name)]}
-              />
-              <Legend wrapperStyle={{ fontSize: "12px" }} />
-              <Pie
+        <div className="relative h-full w-full">
+          {numericColumns.length === 0 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 w-full max-w-lg">
+              <div className="p-3 bg-amber-500/10 backdrop-blur-md border border-amber-500/20 rounded-xl flex items-center gap-3 animate-in slide-in-from-top duration-500">
+                <div className="p-1.5 bg-amber-500 rounded-lg">
+                  <span className="text-[10px] font-black text-white">!</span>
+                </div>
+                <p className="text-[11px] font-bold text-amber-600/80">
+                  No numeric columns detected. For best results, cast columns to
+                  numbers in your SQL.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <Recharts.ResponsiveContainer width="100%" height="100%">
+            {chartType === "bar" ? (
+              <Recharts.BarChart
                 data={chartData}
-                dataKey={yAxisKey}
-                nameKey={xAxisKey}
-                cx="50%"
-                cy="50%"
-                outerRadius={120}
-                fill="#8884d8"
-                label={{ fontSize: 11 }}
-                animationDuration={1000}
+                margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
               >
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={COLORS[index % COLORS.length]}
+                <defs>
+                  {yAxisKeys.map((key: string, i: number) => (
+                    <linearGradient
+                      key={`grad-${key}`}
+                      id={`grad-${key}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="0%"
+                        stopColor={COLORS[i % COLORS.length]}
+                        stopOpacity={0.9}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor={COLORS[i % COLORS.length]}
+                        stopOpacity={0.3}
+                      />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <Recharts.CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="hsl(var(--border))"
+                  opacity={0.3}
+                />
+                <Recharts.XAxis
+                  dataKey={xAxisKey}
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  className="font-bold uppercase tracking-wider"
+                />
+                <Recharts.YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  className="font-mono"
+                  tickFormatter={(val) =>
+                    val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val
+                  }
+                />
+                <Recharts.Tooltip
+                  content={<CustomTooltip />}
+                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
+                />
+                <Recharts.Legend
+                  wrapperStyle={{
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                    paddingTop: "20px",
+                  }}
+                />
+                {yAxisKeys.map((key: string, i: number) => (
+                  <Recharts.Bar
+                    key={key}
+                    dataKey={key}
+                    fill={`url(#grad-${key})`}
+                    radius={[6, 6, 0, 0]}
+                    animationDuration={1500}
+                    animationEasing="ease-out"
+                    maxBarSize={45}
                   />
                 ))}
-              </Pie>
-            </PieChart>
-          )}
-        </ResponsiveContainer>
+              </Recharts.BarChart>
+            ) : chartType === "line" ? (
+              <Recharts.LineChart
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+              >
+                <Recharts.CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="hsl(var(--border))"
+                  opacity={0.3}
+                />
+                <Recharts.XAxis
+                  dataKey={xAxisKey}
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  className="font-bold uppercase tracking-wider"
+                />
+                <Recharts.YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  className="font-mono"
+                />
+                <Recharts.Tooltip content={<CustomTooltip />} />
+                <Recharts.Legend
+                  wrapperStyle={{
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    paddingTop: "20px",
+                  }}
+                />
+                {yAxisKeys.map((key: string, i: number) => (
+                  <Recharts.Line
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke={COLORS[i % COLORS.length]}
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      strokeWidth: 2,
+                      fill: "hsl(var(--background))",
+                    }}
+                    activeDot={{ r: 6, strokeWidth: 0 }}
+                    animationDuration={1500}
+                  />
+                ))}
+              </Recharts.LineChart>
+            ) : chartType === "area" ? (
+              <Recharts.AreaChart
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+              >
+                <defs>
+                  {yAxisKeys.map((key: string, i: number) => (
+                    <linearGradient
+                      key={`area-grad-${key}`}
+                      id={`area-grad-${key}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor={COLORS[i % COLORS.length]}
+                        stopOpacity={0.6}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor={COLORS[i % COLORS.length]}
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <Recharts.CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="hsl(var(--border))"
+                  opacity={0.3}
+                />
+                <Recharts.XAxis
+                  dataKey={xAxisKey}
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  className="font-bold uppercase tracking-wider"
+                />
+                <Recharts.YAxis
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={12}
+                  className="font-mono"
+                />
+                <Recharts.Tooltip content={<CustomTooltip />} />
+                <Recharts.Legend
+                  wrapperStyle={{
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    paddingTop: "20px",
+                  }}
+                />
+                {yAxisKeys.map((key: string, i: number) => (
+                  <Recharts.Area
+                    key={key}
+                    type="monotone"
+                    dataKey={key}
+                    stroke={COLORS[i % COLORS.length]}
+                    fillOpacity={1}
+                    fill={`url(#area-grad-${key})`}
+                    strokeWidth={3}
+                    animationDuration={1500}
+                  />
+                ))}
+              </Recharts.AreaChart>
+            ) : (
+              <Recharts.PieChart>
+                <Recharts.Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={80}
+                  outerRadius={120}
+                  paddingAngle={5}
+                  dataKey={yAxisKeys[0]}
+                  nameKey={xAxisKey}
+                  animationDuration={1500}
+                >
+                  {chartData.map((_: any, index: number) => (
+                    <Recharts.Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                      stroke="hsl(var(--background))"
+                      strokeWidth={2}
+                    />
+                  ))}
+                </Recharts.Pie>
+                <Recharts.Tooltip content={<CustomTooltip />} />
+                <Recharts.Legend
+                  wrapperStyle={{
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    paddingTop: "20px",
+                  }}
+                />
+              </Recharts.PieChart>
+            )}
+          </Recharts.ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

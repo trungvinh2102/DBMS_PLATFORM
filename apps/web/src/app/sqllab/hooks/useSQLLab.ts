@@ -172,7 +172,20 @@ export function useSQLLab() {
     selectedSchema: activeTab.selectedSchema,
     setSelectedSchema: (sc: string) => updateActiveTab({ selectedSchema: sc }),
     selectedTable,
-    setSelectedTable,
+    setSelectedTable: (tableName: string | null) => {
+      setSelectedTable(tableName);
+      if (tableName) {
+        const isTable = (tables as string[])?.includes(tableName);
+        const isView = (metadata.views as string[])?.includes(tableName);
+
+        if (!isTable && !isView) {
+          // If it's a special object, they only have Info/Script
+          if (!["info", "script"].includes(activeRightTab)) {
+            setActiveRightTab("info");
+          }
+        }
+      }
+    },
     autoCommit,
     setAutoCommit,
     limit,

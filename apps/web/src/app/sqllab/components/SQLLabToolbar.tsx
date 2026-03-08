@@ -131,6 +131,15 @@ export function SQLLabToolbar({
 
       {/* Auto Commit Toggle */}
       <div
+        role="switch"
+        aria-checked={autoCommit}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setAutoCommit(!autoCommit);
+          }
+        }}
         className="flex items-center gap-2 px-3 h-9 hover:bg-muted/50 transition-colors rounded-md cursor-pointer border border-transparent hover:border-border/50"
         onClick={() => setAutoCommit(!autoCommit)}
       >

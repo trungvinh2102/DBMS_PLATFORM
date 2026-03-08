@@ -35,8 +35,21 @@ import { cn } from "@/lib/utils";
 import { SQLLabDataTable } from "./SQLLabDataTable";
 
 import { useState, useEffect } from "react";
-import Editor from "@monaco-editor/react";
+import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
+import {
+  EmptyObjectSelection,
+  DataTabView,
+  StructureTabView,
+  IndexTabView,
+  RelationTabView,
+  TriggerTabView,
+  InfoTabView,
+  ScriptTabView,
+} from "./ObjectPanelTabs";
+
+// Dynamically import Monaco Editor to avoid heavy bundle and hydration mismatch
+const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 interface SQLLabObjectPanelProps {
   activeRightTab: string;
@@ -105,6 +118,7 @@ export function SQLLabObjectPanel({
   // Use the same custom themes as the main SQLEditor to prevent global theme override
   const monacoTheme = theme === "dark" ? "querypie-dark" : "querypie-light";
 
+  // availableTabs is determined based on selectedObjectType
   let availableTabs = [
     "Data",
     "Structure",
@@ -124,14 +138,12 @@ export function SQLLabObjectPanel({
     availableTabs = ["Info", "Script"];
   }
 
-  useEffect(() => {
-    if (selectedTable) {
-      const lowerTabs = availableTabs.map((t) => t.toLowerCase());
-      if (!lowerTabs.includes(activeRightTab)) {
-        setActiveRightTab(lowerTabs[0]);
-      }
-    }
-  }, [selectedTable, selectedObjectType]);
+  // Ensure we always have a valid tab selected even if state is slightly behind
+  const activeTabLower = activeRightTab.toLowerCase();
+  const lowerTabs = availableTabs.map((t) => t.toLowerCase());
+  const effectiveTab = lowerTabs.includes(activeTabLower)
+    ? activeTabLower
+    : lowerTabs[0];
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -142,7 +154,7 @@ export function SQLLabObjectPanel({
             onClick={() => setActiveRightTab(t.toLowerCase())}
             className={cn(
               "px-5 h-full text-[10px] font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap",
-              activeRightTab === t.toLowerCase()
+              effectiveTab === t.toLowerCase()
                 ? "border-primary text-primary bg-background"
                 : "border-transparent text-muted-foreground/60 hover:text-foreground hover:bg-muted/30",
             )}
@@ -170,7 +182,7 @@ export function SQLLabObjectPanel({
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          {activeRightTab === "data" && currentTData.length > 0 && (
+          {effectiveTab === "data" && currentTData.length > 0 && (
             <>
               <div className="w-px h-4 bg-border/60" />
               <DropdownMenu>
@@ -221,264 +233,30 @@ export function SQLLabObjectPanel({
 
       <div className="flex-1 overflow-auto bg-background scrollbar-thin">
         {!selectedTable ? (
-          <div className="flex flex-col items-center justify-center h-full p-16 text-center gap-6 text-muted-foreground/10">
-            <Info className="h-16 w-16" />
-            <p className="text-xs font-black uppercase tracking-[0.3em]">
-              Pick an Object
-            </p>
-          </div>
-        ) : activeRightTab === "data" ? (
-          loadingTData ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin opacity-20" />
-            </div>
-          ) : currentTData.length > 0 ? (
-            <SQLLabDataTable
-              columns={currentTColumns}
-              data={currentTData}
-              mini
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full p-12 text-center gap-4 text-muted-foreground/20">
-              <Database className="h-10 w-10" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">
-                No Data Preview
-              </p>
-            </div>
-          )
-        ) : activeRightTab === "structure" ? (
-          <div className="p-5 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em]">
-                Schema Definition
-              </h4>
-              <Badge
-                variant="outline"
-                className="text-[9px] font-black h-5 rounded-sm px-2 border-primary/20 text-primary/60"
-              >
-                DDL
-              </Badge>
-            </div>
-
-            <div className="relative mb-4 shrink-0">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-              <input
-                type="text"
-                placeholder="Search columns..."
-                className="w-full h-8 pl-8 pr-3 text-[11px] bg-muted/20 border border-border/40 rounded-md focus:outline-none focus:border-primary/40 focus:bg-background transition-colors"
-                value={structureSearch}
-                onChange={(e) => setStructureSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1.5 overflow-y-auto flex-1 pr-1 scrollbar-thin">
-              {isLoadingColumns ? (
-                <div className="space-y-3 opacity-20">
-                  {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <div
-                      key={i}
-                      className="h-8 bg-muted animate-pulse rounded w-full"
-                    />
-                  ))}
-                </div>
-              ) : (
-                columnsData
-                  ?.filter(
-                    (col: any) =>
-                      !structureSearch ||
-                      col.name
-                        .toLowerCase()
-                        .includes(structureSearch.toLowerCase()) ||
-                      col.type
-                        .toLowerCase()
-                        .includes(structureSearch.toLowerCase()),
-                  )
-                  .map((col: any, i: number) => (
-                    <div
-                      key={`${col.name}-${i}`}
-                      className="flex items-center justify-between text-[11px] p-3 bg-muted/20 border border-transparent rounded-lg hover:bg-muted/40 hover:border-border/60 transition-all group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-2 w-2 rounded-full bg-primary/20 border border-primary/40" />
-                        <span className="font-mono font-bold text-foreground/70 tracking-tight">
-                          {col.name}
-                        </span>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className="text-[9px] font-mono font-black opacity-70 border-border/60 bg-muted/10 h-5 px-1.5 group-hover:opacity-100 transition-opacity"
-                      >
-                        {col.type}
-                      </Badge>
-                    </div>
-                  ))
-              )}
-              {(!columnsData || columnsData.length === 0) && (
-                <div className="text-center py-10 opacity-30 text-xs italic">
-                  No columns found
-                </div>
-              )}
-            </div>
-          </div>
-        ) : activeRightTab === "index" ? (
-          <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
-              Indexes
-            </h4>
-            <div className="space-y-2">
-              {indexes && indexes.length > 0 ? (
-                indexes.map((idx, i) => (
-                  <div
-                    key={i}
-                    className="p-3 bg-muted/20 border border-border/30 rounded-lg text-xs"
-                  >
-                    <div className="font-bold text-foreground/90 mb-1">
-                      {idx.indexname}
-                    </div>
-                    <div className="font-mono text-muted-foreground text-[10px] break-all">
-                      {idx.indexdef}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-muted-foreground/40 text-xs italic">
-                  No indexes found
-                </div>
-              )}
-            </div>
-          </div>
-        ) : activeRightTab === "relation" ? (
-          <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
-              Foreign Keys
-            </h4>
-            <div className="space-y-2">
-              {foreignKeys && foreignKeys.length > 0 ? (
-                foreignKeys.map((fk, i) => (
-                  <div
-                    key={i}
-                    className="p-3 bg-muted/20 border border-border/30 rounded-lg text-xs"
-                  >
-                    <div className="font-bold text-foreground/90 mb-1">
-                      {fk.constraint}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <span className="font-mono text-[11px]">{fk.column}</span>
-                      <ChevronRight className="h-3 w-3" />
-                      <span className="font-mono">
-                        {fk.foreignTable}.{fk.foreignColumn}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-muted-foreground/40 text-xs italic">
-                  No foreign keys found
-                </div>
-              )}
-            </div>
-          </div>
-        ) : activeRightTab === "trigger" ? (
-          <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
-              Triggers
-            </h4>
-            <div className="space-y-2">
-              {triggers && triggers.length > 0 ? (
-                triggers.map((trg, i) => (
-                  <div key={i} className="p-3 bg-muted/20 rounded-lg text-xs">
-                    <div className="font-bold">{trg}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-muted-foreground/40 text-xs italic">
-                  No triggers found
-                </div>
-              )}
-            </div>
-          </div>
-        ) : activeRightTab === "info" ? (
-          <div className="p-5">
-            <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
-              Table Statistics
-            </h4>
-            {tableInfo ? (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-muted/20 rounded-lg">
-                  <div className="text-[10px] opacity-50 uppercase font-black">
-                    Row Count
-                  </div>
-                  <div className="text-lg font-mono font-bold mt-1">
-                    {tableInfo.row_count}
-                  </div>
-                </div>
-                <div className="p-3 bg-muted/20 rounded-lg">
-                  <div className="text-[10px] opacity-50 uppercase font-black">
-                    Total Size
-                  </div>
-                  <div className="text-lg font-mono font-bold mt-1">
-                    {tableInfo.total_size}
-                  </div>
-                </div>
-                <div className="p-3 bg-muted/20 rounded-lg">
-                  <div className="text-[10px] opacity-50 uppercase font-black">
-                    Data Size
-                  </div>
-                  <div className="text-lg font-mono font-bold mt-1">
-                    {tableInfo.data_size}
-                  </div>
-                </div>
-                <div className="p-3 bg-muted/20 rounded-lg">
-                  <div className="text-[10px] opacity-50 uppercase font-black">
-                    Index Size
-                  </div>
-                  <div className="text-lg font-mono font-bold mt-1">
-                    {tableInfo.index_size}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-muted-foreground/40 text-xs italic">
-                No info available
-              </div>
-            )}
-          </div>
-        ) : activeRightTab === "script" ? (
-          <div className="h-full flex flex-col">
-            <div className="p-3 border-b bg-muted/5 flex justify-between items-center shrink-0">
-              <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em]">
-                DDL Script
-              </h4>
-            </div>
-            <div className="flex-1 overflow-hidden relative">
-              {tableDDL ? (
-                <Editor
-                  height="100%"
-                  language="sql"
-                  theme={monacoTheme}
-                  value={tableDDL}
-                  options={{
-                    readOnly: true,
-                    minimap: { enabled: false },
-                    wordWrap: "on",
-                    scrollBeyondLastLine: false,
-                    fontSize: 12,
-                    lineNumbers: "on",
-                    glyphMargin: false,
-                    folding: true,
-                    lineDecorationsWidth: 10,
-                    padding: { top: 16, bottom: 16 },
-                  }}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full p-4">
-                  <pre className="text-xs font-mono text-muted-foreground/50 italic whitespace-pre-wrap select-text">
-                    -- No DDL available
-                  </pre>
-                </div>
-              )}
-            </div>
-          </div>
+          <EmptyObjectSelection />
+        ) : effectiveTab === "data" ? (
+          <DataTabView
+            loadingTData={loadingTData}
+            currentTData={currentTData}
+            currentTColumns={currentTColumns}
+          />
+        ) : effectiveTab === "structure" ? (
+          <StructureTabView
+            isLoadingColumns={isLoadingColumns}
+            columnsData={columnsData}
+            structureSearch={structureSearch}
+            setStructureSearch={setStructureSearch}
+          />
+        ) : effectiveTab === "index" ? (
+          <IndexTabView indexes={indexes} />
+        ) : effectiveTab === "relation" ? (
+          <RelationTabView foreignKeys={foreignKeys} />
+        ) : effectiveTab === "trigger" ? (
+          <TriggerTabView triggers={triggers} />
+        ) : effectiveTab === "info" ? (
+          <InfoTabView tableInfo={tableInfo} />
+        ) : effectiveTab === "script" ? (
+          <ScriptTabView tableDDL={tableDDL} theme={monacoTheme} />
         ) : (
           <div className="flex items-center justify-center h-full p-16 text-center text-muted-foreground/5 font-black uppercase tracking-[1em] text-[10px]">
             {activeRightTab}

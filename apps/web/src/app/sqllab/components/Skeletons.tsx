@@ -49,7 +49,10 @@ export function PanelSkeleton({ className }: SkeletonProps) {
       <div className="space-y-2">
         <div className="h-10 bg-muted animate-pulse rounded" />
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-8 bg-muted/50 animate-pulse rounded" />
+          <div
+            key={`panel-skeleton-${i}`}
+            className="h-8 bg-muted/50 animate-pulse rounded"
+          />
         ))}
       </div>
     </div>
@@ -104,7 +107,7 @@ export const EditorLoadingSkeleton = () => {
             <div className="w-12.5 flex flex-col items-end pr-3 pt-3 space-y-1.5 bg-[#fffffe] dark:bg-[#1e1e1e] shrink-0">
               {Array.from({ length: 5 }).map((_, n) => (
                 <div
-                  key={n}
+                  key={`editor-skeleton-line-${n}`}
                   className="h-4.5 w-2.5 rounded-sm bg-[#d4d4d4]/40 dark:bg-[#6e6e6e]/40"
                 />
               ))}

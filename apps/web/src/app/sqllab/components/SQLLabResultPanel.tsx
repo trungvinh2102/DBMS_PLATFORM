@@ -22,11 +22,34 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import dynamic from "next/dynamic";
 import { SQLLabDataTable } from "./SQLLabDataTable";
 import { exportData } from "@/lib/export";
 import { ProblemsList } from "./ProblemsList";
-import { ChartViewer } from "./ChartViewer";
-import { LineageViewer } from "./LineageViewer";
+
+const ChartViewer = dynamic(
+  () => import("./ChartViewer").then((m) => m.ChartViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse">
+        Loading charts...
+      </div>
+    ),
+  },
+);
+
+const LineageViewer = dynamic(
+  () => import("./LineageViewer").then((m) => m.LineageViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse">
+        Loading lineage...
+      </div>
+    ),
+  },
+);
 
 interface SQLLabResultPanelProps {
   executing: boolean;
@@ -44,6 +67,8 @@ interface SQLLabResultPanelProps {
 
 type TabType = "results" | "messages" | "problems" | "charts" | "lineage";
 
+const EMPTY_SYNTAX_ERRORS: any[] = [];
+
 export function SQLLabResultPanel({
   executing,
   error,
@@ -51,7 +76,7 @@ export function SQLLabResultPanel({
   columns,
   cursorPos,
   tabSize = 4,
-  syntaxErrors = [],
+  syntaxErrors = EMPTY_SYNTAX_ERRORS,
   onErrorClick,
   activeTab,
   onTabChange,
