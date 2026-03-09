@@ -278,6 +278,8 @@ function SQLLabContent() {
                       activeTab={activeResultTab}
                       onTabChange={setActiveResultTab}
                       sql={sql}
+                      dataSources={dataSources}
+                      selectedDS={selectedDS}
                     />
                   </ResizablePanel>
                 </ResizablePanelGroup>

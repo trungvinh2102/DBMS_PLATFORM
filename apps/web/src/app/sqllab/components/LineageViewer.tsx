@@ -5,7 +5,8 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+
 import {
   Search,
   AlertCircle,
@@ -24,13 +25,34 @@ import { Button } from "@/components/ui/button";
 import { useLineage } from "../hooks/useLineage";
 import { LineageFlow } from "./lineage/LineageFlow";
 
+const DIALECT_MAP: Record<string, string> = {
+  postgresql: "postgresql",
+  postgres: "postgresql",
+  mysql: "mysql",
+  mariadb: "mysql",
+  oracle: "oracle",
+  mssql: "mssql",
+  sqlserver: "mssql",
+  bigquery: "bigquery",
+  snowflake: "snowflake",
+};
+
 interface LineageViewerProps {
   sql: string;
+  dataSource?: any;
 }
 
-export function LineageViewer({ sql }: LineageViewerProps) {
-  const { nodes, edges, error } = useLineage(sql);
+export function LineageViewer({ sql, dataSource }: LineageViewerProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Derive dialect from dataSource type
+  const dialect = useMemo(() => {
+    if (!dataSource?.type) return "mysql";
+    const type = dataSource.type.toLowerCase();
+    return DIALECT_MAP[type] || "mysql";
+  }, [dataSource]);
+
+  const { nodes, edges, error } = useLineage(sql, dialect);
 
   if (!sql.trim()) {
     return <EmptyState />;
@@ -42,7 +64,17 @@ export function LineageViewer({ sql }: LineageViewerProps) {
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden relative">
-      <div className="absolute top-4 right-4 z-40">
+      <div className="absolute top-4 right-4 z-40 flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-background/80 backdrop-blur-md border border-border rounded-full px-4 py-1.5 shadow-lg">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-foreground">
+            {dataSource?.databaseName || "Database"}
+          </span>
+          <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground border-l pl-2 ml-1">
+            {dialect}
+          </span>
+        </div>
+
         <Button
           variant="outline"
           size="sm"

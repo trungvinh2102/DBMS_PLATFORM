@@ -63,6 +63,8 @@ interface SQLLabResultPanelProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   sql: string;
+  dataSources?: any[];
+  selectedDS?: string;
 }
 
 type TabType = "results" | "messages" | "problems" | "charts" | "lineage";
@@ -81,6 +83,8 @@ export function SQLLabResultPanel({
   activeTab,
   onTabChange,
   sql,
+  dataSources = [],
+  selectedDS,
 }: SQLLabResultPanelProps) {
   // const [activeTab, setActiveTab] = useState<TabType>("results");
 
@@ -149,6 +153,8 @@ export function SQLLabResultPanel({
             syntaxErrors={syntaxErrors}
             onErrorClick={onErrorClick}
             sql={sql}
+            dataSources={dataSources}
+            selectedDS={selectedDS}
           />
         )}
       </div>
@@ -220,6 +226,8 @@ function PanelContent({
   syntaxErrors,
   onErrorClick,
   sql,
+  dataSources,
+  selectedDS,
 }: any) {
   if (tab === "results") {
     return results.length > 0 ? (
@@ -244,8 +252,10 @@ function PanelContent({
     );
   }
   if (tab === "lineage") {
-    return <LineageViewer sql={sql} />;
+    const ds = dataSources?.find((d: any) => d.id === selectedDS);
+    return <LineageViewer sql={sql} dataSource={ds} />;
   }
+
   if (tab === "messages") {
     return error ? (
       <div className="p-8">
