@@ -17,6 +17,71 @@ class ExecutionService(BaseDatabaseService):
     """
     Handles SQL execution and query history.
     """
+    def _execute_mongodb(self, database_id, sql, limit):
+        """Native MongoDB execution for simple SELECT-like queries."""
+        session = SessionLocal()
+        try:
+            db_type, config = self.get_db_config(database_id, session)
+            if db_type != 'mongodb': return None
+            
+            from pymongo import MongoClient
+            import re
+            
+            # Simple SQL parsing for "SELECT ... FROM collection"
+            match = re.search(r'FROM\s+["\']?([\w\.-]+)["\']?', sql, re.IGNORECASE)
+            if not match:
+                # Fallback or error if not a select
+                if "SHOW" in sql.upper() or "LIST" in sql.upper():
+                    return [], []
+                raise Exception("Only 'SELECT ... FROM collection' is currently supported for direct MongoDB connection.")
+            
+            collection_name = match.group(1)
+            # Handle schema.collection format (e.g., admin.system.users)
+            parts = collection_name.split('.')
+            target_db = config.get('database', 'test')
+            
+            # Use the first part as db if it looks like a schema from the UI (e.g. admin)
+            if len(parts) > 1:
+                target_db = parts[0]
+                collection_name = ".".join(parts[1:])
+
+            host = config.get('host', '127.0.0.1')
+            raw_port = config.get('port')
+            try:
+                port = int(raw_port) if raw_port else 27017
+            except:
+                port = 27017
+                
+            user = config.get('user')
+            password = config.get('password')
+            
+            client = MongoClient(
+                host=host, 
+                port=port, 
+                username=user, 
+                password=password, 
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=5000
+            )
+            
+            collection = client[target_db][collection_name]
+            cursor = collection.find().limit(limit)
+            
+            data = []
+            columns = set()
+            for doc in cursor:
+                processed_doc = {}
+                for k, v in doc.items():
+                    if k == '_id' or not isinstance(v, (str, int, float, bool, list, dict, type(None))):
+                        v = str(v)
+                    processed_doc[k] = v
+                    columns.add(k)
+                data.append(processed_doc)
+            
+            return data, sorted(list(columns))
+        finally:
+            session.close()
+
     def execute_query(self, database_id: str, sql: str, auto_commit: bool = True, limit: int = 1000):
         """
         Executes a SQL query on the target database.
@@ -38,6 +103,23 @@ class ExecutionService(BaseDatabaseService):
         try:
             if not database_id: raise Exception("Database ID required")
             if not sql: raise Exception("SQL required")
+
+            # Pre-check database type for native execution
+            temp_session = SessionLocal()
+            try:
+                db_type, _ = self.get_db_config(database_id, temp_session)
+                if db_type == 'mongodb':
+                    result_data, columns = self._execute_mongodb(database_id, sql, limit)
+                    execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                    self._save_history(database_id, sql, 'SUCCESS', execution_time_ms, None)
+                    return {
+                        "data": result_data,
+                        "columns": columns,
+                        "executionTime": execution_time_ms,
+                        "error": None
+                    }
+            finally:
+                temp_session.close()
             
             def _op(conn):
                 import re

@@ -135,7 +135,7 @@ class ConnectionService(BaseDatabaseService):
 
     def delete_database(self, db_id):
         """
-        Deletes a database connection.
+        Deletes a database connection and its associated history.
 
         Args:
             db_id (str): The ID of the database to delete.
@@ -143,13 +143,21 @@ class ConnectionService(BaseDatabaseService):
         Returns:
             bool: True if deleted successfully.
         """
+        from models.metadata import QueryHistory, SavedQuery
         session = SessionLocal()
         try:
+            # 1. First delete any history or saved queries referencing this database
+            # to avoid ForeignKeyViolation errors.
+            session.query(QueryHistory).filter(QueryHistory.databaseId == db_id).delete()
+            session.query(SavedQuery).filter(SavedQuery.databaseId == db_id).delete()
+            
+            # 2. Then delete the database record
             db = session.query(Db).filter(Db.id == db_id).first()
             if db:
                 session.delete(db)
                 session.commit()
                 return True
+            session.commit() # Commit deletion of history even if db record is missing
             return False
         finally:
             session.close()
@@ -183,6 +191,28 @@ class ConnectionService(BaseDatabaseService):
             if not config:
                 return {"success": False, "message": "Missing config"}
 
+            if db_type == 'mongodb':
+                # For MongoDB, we use pymongo directly for both health checks and queries
+                # to avoid the overhead and limitations of SQL-to-NoSQL bridges.
+                from pymongo import MongoClient
+                # Parse host and port from config
+                host = config.get('host', '127.0.0.1')
+                port = int(config.get('port', 27017))
+                user = config.get('user')
+                password = config.get('password')
+                
+                # We use a short timeout for the test
+                client = MongoClient(
+                    host=host,
+                    port=port,
+                    username=user,
+                    password=password,
+                    serverSelectionTimeoutMS=5000,
+                    connectTimeoutMS=5000
+                )
+                client.admin.command('ping')
+                return {"success": True, "message": "Connection successful (Direct MongoDB)"}
+            
             engine = self.create_connection_engine(db_type, config)
             with engine.connect() as conn:
                 from sqlalchemy import text

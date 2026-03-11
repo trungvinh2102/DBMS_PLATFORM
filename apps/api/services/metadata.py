@@ -15,6 +15,37 @@ class MetadataService(BaseDatabaseService):
     Retrieves metadata like schemas, tables, columns, and DDL.
     """
 
+    def _get_mongo_client(self, database_id: str, session):
+        """Helper to get a native MongoClient for a database ID."""
+        db_type, config = self.get_db_config(database_id, session)
+        if db_type != 'mongodb':
+            return None, None
+            
+        from pymongo import MongoClient
+        host = config.get('host', '127.0.0.1')
+        raw_port = config.get('port')
+        try:
+            port = int(raw_port) if raw_port else 27017
+        except (ValueError, TypeError):
+            port = 27017
+            
+        user = config.get('user')
+        password = config.get('password')
+        
+        try:
+            client = MongoClient(
+                host=host,
+                port=port,
+                username=user,
+                password=password,
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=5000
+            )
+            return client, config.get('database', 'test')
+        except Exception as e:
+            logger.error(f"Failed to create MongoClient: {e}")
+            return None, None
+
     def get_schemas(self, database_id: str):
         """
         Lists schemas in the database.
@@ -25,6 +56,22 @@ class MetadataService(BaseDatabaseService):
         Returns:
             list[str]: A list of schema names.
         """
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                client, _ = self._get_mongo_client(database_id, session)
+                if client:
+                    # In MongoDB, "schemas" can be interpreted as databases
+                    return client.list_database_names()
+                return []
+        except Exception as e:
+            logger.error(f"Error in MongoDB get_schemas: {e}")
+            return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT schema_name FROM information_schema.schemata 
@@ -48,6 +95,24 @@ class MetadataService(BaseDatabaseService):
         Returns:
             list[str]: A list of table names.
         """
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                client, default_db = self._get_mongo_client(database_id, session)
+                if client:
+                    # In MongoDB, "tables" are collections. 
+                    # If schema is 'public' (relational default) or empty, use the configured database
+                    target_db = schema if schema and schema != 'public' else default_db
+                    return client[target_db].list_collection_names()
+                return []
+        except Exception as e:
+            logger.error(f"Error in MongoDB get_tables: {e}")
+            return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT table_name FROM information_schema.tables 
@@ -59,6 +124,15 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_views(self, database_id: str, schema: str = 'public'):
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT table_name FROM information_schema.views 
@@ -73,6 +147,15 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_functions(self, database_id: str, schema: str = 'public'):
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT routine_name FROM information_schema.routines 
@@ -87,6 +170,15 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_procedures(self, database_id: str, schema: str = 'public'):
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT routine_name FROM information_schema.routines 
@@ -101,6 +193,15 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_triggers(self, database_id: str, schema: str = 'public'):
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT trigger_name FROM information_schema.triggers 
@@ -115,6 +216,15 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_events(self, database_id: str, schema: str = 'public'):
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT event_name FROM information_schema.events 
@@ -140,6 +250,31 @@ class MetadataService(BaseDatabaseService):
         Returns:
             list[dict]: A list of column metadata.
         """
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                client, default_db = self._get_mongo_client(database_id, session)
+                if not client: return []
+                
+                # In MongoDB, we can sample a document to get "columns"
+                target_db = schema if schema and schema != 'public' else default_db
+                collection = client[target_db][table]
+                doc = collection.find_one()
+                if not doc:
+                    return []
+                return [{
+                    "name": key,
+                    "type": type(value).__name__,
+                    "nullable": True
+                } for key, value in doc.items()]
+        except Exception as e:
+            logger.error(f"Error in MongoDB get_columns: {e}")
+            return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT column_name, data_type, is_nullable 
@@ -159,6 +294,15 @@ class MetadataService(BaseDatabaseService):
          """
          Lists indexes for a table.
          """
+         from models.metadata import SessionLocal
+         session = SessionLocal()
+         try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+         finally:
+            session.close()
+
          def _op(conn):
             query = text("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = :schema AND tablename = :table")
             rows = conn.execute(query, {"schema": schema, "table": table})
@@ -169,6 +313,15 @@ class MetadataService(BaseDatabaseService):
         """
         Lists foreign keys for a table.
         """
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return []
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT
@@ -201,6 +354,25 @@ class MetadataService(BaseDatabaseService):
         """
         Gets detailed table statistics.
         """
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                client, default_db = self._get_mongo_client(database_id, session)
+                target_db = schema if schema and schema != 'public' else default_db
+                stats = client[target_db].command("collstats", table)
+                return {
+                    "total_size": f"{stats.get('totalSize', 0) / 1024:.2f} KB",
+                    "data_size": f"{stats.get('size', 0) / 1024:.2f} KB",
+                    "index_size": f"{stats.get('totalIndexSize', 0) / 1024:.2f} KB",
+                    "row_count": stats.get('count', 0)
+                }
+        except Exception:
+            return {}
+        finally:
+            session.close()
+
         def _op(conn):
             query = text("""
                 SELECT
@@ -227,6 +399,15 @@ class MetadataService(BaseDatabaseService):
         """
         Generates DDL for a table (Prototype).
         """
+        from models.metadata import SessionLocal
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return f"-- MongoDB Collection: {schema}.{table}\n-- No DDL available for NoSQL"
+        finally:
+            session.close()
+
         def _op(conn):
             cols_query = text("""
                 SELECT column_name, data_type, character_maximum_length, is_nullable, column_default

@@ -150,6 +150,8 @@ export function ConnectionForm({
                     ? "mysql://user:password@localhost:3306/database"
                     : selectedType === "sqlserver"
                       ? "sqlserver://user:password@localhost:1433/database"
+                      : selectedType === "mongodb"
+                      ? "mongodb://user:password@localhost:27017/database"
                       : "oracle://user:password@localhost:1521/database"
               }
               value={formData.uri}

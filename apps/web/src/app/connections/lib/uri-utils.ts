@@ -34,7 +34,10 @@ export function buildUri(
   password: string,
   database: string,
 ): string {
-  const protocol = DB_URI_PROTOCOLS[type] || type;
+  let protocol = DB_URI_PROTOCOLS[type] || type;
+  if (type === "mongodb" && !port) {
+    protocol = "mongodb+srv";
+  }
 
   // Don't build URI if essential fields are empty
   if (!host && !user && !database) {

@@ -101,14 +101,17 @@ class BaseDatabaseService:
         if cache_key in _engine_cache:
             return _engine_cache[cache_key]
 
-        # Create engine with connection pooling
+        # Create engine with connection pooling and timeout
+        connect_args = {}
+            
         engine = create_engine(
             conn_str,
             poolclass=pool.QueuePool,
             pool_size=5,
             max_overflow=10,
             pool_timeout=30,
-            pool_recycle=1800
+            pool_recycle=1800,
+            connect_args=connect_args
         )
         _engine_cache[cache_key] = engine
         return engine
