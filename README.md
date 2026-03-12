@@ -62,7 +62,7 @@ The platform requires a PostgreSQL database. Follow these steps to set it up:
 
 #### A. Using Docker (Recommended)
 If you have Docker installed, you can use the provided configuration:
-1. **Download/Copy** the `docker-compose.yml` file to your server.
+1. **Download/Copy** the [docker-compose.yml](https://github.com/trungvinh2102/DBMS_PLATFORM/blob/dev1.0/docker-compose.yml) file to your server.
 2. Run the following command to start the database:
    ```bash
    docker compose up -d
