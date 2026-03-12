@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Database, ChevronsUpDown, LayoutGrid } from "lucide-react";
+import { Search, Database, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DataSource } from "@/lib/types";
@@ -95,7 +95,7 @@ export function SQLLabSidebarHeader({
           value={selectedSchema}
           onValueChange={(val) => val && setSelectedSchema(val)}
         >
-          <SelectTrigger className="flex-1 h-10 text-xs font-bold bg-muted/40 border border-border/40 hover:bg-muted/60 transition-all rounded-xl px-4 gap-2.5 shadow-sm outline-none ring-0 focus:ring-1 focus:ring-primary/20">
+          <SelectTrigger className="w-full h-10 text-xs font-bold bg-muted/40 border border-border/40 hover:bg-muted/60 transition-all rounded-xl px-4 gap-2.5 shadow-sm outline-none ring-0 focus:ring-1 focus:ring-primary/20">
             <div className="flex items-center gap-2 flex-1 truncate">
               <Database className="h-3.5 w-3.5 opacity-40 shrink-0" />
               <SelectValue placeholder="Select Schema" className="truncate" />
@@ -113,14 +113,6 @@ export function SQLLabSidebarHeader({
             ))}
           </SelectContent>
         </Select>
-
-        <button
-          onClick={onVisualize}
-          className="h-10 w-10 flex items-center justify-center bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-sm shrink-0"
-          title="Visualize Schema"
-        >
-          <LayoutGrid className="h-4 w-4" />
-        </button>
       </div>
 
       {/* Object Search */}

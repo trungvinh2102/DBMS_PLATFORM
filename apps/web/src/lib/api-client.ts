@@ -18,7 +18,7 @@ const getBaseURL = () => {
         // If we're running in Electron/Tauri via app:// or localized localhost
         const isStandalone = window.location.protocol === 'app:' || window.location.origin.includes('localhost:3001');
         if (isStandalone) {
-            return "http://localhost:5050/api/";
+            return "http://localhost:5000/api/";
         }
         
         // If we're in the browser on a web domain, use same host with different port/prefix
@@ -26,7 +26,7 @@ const getBaseURL = () => {
     }
 
     // Default fallback
-    const finalUrl = "http://localhost:5050/api/";
+    const finalUrl = "http://localhost:5000/api/";
     console.log("API Base URL Selected:", finalUrl);
     return finalUrl;
 };
