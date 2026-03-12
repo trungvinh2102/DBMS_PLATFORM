@@ -111,16 +111,54 @@ class UserSetting(Base):
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 # Database connection
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-   # Fallback or error
-   print("Warning: DATABASE_URL not set in environment")
+import sys
+from dotenv import load_dotenv
 
-# Prisma uses 'public' schema by default, verify if tables are in public
-# If using different schema, need __table_args__ = {"schema": "custom"}
+def init_engine():
+    # Attempt 1: Standard load
+    load_dotenv()
+    url = os.getenv("DATABASE_URL")
+    
+    # Attempt 2: Next to executable (Tauri/Sidecar)
+    if not url:
+        exe_dir = os.path.dirname(sys.executable)
+        load_dotenv(os.path.join(exe_dir, '.env'))
+        load_dotenv(os.path.join(exe_dir, 'api.env'))
+        url = os.getenv("DATABASE_URL")
+        
+    # Attempt 3: Parent directory
+    if not url:
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        load_dotenv(os.path.join(script_dir, '.env'))
+        url = os.getenv("DATABASE_URL")
 
-engine = create_engine(DATABASE_URL) if DATABASE_URL else None
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    if not url:
+        # Last resort fallback for local dev if all above fail
+        print("WARNING: DATABASE_URL not found in any .env file. Checking hardcoded fallback...")
+        url = "postgresql://postgres:postgres@127.0.0.1:5432/dbms_platform"
+
+    print(f"Backend: Connecting to database at {url.split('@')[-1] if '@' in url else 'unknown'}")
+    return create_engine(url)
+
+# Initialize engine immediately at module level
+try:
+    engine = init_engine()
+except Exception as e:
+    print(f"CRITICAL: Failed to initialize database engine: {e}")
+    engine = None
+
+def SessionLocal():
+    """Returns a new session. Always ensures binding to avoid 'Could not locate a bind' error."""
+    global engine
+    if engine is None:
+        engine = init_engine()
+    
+    if engine is None:
+        raise Exception("SQLAlchemy Error: DATABASE_URL not found. Engine is not bound.")
+        
+    # Create a fresh session maker bound to the engine
+    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return factory()
 
 def get_db():
     db = SessionLocal()
