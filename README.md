@@ -58,33 +58,33 @@ pip install -r apps/api/requirements.txt
 
 ### 3. Database Setup
 
-The platform uses PostgreSQL. You can start a local instance using Docker or use an existing one.
+The platform requires a PostgreSQL database. Follow these steps to set it up:
 
-1. **Start PostgreSQL Container**:
-
+#### A. Using Docker (Recommended)
+If you have Docker installed, you can use the provided configuration:
+1. **Download/Copy** the `docker-compose.yml` file to your server.
+2. Run the following command to start the database:
    ```bash
-   bun run db:start
+   docker compose up -d
    ```
 
-2. **Configure Environment**:
-   Create or update `apps/api/.env` with your connection string:
+#### B. Configure Environment
+Create an `.env` file in `apps/api/` (or next to the `.exe` for desktop users) with your connection string:
+```env
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/dbms_platform"
+```
 
-   ```env
-   DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/dbms_platform"
-   ```
-
-3. **Initialize Database & Tables**:
-   Run the setup script to create the database and all necessary tables:
-
+#### C. Initialize & Seed (For Developers)
+If you are running from source, initialize the schema and default data:
+1. **Create Tables**:
    ```bash
    python apps/api/scripts/setup_db.py
    ```
-
-4. **Seed Initial Data (Recommended)**:
-   Add default roles and a test user (username: `admin` / password: `password123`):
+2. **Seed Admin User**:
    ```bash
    python apps/api/scripts/seed.py
    ```
+   *Default Admin: `admin` / `password123`*
 
 ### 4. Running in Development
 
