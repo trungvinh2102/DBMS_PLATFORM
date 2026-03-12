@@ -1,0 +1,18 @@
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local Environment
+.env
+api.env
+
+# Build Artifacts
+build/
+dist/
+api.spec
+*.exe
+
+# System
+.DS_Store

@@ -13,6 +13,10 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo -F web dev",
+    "dev:desktop": "turbo -F desktop dev",
+    "desktop:standalone": "turbo -F desktop start",
+    "desktop:dist": "turbo -F desktop dist",
+    "web:standalone": "turbo -F web dev",
 
     "build": "turbo build",
     "start": "turbo start",
@@ -22,7 +26,6 @@
 
     "format": "prettier --write .",
     "clean": "rm -rf node_modules .turbo",
-    "prepare": "bun install",
 
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",

@@ -22,7 +22,28 @@ build
 *.swp
 *.swo
 *~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Misc
 .DS_Store
+Thumbs.db
+rustup-init.exe
+*.exe
+!apps/web/public/downloads/placeholder
+!run-desktop.bat
+!run-web.bat
+*.tgz
+.cache
+tmp
+temp
 
 # Logs
 logs
@@ -33,9 +54,6 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Turbo
-.turbo
-
 # Better-T-Stack
 .alchemy
 
@@ -43,13 +61,9 @@ lerna-debug.log*
 coverage
 .nyc_output
 
-# Misc
-*.tgz
-.cache
-tmp
-temp
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# Workspace
+.agent/
+.turbo/
+node_modules/
+dist/
+build/

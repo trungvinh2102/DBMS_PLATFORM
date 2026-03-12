@@ -7,11 +7,26 @@ import axios from "axios";
 import { useAuth } from "@/hooks/use-auth";
 
 const getBaseURL = () => {
-  const url = process.env.NEXT_PUBLIC_API_URL;
-  if (!url || url === "undefined") {
-    return "http://localhost:5000/api/";
-  }
-  return url.endsWith("/") ? url : `${url}/`;
+    // Priority 1: Environment variable set at build time (Next.js)
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (envUrl && envUrl !== "undefined") {
+        return envUrl.endsWith("/") ? envUrl : `${envUrl}/`;
+    }
+
+    // Priority 2: Standard standalone/desktop local development
+    if (typeof window !== "undefined") {
+        // If we're running in Electron/Tauri via app:// or localized localhost
+        const isStandalone = window.location.protocol === 'app:' || window.location.origin.includes('localhost:3001');
+        if (isStandalone) {
+            return "http://127.0.0.1:5000/api/";
+        }
+        
+        // If we're in the browser on a web domain, use same host with different port/prefix
+        return "/api/"; 
+    }
+
+    // Default fallback
+    return "http://127.0.0.1:5000/api/";
 };
 
 const api = axios.create({

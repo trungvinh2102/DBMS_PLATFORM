@@ -1,0 +1,19 @@
+# Node.js
+node_modules/
+dist/
+
+# Sidecars & Web Dist
+api-bin/
+web-dist/
+
+# Rust/Tauri
+src-tauri/target/
+
+# Local Dev
+.env
+*.exe
+!src-tauri/bin/*.exe
+
+# System
+.DS_Store
+*.log

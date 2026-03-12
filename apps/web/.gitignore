@@ -52,9 +52,8 @@ next-env.d.ts
 .idea
 
 # Other
-dev-dist
-
-.wrangler
-.dev.vars*
-
-.open-next
+# Downloads
+/public/downloads/*.exe
+!/public/downloads/placeholder
+/public/downloads/*.zip
+/public/downloads/*.dmg

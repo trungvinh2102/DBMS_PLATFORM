@@ -1,62 +1,80 @@
-# DBMS
+# DBMS Platform
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Next.js, Self, TRPC, and more.
+A modern, high-performance Database Management System platform built with a Next.js frontend, Flask backend, and cross-platform Desktop support.
 
-## Features
+## 🚀 Quick Launch
 
-- **TypeScript** - For type safety and improved developer experience
-- **Next.js** - Full-stack React framework
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **shadcn/ui** - Reusable UI components
-- **tRPC** - End-to-end type-safe APIs
-- **Prisma** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
-- **Turborepo** - Optimized monorepo build system
+This project includes localized scripts for easy startup:
 
-## Getting Started
+- **Web Browser Version**: Double-click `run-web.bat` to launch the API and open the web interface.
+- **Desktop Application**: Double-click `run-desktop.bat` to launch the standalone desktop app.
 
-First, install the dependencies:
+---
 
+## 💻 Desktop Application (.exe)
+
+The desktop app is built with Electron and includes an embedded Python API sidecar for offline capabilities.
+
+### 📥 Download Installer
+> [!TIP]
+> After building the project, you can find the installer here:
+> `apps/desktop/dist/DBMS Platform Setup 0.1.0.exe`
+
+### 🏗️ Build from Source
+To generate a fresh `.exe` installer:
+1. Ensure all dependencies are installed: `bun install`
+2. Run the distribution command:
+   ```bash
+   bun run desktop:dist
+   ```
+3. The setup file will be generated in `apps/desktop/dist/`.
+
+---
+
+## 🛠️ Architecture
+
+- **Frontend (`apps/web`)**: Next.js 15, TailwindCSS, shadcn/ui, TanStack Query.
+- **Backend (`apps/api`)**: Flask (Python), PostgreSQL, SQLAlchemy.
+- **Desktop (`apps/desktop`)**: Electron wrapper with automated backend lifecycle management.
+
+---
+
+## ⚙️ Setup & Development
+
+### 1. Requirements
+- **Bun** (Runtime)
+- **Python 3.10+** (Backend)
+- **Docker** (For PostgreSQL)
+
+### 2. Installation
 ```bash
 bun install
+pip install -r apps/api/requirements.txt
 ```
 
-## Database Setup
-
-This project uses PostgreSQL with Prisma.
-
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/web/.env` file with your PostgreSQL connection details.
-
-3. Apply the schema to your database:
-
+### 3. Database
+Start the database container:
 ```bash
-bun run db:push
+bun run db:start
 ```
 
-Then, run the development server:
-
+### 4. Running in Development
 ```bash
+# Start everything (Web + Desktop + API)
 bun run dev
+
+# Start only the Backend
+bun run backend:dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the fullstack application.
+---
 
-## Project Structure
+## 🌐 Environment Configuration
 
-```
-DBMS/
-├── apps/
-│   └── web/         # Fullstack application (Next.js)
-├── packages/
-│   ├── api/         # API layer / business logic
-│   └── db/          # Database schema & queries
-```
+The application is configured to handle multiple environments (Local, Desktop, Production) automatically. 
+To customize the API target, use the `NEXT_PUBLIC_API_URL` environment variable during build.
 
-## Available Scripts
+---
 
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run check-types`: Check TypeScript types across all apps
-- `bun run db:push`: Push schema changes to database
-- `bun run db:studio`: Open database studio UI
+## 📄 License
+Internal Development - DBMS Platform Team.
