@@ -46,7 +46,7 @@ export default function Home() {
             <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
         </Link>
-        <a href="/downloads/dbms-platform-setup.exe" download>
+        <a href="https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/0.1.0/DBMS_Platform.exe" target="_blank" rel="noopener noreferrer">
           <Button size="lg" variant="outline" className="rounded-xl px-8 border-white/10 hover:bg-white/5 bg-white/5 backdrop-blur-sm text-white font-semibold shadow-xl">
             <Download className="mr-2 h-4 w-4" />
             Download Desktop App (.exe)
