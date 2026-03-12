@@ -44,6 +44,7 @@ interface SQLLabToolbarProps {
   onOpen?: () => void;
   showAISidebar: boolean;
   setShowAISidebar: (show: boolean) => void;
+  isRelational: boolean;
 }
 
 export function SQLLabToolbar({
@@ -69,6 +70,7 @@ export function SQLLabToolbar({
   onOpen,
   showAISidebar,
   setShowAISidebar,
+  isRelational,
 }: SQLLabToolbarProps) {
   return (
     <header className="flex items-center h-14 border-b bg-background/80 backdrop-blur-md sticky top-0 z-10 px-3 shrink-0 gap-1 overflow-x-auto no-scrollbar">
@@ -220,25 +222,27 @@ export function SQLLabToolbar({
         )}
       />
 
-      <ToolbarButton
-        icon={<LayoutGrid className="h-4 w-4 text-emerald-500" />}
-        label="Schema"
-        active={showRightPanel && rightPanelMode === "schema"}
-        onClick={() => {
-          if (showRightPanel && rightPanelMode === "schema") {
-            setShowRightPanel(false);
-          } else {
-            setShowRightPanel(true);
-            setRightPanelMode("schema");
-            setShowAISidebar(false);
-          }
-        }}
-        className={cn(
-          showRightPanel &&
-            rightPanelMode === "schema" &&
-            "bg-emerald-500/10 border-emerald-500/30",
-        )}
-      />
+      {isRelational && (
+        <ToolbarButton
+          icon={<LayoutGrid className="h-4 w-4 text-emerald-500" />}
+          label="Schema"
+          active={showRightPanel && rightPanelMode === "schema"}
+          onClick={() => {
+            if (showRightPanel && rightPanelMode === "schema") {
+              setShowRightPanel(false);
+            } else {
+              setShowRightPanel(true);
+              setRightPanelMode("schema");
+              setShowAISidebar(false);
+            }
+          }}
+          className={cn(
+            showRightPanel &&
+              rightPanelMode === "schema" &&
+              "bg-emerald-500/10 border-emerald-500/30",
+          )}
+        />
+      )}
 
       <ToolbarButton
         icon={<History className="h-4 w-4 text-purple-500" />}

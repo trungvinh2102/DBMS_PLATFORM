@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useSQLLabTabs } from "./use-sqllab-tabs";
 import { useSQLLabMetadata } from "./use-sqllab-metadata";
 import { useSQLLabQuery } from "./use-sqllab-query";
 
 export function useSQLLab() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const initialConnectionId =
     searchParams.get("connectionId") || searchParams.get("ds");
 
@@ -28,9 +30,9 @@ export function useSQLLab() {
   const [activeResultTab, setActiveResultTab] = useState<
     "results" | "messages" | "problems" | "charts" | "lineage"
   >("results");
-  const [rightPanelMode, setRightPanelMode] = useState<"object" | "history" | "schema">(
-    "object",
-  );
+  const [rightPanelMode, setRightPanelMode] = useState<
+    "object" | "history" | "schema"
+  >("object");
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [autoCommit, setAutoCommit] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
@@ -103,8 +105,14 @@ export function useSQLLab() {
     if (ds && ds.length > 0) {
       if (initialConnectionId) {
         const target = ds.find((d: any) => d.id === initialConnectionId);
-        if (target && activeTab.selectedDS !== target.id) {
-          updateActiveTab({ selectedDS: target.id });
+        if (target) {
+          if (activeTab.selectedDS !== target.id) {
+            updateActiveTab({ selectedDS: target.id });
+          }
+          // Clean up URL query parameters once initial selection is processed
+          if (searchParams.has("connectionId") || searchParams.has("ds")) {
+            router.replace(pathname as any);
+          }
           return;
         }
       }
@@ -112,7 +120,15 @@ export function useSQLLab() {
         updateActiveTab({ selectedDS: ds[0].id });
       }
     }
-  }, [dataSources, initialConnectionId, activeTab.selectedDS, updateActiveTab]);
+  }, [
+    dataSources,
+    initialConnectionId,
+    activeTab.selectedDS,
+    updateActiveTab,
+    router,
+    pathname,
+    searchParams,
+  ]);
 
   // Schema initialization
   useEffect(() => {
@@ -124,6 +140,21 @@ export function useSQLLab() {
       }
     }
   }, [schemas, activeTab.selectedSchema, updateActiveTab]);
+
+  // Handle panel mode switching for NoSQL
+  const isRelational = dataSources?.find((ds: any) => ds.id === activeTab.selectedDS)?.type !== "mongodb";
+
+  useEffect(() => {
+    if (!isRelational && rightPanelMode === "schema") {
+      setRightPanelMode("object");
+    }
+  }, [isRelational, rightPanelMode]);
+
+  useEffect(() => {
+    if (!isRelational && activeResultTab === "lineage") {
+      setActiveResultTab("results");
+    }
+  }, [isRelational, activeResultTab]);
 
   const tableDataMutation = useMutation({
     mutationFn: (vars: { databaseId: string; sql: string }) =>
@@ -176,6 +207,11 @@ export function useSQLLab() {
     setSelectedTable: (tableName: string | null) => {
       setSelectedTable(tableName);
       if (tableName) {
+        // Auto-show panel and switch to Object mode
+        setShowRightPanel(true);
+        setRightPanelMode("object");
+        setShowAISidebar(false);
+        
         const isTable = (tables as string[])?.includes(tableName);
         const isView = (metadata.views as string[])?.includes(tableName);
 
@@ -234,6 +270,7 @@ export function useSQLLab() {
     selectedDSName:
       dataSources.find((ds: any) => ds.id === activeTab.selectedDS)
         ?.databaseName || "",
+    isRelational,
     handleRun: (sqlOverride?: string | React.SyntheticEvent) => {
       const actualSql =
         typeof sqlOverride === "string" ? sqlOverride : undefined;

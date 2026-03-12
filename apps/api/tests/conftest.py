@@ -51,6 +51,7 @@ def mock_session(mocker):
     # Also patch it in other service files where imported
     mocker.patch("services.connection.SessionLocal", return_value=mock_session_inst)
     mocker.patch("services.execution.SessionLocal", return_value=mock_session_inst)
+    mocker.patch("services.metadata.SessionLocal", return_value=mock_session_inst)
     return mock_session_inst
 
 @pytest.fixture

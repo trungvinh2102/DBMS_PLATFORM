@@ -154,6 +154,7 @@ function SQLLabContent() {
     currentTColumns,
     loadingTData,
     selectedDSName,
+    isRelational,
     executionTime,
 
     // Actions
@@ -213,7 +214,7 @@ function SQLLabContent() {
           selectedTable={selectedTable}
           setSelectedTable={setSelectedTable}
           onRefreshTables={refetchTables}
-          onVisualize={addSchemaTab}
+          isRelational={isRelational}
         />
 
         <div className="flex-1 flex flex-col overflow-hidden bg-muted/5">
@@ -240,6 +241,7 @@ function SQLLabContent() {
             onRollback={handleRollback}
             showAISidebar={showAISidebar}
             setShowAISidebar={setShowAISidebar}
+            isRelational={isRelational}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -269,6 +271,7 @@ function SQLLabContent() {
                       onRenameTab={renameTab}
                       undoTrigger={undoTrigger}
                       redoTrigger={redoTrigger}
+                      language={isRelational ? "sql" : "javascript"}
                       onErrorsChange={setSyntaxErrors}
                     />
                   </ResizablePanel>
@@ -335,6 +338,7 @@ function SQLLabContent() {
                       tableInfo={tableInfo}
                       tableDDL={tableDDL}
                       triggers={triggers}
+                      isRelational={isRelational}
                     />
                   ) : rightPanelMode === "history" ? (
                     <SQLLabHistoryPanel
@@ -346,7 +350,7 @@ function SQLLabContent() {
                       selectedSchema={selectedSchema}
                     />
                   ) : (
-                    <SchemaContent 
+                    <SchemaContent
                       databaseId={selectedDS}
                       schema={selectedSchema}
                       dataSources={dataSources}

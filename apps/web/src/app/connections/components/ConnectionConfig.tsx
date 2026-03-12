@@ -109,7 +109,7 @@ export function ConnectionConfig({
           <Button
             variant="outline"
             className="h-8 px-3 font-semibold uppercase tracking-wide text-[10px] border-border hover:bg-muted/10 rounded-md gap-2"
-            onClick={() => router.push(`/sqllab?ds=${activeConn.id}`)}
+            onClick={() => router.push(`/sqllab?ds=${activeConn.id}` as any)}
           >
             <Database className="h-3.5 w-3.5" />
             Explore Data

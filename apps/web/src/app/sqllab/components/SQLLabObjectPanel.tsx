@@ -69,6 +69,7 @@ interface SQLLabObjectPanelProps {
   tableInfo?: any;
   tableDDL?: string;
   triggers?: string[];
+  isRelational: boolean;
 }
 
 const ObjectIcon = ({
@@ -112,6 +113,7 @@ export function SQLLabObjectPanel({
   tableInfo,
   tableDDL,
   triggers,
+  isRelational,
 }: SQLLabObjectPanelProps) {
   const [structureSearch, setStructureSearch] = useState("");
   const { theme } = useTheme();
@@ -123,19 +125,18 @@ export function SQLLabObjectPanel({
     "Data",
     "Structure",
     "Index",
-    "Relation",
-    "Trigger",
+    ...(isRelational ? ["Relation", "Trigger"] : []),
     "Info",
-    "Script",
+    ...(isRelational ? ["Script"] : []),
   ];
   if (selectedObjectType === "view") {
-    availableTabs = ["Data", "Structure", "Info", "Script"];
+    availableTabs = ["Data", "Structure", "Info", ...(isRelational ? ["Script"] : [])];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
       selectedObjectType || "",
     )
   ) {
-    availableTabs = ["Info", "Script"];
+    availableTabs = ["Info", ...(isRelational ? ["Script"] : [])];
   }
 
   // Ensure we always have a valid tab selected even if state is slightly behind
@@ -256,7 +257,7 @@ export function SQLLabObjectPanel({
         ) : effectiveTab === "info" ? (
           <InfoTabView tableInfo={tableInfo} />
         ) : effectiveTab === "script" ? (
-          <ScriptTabView tableDDL={tableDDL} theme={monacoTheme} />
+          <ScriptTabView tableDDL={tableDDL} monacoTheme={monacoTheme} />
         ) : (
           <div className="flex items-center justify-center h-full p-16 text-center text-muted-foreground/5 font-black uppercase tracking-[1em] text-[10px]">
             {activeRightTab}
