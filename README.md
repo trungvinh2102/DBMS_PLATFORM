@@ -15,10 +15,9 @@ This project includes localized scripts for easy startup:
 
 The desktop app is built with Electron and includes an embedded Python API sidecar for offline capabilities.
 
-### 📥 Download Installer
-> [!TIP]
-> After building the project, you can find the installer here:
-> `apps/desktop/dist/DBMS Platform Setup 0.1.0.exe`
+### 📥 [Download Latest Release](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/latest)
+> [!IMPORTANT]
+> Click the link above to download the official `.exe` installer from the Releases page.
 
 ### 🏗️ Build from Source
 To generate a fresh `.exe` installer:
