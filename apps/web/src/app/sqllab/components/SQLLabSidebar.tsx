@@ -60,7 +60,7 @@ interface SQLLabSidebarProps {
   selectedTable: string | null;
   setSelectedTable: (table: string) => void;
   onRefreshTables: () => void;
-  onVisualize?: () => void;
+  isRelational: boolean;
 }
 
 export function SQLLabSidebar({
@@ -80,7 +80,7 @@ export function SQLLabSidebar({
   selectedTable,
   setSelectedTable,
   onRefreshTables,
-  onVisualize,
+  isRelational,
 }: SQLLabSidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,7 +255,6 @@ export function SQLLabSidebar({
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         getDBIcon={getDBIcon}
-        onVisualize={onVisualize}
       />
 
       <div className="flex-1 overflow-auto scrollbar-thin py-2">
@@ -274,34 +273,38 @@ export function SQLLabSidebar({
           filteredViews,
           filteredViews?.length,
         )}
-        {folderItem(
-          "events",
-          "Events",
-          <CalendarClock className="h-4 w-4 text-orange-500" />,
-          filteredEvents,
-          filteredEvents?.length,
-        )}
-        {folderItem(
-          "functions",
-          "Functions",
-          <FunctionSquare className="h-4 w-4 text-yellow-500" />,
-          filteredFunctions,
-          filteredFunctions?.length,
-        )}
-        {folderItem(
-          "procedures",
-          "Procedures",
-          <Settings2 className="h-4 w-4 text-slate-500" />,
-          filteredProcedures,
-          filteredProcedures?.length,
-        )}
-        {folderItem(
-          "triggers",
-          "Triggers",
-          <Zap className="h-4 w-4 text-indigo-500" />,
-          filteredTriggers,
-          filteredTriggers?.length,
-        )}
+        {isRelational &&
+          folderItem(
+            "events",
+            "Events",
+            <CalendarClock className="h-4 w-4 text-orange-500" />,
+            filteredEvents,
+            filteredEvents?.length,
+          )}
+        {isRelational &&
+          folderItem(
+            "functions",
+            "Functions",
+            <FunctionSquare className="h-4 w-4 text-yellow-500" />,
+            filteredFunctions,
+            filteredFunctions?.length,
+          )}
+        {isRelational &&
+          folderItem(
+            "procedures",
+            "Procedures",
+            <Settings2 className="h-4 w-4 text-slate-500" />,
+            filteredProcedures,
+            filteredProcedures?.length,
+          )}
+        {isRelational &&
+          folderItem(
+            "triggers",
+            "Triggers",
+            <Zap className="h-4 w-4 text-indigo-500" />,
+            filteredTriggers,
+            filteredTriggers?.length,
+          )}
       </div>
     </aside>
   );

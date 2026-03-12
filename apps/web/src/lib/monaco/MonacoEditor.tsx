@@ -18,6 +18,7 @@ import type { ValidationOptions } from "@/lib/monaco/types";
 import { useSettingsStore } from "@/stores/use-settings-store";
 import { defineThemes } from "@/lib/monaco/themes";
 import { registerSqlAutocomplete } from "@/lib/monaco/sql-autocomplete";
+import { registerMongoAutocomplete } from "@/lib/monaco/mongodb-autocomplete";
 import { registerEditorCommands } from "../../app/sqllab/hooks/use-editor-commands";
 
 interface SQLEditorProps {
@@ -37,6 +38,7 @@ interface SQLEditorProps {
   enableValidation?: boolean;
   showErrorPanel?: boolean;
   sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery";
+  language?: string;
   validationDebounceMs?: number;
   onValidationChange?: (errorCount: number, warningCount: number) => void;
   onErrorsChange?: (errors: any[]) => void;
@@ -58,6 +60,7 @@ export function SQLEditor({
   enableValidation = true,
   showErrorPanel = false,
   sqlDialect = "postgresql",
+  language = "sql",
   validationDebounceMs = 300,
   onValidationChange,
   onErrorsChange,
@@ -88,10 +91,10 @@ export function SQLEditor({
   const { errors, validate, clearMarkers } = useEditorValidation({
     monacoRef,
     editorRef,
-    language: "sql",
+    language: language === "sql" ? "sql" : "javascript", // Use javascript for MQL or fallback
     debounceMs: validationDebounceMs,
     validationOptions,
-    enabled: enableValidation,
+    enabled: enableValidation && language === "sql", // Disable SQL validation for non-SQL
     markerId: "sql-syntax-validator",
     onValidationComplete: (result) => {
       const eCount = result.markers.filter((m) => m.severity === 8).length;
@@ -168,6 +171,7 @@ export function SQLEditor({
       );
 
       registerSqlAutocomplete(monaco, tablesRef, columnsRef);
+      registerMongoAutocomplete(monaco, tablesRef, columnsRef);
       registerEditorCommands({
         editor,
         monaco,
@@ -193,7 +197,8 @@ export function SQLEditor({
       <div className="editor-area flex-1 min-h-0 overflow-hidden">
         <Editor
           height="100%"
-          defaultLanguage="sql"
+          defaultLanguage={language}
+          language={language}
           theme={currentTheme === "dark" ? "querypie-dark" : "querypie-light"}
           value={value}
           onChange={onChange}
@@ -212,7 +217,7 @@ export function SQLEditor({
             renderLineHighlight: "all",
             fontLigatures: true,
             formatOnPaste: settings.editorFormatOnPaste,
-            glyphMargin: enableValidation,
+            glyphMargin: enableValidation && language === "sql",
             renderValidationDecorations: "on",
           }}
         />

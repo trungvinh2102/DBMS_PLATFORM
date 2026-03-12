@@ -57,6 +57,8 @@ interface SQLLabEditorContainerProps {
   showErrorPanel?: boolean;
   /** SQL dialect for validation (default: 'postgresql') */
   sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery";
+  /** Editor language (default: 'sql') */
+  language?: string;
   /** Callback when syntax errors change */
   onErrorsChange?: (errors: SyntaxError[]) => void;
 }
@@ -86,6 +88,7 @@ export function SQLLabEditorContainer({
   enableValidation = true,
   showErrorPanel = false,
   sqlDialect = "postgresql",
+  language = "sql",
   onErrorsChange,
 }: SQLLabEditorContainerProps) {
   return (
@@ -168,6 +171,7 @@ export function SQLLabEditorContainer({
           enableValidation={enableValidation}
           showErrorPanel={showErrorPanel}
           sqlDialect={sqlDialect}
+          language={language}
           onErrorsChange={onErrorsChange}
         />
       </div>

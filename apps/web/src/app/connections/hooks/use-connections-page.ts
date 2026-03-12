@@ -155,7 +155,7 @@ export function useConnectionsPage() {
   const handleEdit = useCallback(
     (conn: any) => {
       setActiveConn(conn);
-      router.push(`/connections?id=${conn.id}`);
+      router.push(`/connections?id=${conn.id}` as any);
     },
     [router],
   );

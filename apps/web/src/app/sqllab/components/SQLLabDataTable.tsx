@@ -3,10 +3,10 @@
  * @description Data table component for SQL Lab with JSON preview support.
  */
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
-import { ChevronDown, ChevronRight, Terminal } from "lucide-react";
+import { ChevronDown, ChevronRight, Terminal, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -135,9 +135,20 @@ interface SQLLabDataTableProps {
 
 export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredData = React.useMemo(() => {
+    if (!searchTerm) return data;
+    const term = searchTerm.toLowerCase();
+    return data.filter(row => {
+      return Object.values(row).some(val => 
+        String(val).toLowerCase().includes(term)
+      );
+    });
+  }, [data, searchTerm]);
 
   const rowVirtualizer = useVirtualizer({
-    count: data.length,
+    count: filteredData.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => (mini ? 32 : 40),
     overscan: 10,
@@ -160,10 +171,35 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
   };
 
   return (
-    <>
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      {!mini && (
+        <div className="p-2 border-b bg-muted/5 flex items-center gap-3 shrink-0">
+          <div className="relative flex-1 max-w-sm group">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+            <input
+              type="text"
+              placeholder="Search in results..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-7 pl-8 pr-7 bg-muted/20 border border-border/40 rounded text-[11px] focus:outline-none focus:border-primary/40 focus:bg-background transition-all"
+            />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest px-2">
+            {filteredData.length} of {data.length} rows
+          </div>
+        </div>
+      )}
       <div
         ref={parentRef}
-        className="relative overflow-auto h-full scrollbar-thin bg-background"
+        className="flex-1 relative overflow-auto scrollbar-thin bg-background"
       >
         <table className="w-full text-sm border-collapse table-fixed min-w-full font-mono">
           <thead className="sticky top-0 bg-background/95 backdrop-blur-md shadow-sm z-50">
@@ -198,7 +234,7 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
             )}
             {virtualRows.map((virtualRow) => {
               const i = virtualRow.index;
-              const row = data[i];
+              const row = filteredData[i];
               return (
                 <tr
                   key={virtualRow.key}
@@ -270,6 +306,12 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
               )}
           </tbody>
         </table>
+        {filteredData.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground/20">
+            <Search className="h-8 w-8 mb-4 opacity-10" />
+            <p className="text-[10px] uppercase font-black tracking-widest">No matching rows found</p>
+          </div>
+        )}
       </div>
 
       <Dialog
@@ -319,6 +361,6 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
