@@ -69,11 +69,18 @@ class BaseDatabaseService:
             
         conn_str = ""
         if config.get('uri'):
-            conn_str = config['uri'].replace('localhost', '127.0.0.1')
+            uri = config['uri'].strip()
+            # Remove literal quotes if present
+            if (uri.startswith('"') and uri.endswith('"')) or (uri.startswith("'") and uri.endswith("'")):
+                uri = uri[1:-1].strip()
+                
+            conn_str = uri.replace('localhost', '127.0.0.1')
             if conn_str.startswith('postgres://'):
                 conn_str = conn_str.replace('postgres://', 'postgresql+psycopg2://')
             elif conn_str.startswith('postgresql://'):
                  conn_str = conn_str.replace('postgresql://', 'postgresql+psycopg2://')
+            
+            # Update config for consistency if needed, but conn_str is what matters here
         else:
             user = config.get('user')
             password = config.get('password')
@@ -96,6 +103,11 @@ class BaseDatabaseService:
             elif db_type == 'sqlite':
                 conn_str = f"sqlite:///{dbname}"
 
+        # Masking for safe logging
+        masked_conn_str = conn_str
+        if '@' in conn_str:
+            masked_conn_str = '***' + conn_str[conn_str.find('@'):]
+        
         # Caching logic
         cache_key = conn_str
         if cache_key in _engine_cache:
@@ -104,17 +116,23 @@ class BaseDatabaseService:
         # Create engine with connection pooling and timeout
         connect_args = {}
             
-        engine = create_engine(
-            conn_str,
-            poolclass=pool.QueuePool,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=1800,
-            connect_args=connect_args
-        )
-        _engine_cache[cache_key] = engine
-        return engine
+        try:
+            logger.info(f"Creating SQLAlchemy engine for: {masked_conn_str}")
+            # print(f"DEBUG: Target engine create with: {masked_conn_str}") # Add this for immediate console feedback
+            engine = create_engine(
+                conn_str,
+                poolclass=pool.QueuePool,
+                pool_size=5,
+                max_overflow=10,
+                pool_timeout=30,
+                pool_recycle=1800,
+                connect_args=connect_args
+            )
+            _engine_cache[cache_key] = engine
+            return engine
+        except Exception as e:
+            logger.error(f"SQLAlchemy engine creation FAILED for {masked_conn_str}: {e}")
+            raise Exception(f"Failed to connect to {db_type} database. Check your configuration. (Error: {str(e)})")
 
     def run_dynamic_query(self, database_id: str, callback):
         """

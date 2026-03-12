@@ -290,6 +290,49 @@ class MetadataService(BaseDatabaseService):
             } for r in rows]
         return self.run_dynamic_query(database_id, _op)
 
+    def get_all_columns(self, database_id: str, schema: str):
+        """
+        Lists all columns for all tables in a schema using Inspector for cross-db support.
+        """
+        from sqlalchemy import inspect
+        def _op(conn):
+            inspector = inspect(conn)
+            tables = inspector.get_table_names(schema=schema)
+            result = {}
+            for table in tables:
+                cols = inspector.get_columns(table, schema=schema)
+                result[table] = [{
+                    "name": c["name"],
+                    "type": str(c["type"]),
+                    "nullable": c.get("nullable", True)
+                } for c in cols]
+            return result
+        return self.run_dynamic_query(database_id, _op)
+
+    def get_all_foreign_keys(self, database_id: str, schema: str):
+        """
+        Lists all foreign keys in a schema using Inspector for cross-db support.
+        """
+        from sqlalchemy import inspect
+        def _op(conn):
+            inspector = inspect(conn)
+            tables = inspector.get_table_names(schema=schema)
+            all_fks = []
+            for table in tables:
+                fks = inspector.get_foreign_keys(table, schema=schema)
+                for fk in fks:
+                    # fk is usually like: {'name': ..., 'constrained_columns': [...], 'referred_schema': ..., 'referred_table': ..., 'referred_columns': [...]}
+                    for i, col in enumerate(fk['constrained_columns']):
+                        all_fks.append({
+                            "table": table,
+                            "column": col,
+                            "foreignSchema": fk.get('referred_schema') or schema,
+                            "foreignTable": fk['referred_table'],
+                            "foreignColumn": fk['referred_columns'][i] if i < len(fk['referred_columns']) else None
+                        })
+            return all_fks
+        return self.run_dynamic_query(database_id, _op)
+
     def get_indexes(self, database_id: str, schema: str, table: str):
          """
          Lists indexes for a table.

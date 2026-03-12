@@ -115,43 +115,60 @@ import sys
 from dotenv import load_dotenv
 
 def init_engine():
-    # Attempt 1: Standard load
+    # Attempt 1: Standard load from current workdir
     load_dotenv()
     url = os.getenv("DATABASE_URL")
     
-    # Attempt 2: Next to executable (Tauri/Sidecar)
+    # Attempt 2: Load from apps/api/.env (relative to this file)
     if not url:
-        exe_dir = os.path.dirname(sys.executable)
-        load_dotenv(os.path.join(exe_dir, '.env'))
-        load_dotenv(os.path.join(exe_dir, 'api.env'))
-        url = os.getenv("DATABASE_URL")
-        
-    # Attempt 3: Parent directory
+        models_dir = os.path.dirname(os.path.abspath(__file__))
+        api_dir = os.path.dirname(models_dir)
+        api_env = os.path.join(api_dir, '.env')
+        if os.path.exists(api_env):
+            load_dotenv(api_env, override=True)
+            url = os.getenv("DATABASE_URL")
+            
+    # Attempt 3: Load from root .env (relative to this file)
     if not url:
-        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        load_dotenv(os.path.join(script_dir, '.env'))
-        url = os.getenv("DATABASE_URL")
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        root_env = os.path.join(root_dir, '.env')
+        if os.path.exists(root_env):
+            load_dotenv(root_env, override=True)
+            url = os.getenv("DATABASE_URL")
+
+    # Final cleanup
+    if url:
+        # Handle cases where the URL might be wrapped in quotes in the .env file
+        url = url.strip()
+        if (url.startswith('"') and url.endswith('"')) or (url.startswith("'") and url.endswith("'")):
+            url = url[1:-1].strip()
 
     if not url:
-        # Last resort fallback for local dev if all above fail
         print("WARNING: DATABASE_URL not found in any .env file. Checking hardcoded fallback...")
         url = "postgresql://postgres:postgres@127.0.0.1:5432/dbms_platform"
 
-    print(f"Backend: Connecting to database at {url.split('@')[-1] if '@' in url else 'unknown'}")
-    return create_engine(url)
+    print(f"Backend: Database connection initialized.")
+    # Log masked URL for safety
+    masked_url = url
+    if '@' in url:
+        masked_url = '***' + url[url.find('@'):]
+    print(f"Backend: Target: {masked_url}")
+    
+    return create_engine(url), url
 
 # Initialize engine immediately at module level
 try:
-    engine = init_engine()
+    engine, DATABASE_URL = init_engine()
 except Exception as e:
     print(f"CRITICAL: Failed to initialize database engine: {e}")
     engine = None
+    DATABASE_URL = None
 
 def SessionLocal():
     """Returns a new session. Always ensures binding to avoid 'Could not locate a bind' error."""
     global engine
     if engine is None:
-        engine = init_engine()
+        engine, DATABASE_URL = init_engine()
     
     if engine is None:
         raise Exception("SQLAlchemy Error: DATABASE_URL not found. Engine is not bound.")

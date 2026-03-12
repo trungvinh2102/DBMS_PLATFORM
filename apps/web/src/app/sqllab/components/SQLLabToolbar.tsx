@@ -15,6 +15,7 @@ import {
   Zap,
   History,
   Table2,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToolbarButton } from "./ToolbarButton";
@@ -26,8 +27,8 @@ interface SQLLabToolbarProps {
   selectedDS: string;
   showRightPanel: boolean;
   setShowRightPanel: (show: boolean) => void;
-  rightPanelMode: "object" | "history";
-  setRightPanelMode: (mode: "object" | "history") => void;
+  rightPanelMode: "object" | "history" | "schema";
+  setRightPanelMode: (mode: "object" | "history" | "schema") => void;
   handleFormat: () => void;
   handleStop?: () => void;
   autoCommit: boolean;
@@ -77,7 +78,7 @@ export function SQLLabToolbar({
           icon={
             <Play
               className={cn(
-                "h-4 w-4 text-emerald-600",
+                "h-4 w-4 text-primary",
                 executing && "animate-pulse",
               )}
             />
@@ -216,6 +217,26 @@ export function SQLLabToolbar({
           showRightPanel &&
             rightPanelMode === "object" &&
             "bg-blue-500/10 border-blue-500/30",
+        )}
+      />
+
+      <ToolbarButton
+        icon={<LayoutGrid className="h-4 w-4 text-emerald-500" />}
+        label="Schema"
+        active={showRightPanel && rightPanelMode === "schema"}
+        onClick={() => {
+          if (showRightPanel && rightPanelMode === "schema") {
+            setShowRightPanel(false);
+          } else {
+            setShowRightPanel(true);
+            setRightPanelMode("schema");
+            setShowAISidebar(false);
+          }
+        }}
+        className={cn(
+          showRightPanel &&
+            rightPanelMode === "schema" &&
+            "bg-emerald-500/10 border-emerald-500/30",
         )}
       />
 

@@ -37,3 +37,13 @@ def optimize_sql():
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@ai_bp.route('/fix-sql', methods=['POST'])
+@login_required
+def fix_sql():
+    data = request.json
+    try:
+        result = ai_service.fix_sql(data['sql'], data['error'], data['databaseId'], data.get('schema', 'public'))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
