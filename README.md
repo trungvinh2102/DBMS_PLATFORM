@@ -13,12 +13,12 @@ This project includes localized scripts for easy startup:
 
 ## 💻 Desktop Application (.exe)
 
-The desktop app is built with Electron and includes an embedded Python API sidecar for offline capabilities.
+The desktop app is built with **Tauri** and includes an embedded Python API sidecar for offline capabilities.
 
-### 📥 [Download Installer Directly](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/latest/download/DBMS_Platform.exe)
+### 📥 [Download Installer Directly (v0.1.0)](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/0.1.0/DBMS_Platform.exe)
 
-> [!IMPORTANT]
-> Click the link above to download the official `.exe` installer from the Releases page.
+> [!TIP]
+> This link points to the current stable release. To download the very latest official version, visit the [Releases Page](https://github.com/trungvinh2102/DBMS_PLATFORM/releases).
 
 ### 🏗️ Build from Source
 
@@ -37,7 +37,7 @@ To generate a fresh `.exe` installer:
 
 - **Frontend (`apps/web`)**: Next.js 15, TailwindCSS, shadcn/ui, TanStack Query.
 - **Backend (`apps/api`)**: Flask (Python), PostgreSQL, SQLAlchemy.
-- **Desktop (`apps/desktop`)**: Electron wrapper with automated backend lifecycle management.
+- **Desktop (`apps/desktop`)**: Tauri wrapper with automated backend lifecycle management.
 
 ---
 
