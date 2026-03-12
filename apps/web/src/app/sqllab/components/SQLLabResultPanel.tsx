@@ -13,6 +13,7 @@ import {
   FileText,
   XCircle,
   AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -44,12 +45,13 @@ const LineageViewer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse">
+      <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse text-[10px] font-black uppercase tracking-widest">
         Loading lineage...
       </div>
     ),
   },
 );
+
 
 interface SQLLabResultPanelProps {
   executing: boolean;
@@ -65,6 +67,8 @@ interface SQLLabResultPanelProps {
   sql: string;
   dataSources?: any[];
   selectedDS?: string;
+  selectedSchema?: string;
+  onFixWithAI?: (error: string) => void;
 }
 
 type TabType = "results" | "messages" | "problems" | "charts" | "lineage";
@@ -85,6 +89,8 @@ export function SQLLabResultPanel({
   sql,
   dataSources = [],
   selectedDS,
+  selectedSchema,
+  onFixWithAI,
 }: SQLLabResultPanelProps) {
   // const [activeTab, setActiveTab] = useState<TabType>("results");
 
@@ -155,6 +161,8 @@ export function SQLLabResultPanel({
             sql={sql}
             dataSources={dataSources}
             selectedDS={selectedDS}
+            selectedSchema={selectedSchema}
+            onFixWithAI={onFixWithAI}
           />
         )}
       </div>
@@ -228,6 +236,8 @@ function PanelContent({
   sql,
   dataSources,
   selectedDS,
+  selectedSchema,
+  onFixWithAI,
 }: any) {
   if (tab === "results") {
     return results.length > 0 ? (
@@ -259,8 +269,26 @@ function PanelContent({
   if (tab === "messages") {
     return error ? (
       <div className="p-8">
-        <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-5 text-xs font-mono text-red-700 dark:text-red-400 whitespace-pre-wrap max-h-48 overflow-auto shadow-sm">
-          {error}
+        <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-6 font-mono text-red-700 dark:text-red-400 shadow-xl glass transition-all duration-500 overflow-hidden group">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-500" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Execution Error</span>
+            </div>
+          </div>
+          <div className="text-xs whitespace-pre-wrap max-h-64 overflow-auto scrollbar-thin pr-4 leading-relaxed opacity-80">
+            {error}
+          </div>
+          
+          <div className="mt-6 pt-6 border-t border-red-500/10 flex justify-end">
+            <button
+              onClick={() => onFixWithAI?.(error)}
+              className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/20"
+            >
+              <Sparkles className="h-4 w-4" />
+              Fix with AI
+            </button>
+          </div>
         </div>
       </div>
     ) : (
@@ -271,6 +299,7 @@ function PanelContent({
       />
     );
   }
+
   return <ProblemsList errors={syntaxErrors} onItemClick={onErrorClick} />;
 }
 
@@ -356,7 +385,7 @@ function Footer({
           </button>
         )}
         <div className="flex items-center gap-3 hover:bg-muted px-5 cursor-pointer transition-colors h-full">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
+          <span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_12px_rgba(0,0,0,0.2)] dark:shadow-[0_0_12px_rgba(255,255,255,0.2)]" />
           ASIA/HO_CHI_MINH (GMT+07:00)
         </div>
       </div>

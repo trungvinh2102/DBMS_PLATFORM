@@ -60,6 +60,7 @@ interface SQLLabSidebarProps {
   selectedTable: string | null;
   setSelectedTable: (table: string) => void;
   onRefreshTables: () => void;
+  onVisualize?: () => void;
 }
 
 export function SQLLabSidebar({
@@ -79,6 +80,7 @@ export function SQLLabSidebar({
   selectedTable,
   setSelectedTable,
   onRefreshTables,
+  onVisualize,
 }: SQLLabSidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -253,6 +255,7 @@ export function SQLLabSidebar({
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         getDBIcon={getDBIcon}
+        onVisualize={onVisualize}
       />
 
       <div className="flex-1 overflow-auto scrollbar-thin py-2">
@@ -295,7 +298,7 @@ export function SQLLabSidebar({
         {folderItem(
           "triggers",
           "Triggers",
-          <Zap className="h-4 w-4 text-green-500" />,
+          <Zap className="h-4 w-4 text-indigo-500" />,
           filteredTriggers,
           filteredTriggers?.length,
         )}

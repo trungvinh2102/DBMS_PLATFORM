@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Desktop app for DBMS Platform",
   "main": "main.js",
+  "author": "DBMS Platform Team",
   "private": true,
   "scripts": {
     "dev": "electron .",
@@ -34,12 +35,12 @@
       "api-bin/**/*"
     ],
     "asar": true,
-    "asarUnpacked": [
+    "asarUnpack": [
       "api-bin/**/*"
     ],
     "win": {
       "target": [
-        "nsis"
+        "zip"
       ],
       "icon": "src-tauri/icons/icon.ico"
     },

@@ -16,6 +16,7 @@ database_bp = Blueprint('database', __name__)
 @login_required
 def require_auth():
     """Ensure all database routes require authentication."""
+    print(f"Database BP Request: {request.method} {request.path}")
     pass
 
 @database_bp.route('/list', methods=['GET'])
@@ -178,6 +179,32 @@ def get_columns():
     try:
         columns = metadata_service.get_columns(db_id, schema, table)
         return jsonify(columns)
+    except Exception as e:
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
+
+@database_bp.route('/all-columns', methods=['GET', 'OPTIONS'])
+def get_all_columns():
+    """Get all columns for all tables in a schema."""
+    db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
+    schema = request.args.get('schema', 'public')
+    try:
+        columns = metadata_service.get_all_columns(db_id, schema)
+        return jsonify(columns)
+    except Exception as e:
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
+
+@database_bp.route('/all-foreign-keys', methods=['GET', 'OPTIONS'])
+def get_all_foreign_keys():
+    """Get all foreign keys for a schema."""
+    db_id = request.args.get('databaseId')
+    if not db_id: return jsonify({'error': 'databaseId required'}), 400
+    schema = request.args.get('schema', 'public')
+    try:
+        fks = metadata_service.get_all_foreign_keys(db_id, schema)
+        return jsonify(fks)
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
         return jsonify({'error': str(e)}), status

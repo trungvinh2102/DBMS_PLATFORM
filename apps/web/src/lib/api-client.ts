@@ -18,7 +18,7 @@ const getBaseURL = () => {
         // If we're running in Electron/Tauri via app:// or localized localhost
         const isStandalone = window.location.protocol === 'app:' || window.location.origin.includes('localhost:3001');
         if (isStandalone) {
-            return "http://127.0.0.1:5000/api/";
+            return "http://localhost:5050/api/";
         }
         
         // If we're in the browser on a web domain, use same host with different port/prefix
@@ -26,7 +26,9 @@ const getBaseURL = () => {
     }
 
     // Default fallback
-    return "http://127.0.0.1:5000/api/";
+    const finalUrl = "http://localhost:5050/api/";
+    console.log("API Base URL Selected:", finalUrl);
+    return finalUrl;
 };
 
 const api = axios.create({
@@ -112,6 +114,10 @@ export const databaseApi = {
     ),
   getDDL: (databaseId: string, table: string, schema?: string) =>
     req(api.get("database/ddl", { params: { databaseId, table, schema } })),
+  getAllColumns: (databaseId: string, schema?: string) =>
+    req(api.get("database/all-columns", { params: { databaseId, schema } })),
+  getAllForeignKeys: (databaseId: string, schema?: string) =>
+    req(api.get("database/all-foreign-keys", { params: { databaseId, schema } })),
 
   // Execution
   execute: (
@@ -145,6 +151,7 @@ export const aiApi = {
   generateSQL: (data: any) => req(api.post("ai/generate-sql", data)),
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
+  fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
 };
 
 export { api };

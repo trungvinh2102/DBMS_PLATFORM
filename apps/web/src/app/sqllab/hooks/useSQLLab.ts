@@ -28,7 +28,7 @@ export function useSQLLab() {
   const [activeResultTab, setActiveResultTab] = useState<
     "results" | "messages" | "problems" | "charts" | "lineage"
   >("results");
-  const [rightPanelMode, setRightPanelMode] = useState<"object" | "history">(
+  const [rightPanelMode, setRightPanelMode] = useState<"object" | "history" | "schema">(
     "object",
   );
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
@@ -43,6 +43,7 @@ export function useSQLLab() {
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState(false);
   const [showAISidebar, setShowAISidebar] = useState(false);
   const [selectedText, setSelectedText] = useState<string>("");
+  const [fixSQLError, setFixSQLError] = useState<string | null>(null);
 
   const {
     dataSources,
@@ -205,6 +206,8 @@ export function useSQLLab() {
     setIsOpenDialogOpen,
     showAISidebar,
     setShowAISidebar,
+    fixSQLError,
+    setFixSQLError,
     dataSources,
     schemas,
     isLoadingSchemas,
@@ -281,6 +284,11 @@ export function useSQLLab() {
       return run;
     },
     addTab: () => addTab(activeTab.selectedDS, activeTab.selectedSchema),
+    addSchemaTab: () => {
+      setRightPanelMode("schema");
+      setShowRightPanel(true);
+      setShowAISidebar(false);
+    },
     closeTab,
     renameTab,
     savedQueries,

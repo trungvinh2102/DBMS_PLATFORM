@@ -74,6 +74,14 @@ const OpenQueryDialog = dynamic(
   { ssr: false },
 );
 
+const SchemaContent = dynamic(
+  () => import("./components/SchemaContent").then((m) => m.SchemaContent),
+  {
+    ssr: false,
+    loading: () => <PanelSkeleton />,
+  },
+);
+
 // Hooks
 import { useSQLLab } from "./hooks/useSQLLab";
 
@@ -166,6 +174,7 @@ function SQLLabContent() {
     activeTabId,
     setActiveTabId,
     addTab,
+    addSchemaTab,
     closeTab,
     renameTab,
     handleImport,
@@ -177,6 +186,8 @@ function SQLLabContent() {
     setSelectedText,
     selectedObjectType,
     handleRollback,
+    fixSQLError,
+    setFixSQLError,
   } = useSQLLab();
 
   // Syntax validation errors from the editor
@@ -202,6 +213,7 @@ function SQLLabContent() {
           selectedTable={selectedTable}
           setSelectedTable={setSelectedTable}
           onRefreshTables={refetchTables}
+          onVisualize={addSchemaTab}
         />
 
         <div className="flex-1 flex flex-col overflow-hidden bg-muted/5">
@@ -280,6 +292,12 @@ function SQLLabContent() {
                       sql={sql}
                       dataSources={dataSources}
                       selectedDS={selectedDS}
+                      selectedSchema={selectedSchema}
+                      onFixWithAI={(errMsg) => {
+                        setFixSQLError(errMsg);
+                        setShowAISidebar(true);
+                        toast.info("AI Sidebar opened to fix the error.");
+                      }}
                     />
                   </ResizablePanel>
                 </ResizablePanelGroup>
@@ -318,7 +336,7 @@ function SQLLabContent() {
                       tableDDL={tableDDL}
                       triggers={triggers}
                     />
-                  ) : (
+                  ) : rightPanelMode === "history" ? (
                     <SQLLabHistoryPanel
                       onSelectQuery={(historySql) => {
                         setSql(historySql);
@@ -326,6 +344,12 @@ function SQLLabContent() {
                       }}
                       selectedDS={selectedDS}
                       selectedSchema={selectedSchema}
+                    />
+                  ) : (
+                    <SchemaContent 
+                      databaseId={selectedDS}
+                      schema={selectedSchema}
+                      dataSources={dataSources}
                     />
                   )}
                 </ResizablePanel>
@@ -348,6 +372,8 @@ function SQLLabContent() {
                         }}
                         databaseId={selectedDS}
                         schema={selectedSchema}
+                        currentSQL={sql}
+                        fixSQLError={fixSQLError}
                       />
                     </div>
                   </ResizablePanel>
