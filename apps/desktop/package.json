@@ -46,6 +46,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "artifactName": "dbms-platform-setup.exe",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "DBMS Platform",
