@@ -147,6 +147,7 @@ export function SchemaVisualizer({ tables, columns, foreignKeys, databaseName }:
           nodeTypes={nodeTypes}
           fitView
           colorMode={currentTheme}
+          proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} size={1} color="currentColor" className="opacity-[0.03] dark:opacity-[0.07]" />
           <Controls className="bg-background border border-border shadow-xl fill-foreground!" />
@@ -218,6 +219,7 @@ function SchemaDetailsDialog({
             nodeTypes={nodeTypes}
             fitView
             colorMode={theme}
+            proOptions={{ hideAttribution: true }}
           >
             <Background gap={24} size={1} color="currentColor" className="opacity-[0.03] dark:opacity-[0.07]" />
             <Controls className="bg-background border border-border shadow-xl fill-foreground!" />
