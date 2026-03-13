@@ -5,6 +5,7 @@ Service for retrieving database schema information.
 """
 
 from services.base_service import BaseDatabaseService
+from models.metadata import SessionLocal
 from sqlalchemy import text
 import logging
 
@@ -16,35 +17,8 @@ class MetadataService(BaseDatabaseService):
     """
 
     def _get_mongo_client(self, database_id: str, session):
-        """Helper to get a native MongoClient for a database ID."""
-        db_type, config = self.get_db_config(database_id, session)
-        if db_type != 'mongodb':
-            return None, None
-            
-        from pymongo import MongoClient
-        host = config.get('host', '127.0.0.1')
-        raw_port = config.get('port')
-        try:
-            port = int(raw_port) if raw_port else 27017
-        except (ValueError, TypeError):
-            port = 27017
-            
-        user = config.get('user')
-        password = config.get('password')
-        
-        try:
-            client = MongoClient(
-                host=host,
-                port=port,
-                username=user,
-                password=password,
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=5000
-            )
-            return client, config.get('database', 'test')
-        except Exception as e:
-            logger.error(f"Failed to create MongoClient: {e}")
-            return None, None
+        """Helper to get a native MongoClient for a database ID (Legacy wrapper)."""
+        return self.get_mongo_client(database_id, session)
 
     def get_schemas(self, database_id: str):
         """
@@ -56,7 +30,6 @@ class MetadataService(BaseDatabaseService):
         Returns:
             list[str]: A list of schema names.
         """
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -95,7 +68,6 @@ class MetadataService(BaseDatabaseService):
         Returns:
             list[str]: A list of table names.
         """
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -105,8 +77,18 @@ class MetadataService(BaseDatabaseService):
                     # In MongoDB, "tables" are collections. 
                     # If schema is 'public' (relational default) or empty, use the configured database
                     target_db = schema if schema and schema != 'public' else default_db
-                    collections = client[target_db].list_collections()
-                    return [c['name'] for c in collections if c.get('type', 'collection') == 'collection']
+                    
+                    # More robust way: Get all names first
+                    all_names = client[target_db].list_collection_names()
+                    
+                    # Try to get views to filter them out from tables
+                    try:
+                        collections_info = list(client[target_db].list_collections())
+                        view_names = [c['name'] for c in collections_info if c.get('type') == 'view']
+                        return [name for name in all_names if name not in view_names and not name.startswith('system.')]
+                    except:
+                        # Fallback: if list_collections fails, just show everything except system.
+                        return [name for name in all_names if not name.startswith('system.')]
                 return []
         except Exception as e:
             logger.error(f"Error in MongoDB get_tables: {e}")
@@ -125,7 +107,6 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_views(self, database_id: str, schema: str = 'public'):
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -133,8 +114,13 @@ class MetadataService(BaseDatabaseService):
                 client, default_db = self._get_mongo_client(database_id, session)
                 if client:
                     target_db = schema if schema and schema != 'public' else default_db
-                    collections = client[target_db].list_collections()
-                    return [c['name'] for c in collections if c.get('type') == 'view']
+                    try:
+                        # Get only the collections that are of type 'view'
+                        collections = client[target_db].list_collections()
+                        return [c['name'] for c in collections if c.get('type') == 'view']
+                    except Exception as e:
+                        logger.error(f"Error listing MongoDB views: {e}")
+                        return []
                 return []
         finally:
             session.close()
@@ -153,7 +139,6 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_functions(self, database_id: str, schema: str = 'public'):
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -176,7 +161,6 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_procedures(self, database_id: str, schema: str = 'public'):
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -199,7 +183,6 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_triggers(self, database_id: str, schema: str = 'public'):
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -222,7 +205,6 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_events(self, database_id: str, schema: str = 'public'):
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -256,7 +238,6 @@ class MetadataService(BaseDatabaseService):
         Returns:
             list[dict]: A list of column metadata.
         """
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -264,17 +245,32 @@ class MetadataService(BaseDatabaseService):
                 client, default_db = self._get_mongo_client(database_id, session)
                 if not client: return []
                 
-                # In MongoDB, we can sample a document to get "columns"
+                # Sample documents to find all frequent fields using $sample for performance
                 target_db = schema if schema and schema != 'public' else default_db
                 collection = client[target_db][table]
-                doc = collection.find_one()
-                if not doc:
+                
+                # Use $sample aggregation stage for better distribution in large collections
+                try:
+                    cursor = collection.aggregate([{"$sample": {"size": 20}}])
+                except Exception:
+                    # Fallback for old versions or restricted environments
+                    cursor = collection.find().limit(20)
+                
+                all_fields = {} # name -> type
+                
+                for doc in cursor:
+                    for key, value in doc.items():
+                        if key not in all_fields or (all_fields[key] == 'NoneType' and value is not None):
+                            all_fields[key] = type(value).__name__
+                
+                if not all_fields:
                     return []
+                    
                 return [{
                     "name": key,
-                    "type": type(value).__name__,
+                    "type": val_type,
                     "nullable": True
-                } for key, value in doc.items()]
+                } for key, val_type in all_fields.items()]
         except Exception as e:
             logger.error(f"Error in MongoDB get_columns: {e}")
             return []
@@ -298,9 +294,39 @@ class MetadataService(BaseDatabaseService):
 
     def get_all_columns(self, database_id: str, schema: str):
         """
-        Lists all columns for all tables in a schema using Inspector for cross-db support.
+        Lists all columns for all tables in a schema.
+        Supports both Relational (via Inspector) and MongoDB.
         """
         from sqlalchemy import inspect
+        
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                client, default_db = self._get_mongo_client(database_id, session)
+                if not client: return {}
+                
+                target_db = schema if schema and schema != 'public' else default_db
+                collections = client[target_db].list_collection_names()
+                result = {}
+                for coll in collections:
+                    # For performance, we limit sampling when getting "all"
+                    doc = client[target_db][coll].find_one()
+                    if doc:
+                         result[coll] = [{
+                            "name": key,
+                            "type": type(value).__name__,
+                            "nullable": True
+                        } for key, value in doc.items()]
+                    else:
+                        result[coll] = []
+                return result
+        except Exception as e:
+            logger.error(f"Error in MongoDB get_all_columns: {e}")
+            return {}
+        finally:
+            session.close()
+
         def _op(conn):
             inspector = inspect(conn)
             tables = inspector.get_table_names(schema=schema)
@@ -320,6 +346,15 @@ class MetadataService(BaseDatabaseService):
         Lists all foreign keys in a schema using Inspector for cross-db support.
         """
         from sqlalchemy import inspect
+        
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                return [] # No FKs in MongoDB natively
+        finally:
+            session.close()
+            
         def _op(conn):
             inspector = inspect(conn)
             tables = inspector.get_table_names(schema=schema)
@@ -341,18 +376,25 @@ class MetadataService(BaseDatabaseService):
 
     def get_indexes(self, database_id: str, schema: str, table: str):
          """
-         Lists indexes for a table.
+         Lists indexes for a table/collection.
          """
-         from models.metadata import SessionLocal
          session = SessionLocal()
          try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
                 client, default_db = self._get_mongo_client(database_id, session)
-                if client:
-                    target_db = schema if schema and schema != 'public' else default_db
-                    indexes = client[target_db][table].list_indexes()
-                    return [{"indexname": idx["name"], "indexdef": str(idx["key"])} for idx in indexes]
+                if not client: return []
+                
+                target_db = schema if schema and schema != 'public' else default_db
+                collection = client[target_db][table]
+                indexes = list(collection.list_indexes())
+                
+                return [{
+                    "indexname": idx.get('name'),
+                    "indexdef": str(idx.get('key'))
+                } for idx in indexes]
+         except Exception as e:
+                logger.error(f"Error in MongoDB get_indexes: {e}")
                 return []
          finally:
             session.close()
@@ -367,7 +409,6 @@ class MetadataService(BaseDatabaseService):
         """
         Lists foreign keys for a table.
         """
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -408,7 +449,6 @@ class MetadataService(BaseDatabaseService):
         """
         Gets detailed table statistics.
         """
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -453,7 +493,6 @@ class MetadataService(BaseDatabaseService):
         """
         Generates DDL for a table (Prototype).
         """
-        from models.metadata import SessionLocal
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)

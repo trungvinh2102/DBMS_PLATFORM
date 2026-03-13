@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Cache for database engines to manage connection pooling globally
 _engine_cache = {}
+_mongo_cache = {}
 
 class BaseDatabaseService:
     """
@@ -161,3 +162,43 @@ class BaseDatabaseService:
                 connection.close()
             # Engine is cached, so do not dispose it here
             session.close()
+
+    def get_mongo_client(self, database_id: str, session: Session):
+        """
+        Retrieves a cached MongoClient or creates a new one.
+        Returns (client, default_database_name).
+        """
+        db_type, config = self.get_db_config(database_id, session)
+        if db_type != 'mongodb':
+            return None, None
+
+        # Create a stable cache key
+        host = config.get('host', '127.0.0.1')
+        port = config.get('port', 27017)
+        user = config.get('user', '')
+        # Use a combination of host, port, user, and database for the cache key
+        cache_key = f"{host}:{port}:{user}:{config.get('database', '')}"
+
+        if cache_key in _mongo_cache:
+            return _mongo_cache[cache_key], config.get('database', 'test')
+
+        from pymongo import MongoClient
+        try:
+            client = MongoClient(
+                host=host,
+                port=int(port) if port else 27017,
+                username=user,
+                password=config.get('password'),
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=5000,
+                # Enable pooling
+                maxPoolSize=10,
+                minPoolSize=1
+            )
+            # Basic connectivity check
+            client.admin.command('ping')
+            _mongo_cache[cache_key] = client
+            return client, config.get('database', 'test')
+        except Exception as e:
+            logger.error(f"Failed to create MongoClient for {database_id}: {e}")
+            return None, None

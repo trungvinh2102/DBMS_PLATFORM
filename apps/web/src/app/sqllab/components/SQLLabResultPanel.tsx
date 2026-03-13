@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import dynamic from "next/dynamic";
 import { SQLLabDataTable } from "./SQLLabDataTable";
+import { NoSQLResults } from "./NoSQLResults";
 import { exportData } from "@/lib/export";
 import { ProblemsList } from "./ProblemsList";
 
@@ -94,6 +95,7 @@ export function SQLLabResultPanel({
 }: SQLLabResultPanelProps) {
   // const [activeTab, setActiveTab] = useState<TabType>("results");
 
+  const isMongoDB = dataSources?.find((ds: any) => ds.id === selectedDS)?.type === "mongodb";
   const errorCount = syntaxErrors.filter((e) => e.severity === 8).length;
   const warningCount = syntaxErrors.filter((e) => e.severity === 4).length;
   const totalProblems = syntaxErrors.length;
@@ -134,7 +136,7 @@ export function SQLLabResultPanel({
           >
             Charts
           </TabButton>
-          {dataSources?.find((d) => d.id === selectedDS)?.type?.toLowerCase() !== "mongodb" && (
+          {!isMongoDB && (
             <TabButton
               active={effectiveTab === "lineage"}
               onClick={() => onTabChange("lineage")}
@@ -149,7 +151,7 @@ export function SQLLabResultPanel({
         )}
       </div>
 
-      <div className="flex-1 overflow-auto bg-background scrollbar-thin">
+      <div className="flex-1 bg-background relative overflow-hidden">
         {executing ? (
           <LoadingState />
         ) : (
@@ -241,10 +243,17 @@ function PanelContent({
   selectedSchema,
   onFixWithAI,
 }: any) {
+  const isMongoDB = dataSources?.find((ds: any) => ds.id === selectedDS)?.type === "mongodb";
+
   if (tab === "results") {
-    return results.length > 0 ? (
-      <SQLLabDataTable columns={columns} data={results} />
-    ) : (
+    if (results.length > 0) {
+        return isMongoDB ? (
+            <NoSQLResults data={results} />
+        ) : (
+            <SQLLabDataTable columns={columns} data={results} />
+        );
+    }
+    return (
       <EmptyState
         icon={<Terminal className="h-12 w-12 mb-6" />}
         title="Empty Result Set"

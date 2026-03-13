@@ -39,7 +39,7 @@ const TableNode = ({ data }: any) => {
         </div>
       </div>
       
-      <div className="p-2 space-y-0.5 bg-background/50 backdrop-blur-sm max-h-[300px] overflow-y-auto scrollbar-none">
+      <div className="p-2 space-y-0.5 bg-background/50 backdrop-blur-sm max-h-75 overflow-y-auto scrollbar-none">
         {data.columns.map((col: any, idx: number) => (
           <div key={idx} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-muted transition-colors group">
             <div className="flex items-center gap-2 overflow-hidden">

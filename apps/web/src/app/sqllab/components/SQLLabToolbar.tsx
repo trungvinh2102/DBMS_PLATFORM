@@ -44,7 +44,7 @@ interface SQLLabToolbarProps {
   onOpen?: () => void;
   showAISidebar: boolean;
   setShowAISidebar: (show: boolean) => void;
-  dataSources?: any[];
+  isRelational: boolean;
 }
 
 export function SQLLabToolbar({
@@ -70,10 +70,8 @@ export function SQLLabToolbar({
   onOpen,
   showAISidebar,
   setShowAISidebar,
-  dataSources = [],
+  isRelational,
 }: SQLLabToolbarProps) {
-  const selectedDSData = dataSources?.find((ds) => ds.id === selectedDS);
-  const isMongo = selectedDSData?.type?.toLowerCase() === "mongodb";
   return (
     <header className="flex items-center h-14 border-b bg-background/80 backdrop-blur-md sticky top-0 z-10 px-3 shrink-0 gap-1 overflow-x-auto no-scrollbar">
       {/* Run & Stop Group */}
@@ -224,7 +222,7 @@ export function SQLLabToolbar({
         )}
       />
 
-      {!isMongo && (
+      {isRelational && (
         <ToolbarButton
           icon={<LayoutGrid className="h-4 w-4 text-emerald-500" />}
           label="Schema"

@@ -154,6 +154,7 @@ function SQLLabContent() {
     currentTColumns,
     loadingTData,
     selectedDSName,
+    isRelational,
     executionTime,
 
     // Actions
@@ -213,7 +214,7 @@ function SQLLabContent() {
           selectedTable={selectedTable}
           setSelectedTable={setSelectedTable}
           onRefreshTables={refetchTables}
-          onVisualize={addSchemaTab}
+          isRelational={isRelational}
         />
 
         <div className="flex-1 flex flex-col overflow-hidden bg-muted/5">
@@ -240,7 +241,7 @@ function SQLLabContent() {
             onRollback={handleRollback}
             showAISidebar={showAISidebar}
             setShowAISidebar={setShowAISidebar}
-            dataSources={dataSources}
+            isRelational={isRelational}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -270,14 +271,8 @@ function SQLLabContent() {
                       onRenameTab={renameTab}
                       undoTrigger={undoTrigger}
                       redoTrigger={redoTrigger}
+                      language={isRelational ? "sql" : "javascript"}
                       onErrorsChange={setSyntaxErrors}
-                      sqlDialect={
-                        dataSources.find((ds: any) => ds.id === selectedDS)
-                          ?.type?.toLowerCase() === "mongodb"
-                          ? "mongodb"
-                          : (dataSources.find((ds: any) => ds.id === selectedDS)
-                              ?.type?.toLowerCase() as any) || "postgresql"
-                      }
                     />
                   </ResizablePanel>
 
@@ -343,7 +338,7 @@ function SQLLabContent() {
                       tableInfo={tableInfo}
                       tableDDL={tableDDL}
                       triggers={triggers}
-                      dataSourceType={dataSources.find((ds: any) => ds.id === selectedDS)?.type}
+                      isRelational={isRelational}
                     />
                   ) : rightPanelMode === "history" ? (
                     <SQLLabHistoryPanel
@@ -355,7 +350,7 @@ function SQLLabContent() {
                       selectedSchema={selectedSchema}
                     />
                   ) : (
-                    <SchemaContent 
+                    <SchemaContent
                       databaseId={selectedDS}
                       schema={selectedSchema}
                       dataSources={dataSources}

@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, Database, ChevronsUpDown } from "lucide-react";
+import { Search, Database, ChevronsUpDown, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DataSource } from "@/lib/types";
@@ -28,7 +28,6 @@ interface SQLLabSidebarHeaderProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   getDBIcon: (type: string) => React.ReactNode;
-  onVisualize?: () => void;
 }
 
 export function SQLLabSidebarHeader({
@@ -42,7 +41,6 @@ export function SQLLabSidebarHeader({
   searchQuery,
   setSearchQuery,
   getDBIcon,
-  onVisualize,
 }: SQLLabSidebarHeaderProps) {
   return (
     <div className="p-3 pb-4 flex flex-col gap-3 border-b border-border/40">
