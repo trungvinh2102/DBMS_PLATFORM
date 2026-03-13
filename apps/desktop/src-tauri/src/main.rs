@@ -1,5 +1,4 @@
-// Tạm thời tắt ẩn console để xem lỗi
-// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
   println!("UNG DUNG DANG KHOI CHAY...");

@@ -15,7 +15,7 @@ This project includes localized scripts for easy startup:
 
 The desktop app is built with **Tauri** and includes an embedded Python API sidecar for offline capabilities.
 
-### 📥 [Download Installer Directly (v0.1.1)](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/0.1.1/DBMS_Platform.exe)
+### 📥 [Download Installer Directly (v0.1.2)](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/0.1.2/DBMS_Platform.exe)
 
 > [!TIP]
 > This link points to the current stable release. To download the very latest official version, visit the [Releases Page](https://github.com/trungvinh2102/DBMS_PLATFORM/releases).
@@ -108,3 +108,6 @@ To customize the API target, use the `NEXT_PUBLIC_API_URL` environment variable 
 ## 📄 License
 
 Internal Development - DBMS Platform Team.
+
+---
+*DBMS Platform Team - v0.1.2*
