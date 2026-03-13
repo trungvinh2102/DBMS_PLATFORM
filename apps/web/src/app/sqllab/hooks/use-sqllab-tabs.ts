@@ -20,8 +20,8 @@ export function useSQLLabTabs() {
   const [tabs, setTabs] = useState<QueryTab[]>([
     {
       id: "1",
-      name: "SQL-1",
-      sql: 'SELECT * FROM "databases" LIMIT 10;',
+      name: "console_1",
+      sql: "",
       selectedDS: "",
       selectedSchema: "",
       results: [],

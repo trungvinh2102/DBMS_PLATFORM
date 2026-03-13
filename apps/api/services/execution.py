@@ -18,67 +18,141 @@ class ExecutionService(BaseDatabaseService):
     Handles SQL execution and query history.
     """
     def _execute_mongodb(self, database_id, sql, limit):
-        """Native MongoDB execution for simple SELECT-like queries."""
+        """Native MongoDB execution for MQL, Aggregation, and simple SQL-like queries."""
         session = SessionLocal()
         try:
             db_type, config = self.get_db_config(database_id, session)
             if db_type != 'mongodb': return None
             
             from pymongo import MongoClient
+            from bson import json_util
             import re
+            import json
             
-            # Simple SQL parsing for "SELECT ... FROM collection"
-            match = re.search(r'FROM\s+["\']?([\w\.-]+)["\']?', sql, re.IGNORECASE)
-            if not match:
-                # Fallback or error if not a select
-                if "SHOW" in sql.upper() or "LIST" in sql.upper():
-                    return [], []
-                raise Exception("Only 'SELECT ... FROM collection' is currently supported for direct MongoDB connection.")
+            sql = sql.strip()
+            collection_name = None
+            query_type = 'find'
+            filter_obj = {}
+            pipeline = None
             
-            collection_name = match.group(1)
+            # Pattern 1: coll.method({...}) or db.method(...)
+            mql_match = re.match(r'^(db|[\w\.-]+)\.(find|aggregate|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|replaceOne|createView)\s*\((.*)\)\s*$', sql, re.DOTALL | re.IGNORECASE)
+            
+            # Pattern 2: SELECT ... FROM coll (Existing fallback)
+            sql_match = re.search(r'FROM\s+["\']?([\w\.-]+)["\']?', sql, re.IGNORECASE)
+            
+            if mql_match:
+                collection_name = mql_match.group(1)
+                query_type = mql_match.group(2) # Keep original case for getattr
+                arg_str = mql_match.group(3).strip()
+                
+                # Basic arg parsing: attempt to parse arguments as a JSON list
+                try:
+                    # We use bson.json_util.loads to support Extended JSON (e.g., $oid, $date)
+                    args = json_util.loads(f"[{arg_str}]") if arg_str else []
+                except Exception as e:
+                    raise Exception(f"Invalid MQL arguments in {query_type}. Ensure valid JSON format (use double quotes). Error: {str(e)}")
+            elif sql_match:
+                collection_name = sql_match.group(1)
+                query_type = 'find'
+                args = [{}]
+            else:
+                raise Exception("Unsupported MongoDB format. Use 'coll.find({})' or 'coll.insertOne({...})'.")
+
+            if not collection_name:
+                raise Exception("Could not identify collection name.")
+
             # Handle schema.collection format (e.g., admin.system.users)
             parts = collection_name.split('.')
             target_db = config.get('database', 'test')
-            
-            # Use the first part as db if it looks like a schema from the UI (e.g. admin)
             if len(parts) > 1:
                 target_db = parts[0]
                 collection_name = ".".join(parts[1:])
 
-            host = config.get('host', '127.0.0.1')
-            raw_port = config.get('port')
-            try:
-                port = int(raw_port) if raw_port else 27017
-            except:
-                port = 27017
+            client, default_db = self.get_mongo_client(database_id, session)
+            if not client:
+                raise Exception("Failed to connect to MongoDB")
+            
+            # Determine if the target is the database or a collection
+            if collection_name.lower() == 'db':
+                target_obj = client[target_db]
+            else:
+                target_obj = client[target_db][collection_name]
+            
+            # Map camelCase to snake_case for PyMongo
+            method_map = {
+                'find': 'find',
+                'aggregate': 'aggregate',
+                'insertOne': 'insert_one',
+                'insertMany': 'insert_many',
+                'updateOne': 'update_one',
+                'updateMany': 'update_many',
+                'deleteOne': 'delete_one',
+                'deleteMany': 'delete_many',
+                'replaceOne': 'replace_one',
+                'createView': 'command' # createView must be run as a command on the database
+            }
+            
+            py_method_name = method_map.get(query_type, query_type)
+            method = getattr(target_obj, py_method_name, None)
+            
+            if py_method_name == 'find':
+                cursor = method(*args).limit(limit)
+                data = list(cursor)
+            elif py_method_name == 'aggregate':
+                cursor = method(*args)
+                data = []
+                for i, doc in enumerate(cursor):
+                    if i >= limit: break
+                    data.append(doc)
+            else:
+                # Handle write operations (insertOne, updateOne, etc.)
+                if py_method_name == 'command' and query_type == 'createView':
+                    # Special handling for createView: db.createView(viewName, sourceColl, pipeline)
+                    # Args should be [viewName, sourceColl, pipeline]
+                    view_name = args[0]
+                    source_coll = args[1]
+                    view_pipeline = args[2]
+                    
+                    result = client[target_db].command({
+                        'create': view_name,
+                        'viewOn': source_coll,
+                        'pipeline': view_pipeline
+                    })
+                    info = {"status": "success", "command": "createView", "view": view_name}
+                else:
+                    result = method(*args)
+                    info = {"status": "success", "command": query_type}
+
+                if hasattr(result, 'inserted_id'):
+                    info["inserted_id"] = str(result.inserted_id)
+                if hasattr(result, 'inserted_ids'):
+                    info["inserted_ids"] = [str(id) for id in result.inserted_ids]
+                if hasattr(result, 'matched_count'):
+                    info["matched_count"] = result.matched_count
+                if hasattr(result, 'modified_count'):
+                    info["modified_count"] = result.modified_count
+                if hasattr(result, 'deleted_count'):
+                    info["deleted_count"] = result.deleted_count
+                if hasattr(result, 'acknowledged'):
+                    info["acknowledged"] = result.acknowledged
                 
-            user = config.get('user')
-            password = config.get('password')
+                return [info], list(info.keys())
             
-            client = MongoClient(
-                host=host, 
-                port=port, 
-                username=user, 
-                password=password, 
-                serverSelectionTimeoutMS=5000,
-                connectTimeoutMS=5000
-            )
-            
-            collection = client[target_db][collection_name]
-            cursor = collection.find().limit(limit)
-            
-            data = []
+            processed_data = []
             columns = set()
-            for doc in cursor:
+            for doc in data:
                 processed_doc = {}
                 for k, v in doc.items():
+                    # Handle BSON types (ObjectId, datetime, etc.)
                     if k == '_id' or not isinstance(v, (str, int, float, bool, list, dict, type(None))):
-                        v = str(v)
-                    processed_doc[k] = v
+                        processed_doc[k] = str(v)
+                    else:
+                        processed_doc[k] = v
                     columns.add(k)
-                data.append(processed_doc)
+                processed_data.append(processed_doc)
             
-            return data, sorted(list(columns))
+            return processed_data, sorted(list(columns))
         finally:
             session.close()
 
