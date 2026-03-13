@@ -56,7 +56,7 @@ interface SQLLabEditorContainerProps {
   /** Show error panel below editor (default: false) */
   showErrorPanel?: boolean;
   /** SQL dialect for validation (default: 'postgresql') */
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery";
+  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery" | "mongodb";
   /** Callback when syntax errors change */
   onErrorsChange?: (errors: SyntaxError[]) => void;
 }

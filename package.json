@@ -13,10 +13,8 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo -F web dev",
-    "dev:desktop": "turbo -F desktop dev",
-    "desktop:standalone": "turbo -F desktop start",
-    "desktop:dist": "turbo -F desktop dist",
-    "web:standalone": "turbo -F web dev",
+    "dev:desktop": "turbo -F desktop tauri dev",
+    "desktop:dist": "turbo -F desktop tauri build",
 
     "build": "turbo build",
     "start": "turbo start",
@@ -32,8 +30,8 @@
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
 
-    "backend:dev": "cd apps/api && python app.py",
-    "backend:start": "cd apps/api && gunicorn app:app"
+    "dev:backend": "cd apps/api && python app.py",
+    "start:backend": "cd apps/api && gunicorn app:app"
   },
 
   "devDependencies": {

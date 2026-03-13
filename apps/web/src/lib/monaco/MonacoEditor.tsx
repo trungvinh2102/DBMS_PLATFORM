@@ -17,7 +17,7 @@ import { ErrorPanel } from "@/lib/monaco/ErrorPanel";
 import type { ValidationOptions } from "@/lib/monaco/types";
 import { useSettingsStore } from "@/stores/use-settings-store";
 import { defineThemes } from "@/lib/monaco/themes";
-import { registerSqlAutocomplete } from "@/lib/monaco/sql-autocomplete";
+import { registerSqlAutocomplete, registerMongoAutocomplete } from "@/lib/monaco/sql-autocomplete";
 import { registerEditorCommands } from "../../app/sqllab/hooks/use-editor-commands";
 
 interface SQLEditorProps {
@@ -36,7 +36,7 @@ interface SQLEditorProps {
   redoTrigger?: number;
   enableValidation?: boolean;
   showErrorPanel?: boolean;
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery";
+  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery" | "mongodb";
   validationDebounceMs?: number;
   onValidationChange?: (errorCount: number, warningCount: number) => void;
   onErrorsChange?: (errors: any[]) => void;
@@ -168,6 +168,7 @@ export function SQLEditor({
       );
 
       registerSqlAutocomplete(monaco, tablesRef, columnsRef);
+      registerMongoAutocomplete(monaco, tablesRef);
       registerEditorCommands({
         editor,
         monaco,
@@ -193,7 +194,7 @@ export function SQLEditor({
       <div className="editor-area flex-1 min-h-0 overflow-hidden">
         <Editor
           height="100%"
-          defaultLanguage="sql"
+          language={sqlDialect === "mongodb" ? "javascript" : "sql"}
           theme={currentTheme === "dark" ? "querypie-dark" : "querypie-light"}
           value={value}
           onChange={onChange}

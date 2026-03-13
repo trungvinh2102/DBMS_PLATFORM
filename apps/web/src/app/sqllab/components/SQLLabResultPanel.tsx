@@ -134,12 +134,14 @@ export function SQLLabResultPanel({
           >
             Charts
           </TabButton>
-          <TabButton
-            active={effectiveTab === "lineage"}
-            onClick={() => onTabChange("lineage")}
-          >
-            Lineage
-          </TabButton>
+          {dataSources?.find((d) => d.id === selectedDS)?.type?.toLowerCase() !== "mongodb" && (
+            <TabButton
+              active={effectiveTab === "lineage"}
+              onClick={() => onTabChange("lineage")}
+            >
+              Lineage
+            </TabButton>
+          )}
         </div>
 
         {results.length > 0 && effectiveTab === "results" && (

@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "dbms-platform",
+  "productName": "DBMS-Platform",
   "version": "0.1.0",
   "identifier": "com.dbms.platform",
   "build": {
@@ -12,11 +12,13 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "DBMS Platform",
-        "width": 800,
-        "height": 600,
+        "width": 1000,
+        "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "url": "index.html"
       }
     ],
     "security": {
@@ -26,6 +28,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "../../api/.env"
+    ],
     "externalBin": [
       "bin/api"
     ],

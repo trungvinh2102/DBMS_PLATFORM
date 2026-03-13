@@ -274,33 +274,37 @@ export function SQLLabSidebar({
           filteredViews,
           filteredViews?.length,
         )}
-        {folderItem(
-          "events",
-          "Events",
-          <CalendarClock className="h-4 w-4 text-orange-500" />,
-          filteredEvents,
-          filteredEvents?.length,
-        )}
-        {folderItem(
-          "functions",
-          "Functions",
-          <FunctionSquare className="h-4 w-4 text-yellow-500" />,
-          filteredFunctions,
-          filteredFunctions?.length,
-        )}
-        {folderItem(
-          "procedures",
-          "Procedures",
-          <Settings2 className="h-4 w-4 text-slate-500" />,
-          filteredProcedures,
-          filteredProcedures?.length,
-        )}
-        {folderItem(
-          "triggers",
-          "Triggers",
-          <Zap className="h-4 w-4 text-indigo-500" />,
-          filteredTriggers,
-          filteredTriggers?.length,
+        {selectedDSData?.type?.toLowerCase() !== "mongodb" && (
+          <>
+            {folderItem(
+              "events",
+              "Events",
+              <CalendarClock className="h-4 w-4 text-orange-500" />,
+              filteredEvents,
+              filteredEvents?.length,
+            )}
+            {folderItem(
+              "functions",
+              "Functions",
+              <FunctionSquare className="h-4 w-4 text-yellow-500" />,
+              filteredFunctions,
+              filteredFunctions?.length,
+            )}
+            {folderItem(
+              "procedures",
+              "Procedures",
+              <Settings2 className="h-4 w-4 text-slate-500" />,
+              filteredProcedures,
+              filteredProcedures?.length,
+            )}
+            {folderItem(
+              "triggers",
+              "Triggers",
+              <Zap className="h-4 w-4 text-indigo-500" />,
+              filteredTriggers,
+              filteredTriggers?.length,
+            )}
+          </>
         )}
       </div>
     </aside>

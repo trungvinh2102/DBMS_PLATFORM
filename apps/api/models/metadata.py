@@ -31,8 +31,8 @@ class Db(Base):
     sslMode = Column(Enum(SSLMode, name="SSLMode"), default=SSLMode.DISABLE)
     sshConfig = Column(JSON, nullable=True)
     
-    # Postgres String[] maps to ARRAY(String)
-    tags = Column(ARRAY(String), nullable=True) 
+    # Tags handling: Postgres uses ARRAY, others (like SQLite) use JSON or Text
+    tags = Column(JSON, nullable=True) 
     
     username = Column(String, nullable=True)
     password = Column(String, nullable=True)
@@ -145,7 +145,19 @@ def init_engine():
 
     if not url:
         print("WARNING: DATABASE_URL not found in any .env file. Checking hardcoded fallback...")
-        url = "postgresql://postgres:postgres@127.0.0.1:5432/dbms_platform"
+        # Fallback to SQLite for standalone/portable use
+        if getattr(sys, 'frozen', False):
+            # If running as an EXE (PyInstaller)
+            app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
+            data_dir = os.path.join(app_data, 'DBMSPlatform')
+            
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir, exist_ok=True)
+            
+            db_path = os.path.join(data_dir, 'dbms_platform.db').replace('\\', '/')
+            url = f"sqlite:///{db_path}"
+        else:
+            url = "sqlite:///dbms_platform.db"
 
     print(f"Backend: Database connection initialized.")
     # Log masked URL for safety
