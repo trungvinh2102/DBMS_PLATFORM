@@ -105,7 +105,8 @@ class MetadataService(BaseDatabaseService):
                     # In MongoDB, "tables" are collections. 
                     # If schema is 'public' (relational default) or empty, use the configured database
                     target_db = schema if schema and schema != 'public' else default_db
-                    return client[target_db].list_collection_names()
+                    collections = client[target_db].list_collections()
+                    return [c['name'] for c in collections if c.get('type', 'collection') == 'collection']
                 return []
         except Exception as e:
             logger.error(f"Error in MongoDB get_tables: {e}")
@@ -129,6 +130,11 @@ class MetadataService(BaseDatabaseService):
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
+                client, default_db = self._get_mongo_client(database_id, session)
+                if client:
+                    target_db = schema if schema and schema != 'public' else default_db
+                    collections = client[target_db].list_collections()
+                    return [c['name'] for c in collections if c.get('type') == 'view']
                 return []
         finally:
             session.close()
@@ -342,6 +348,11 @@ class MetadataService(BaseDatabaseService):
          try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
+                client, default_db = self._get_mongo_client(database_id, session)
+                if client:
+                    target_db = schema if schema and schema != 'public' else default_db
+                    indexes = client[target_db][table].list_indexes()
+                    return [{"indexname": idx["name"], "indexdef": str(idx["key"])} for idx in indexes]
                 return []
          finally:
             session.close()

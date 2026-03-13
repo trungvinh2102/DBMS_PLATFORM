@@ -56,6 +56,36 @@ const SQL_KEYWORDS = [
   "FUNCTION",
 ];
 
+const MONGO_KEYWORDS = [
+  "db",
+  "collection",
+  "find",
+  "aggregate",
+  "insertOne",
+  "insertMany",
+  "updateOne",
+  "updateMany",
+  "deleteOne",
+  "deleteMany",
+  "countDocuments",
+  "limit",
+  "sort",
+  "skip",
+  "project",
+  "match",
+  "group",
+  "lookup",
+  "unwind",
+  "sort",
+  "count",
+  "replaceOne",
+  "bulkWrite",
+  "distinct",
+  "createIndex",
+  "dropIndex",
+  "listIndexes",
+];
+
 /**
  * Parses table aliases from SQL text.
  * Matches: FROM table alias, FROM table AS alias, JOIN table alias, JOIN table AS alias
@@ -269,6 +299,61 @@ export const registerSqlAutocomplete = (
           sortText: "4", // Lowest priority
         })),
       ];
+
+      return { suggestions };
+    },
+  });
+};
+
+export const registerMongoAutocomplete = (
+  monaco: Monaco,
+  tablesRef: React.MutableRefObject<string[]>,
+) => {
+  return monaco.languages.registerCompletionItemProvider("javascript", {
+    triggerCharacters: ["."],
+    provideCompletionItems: (
+      model: monacoEditor.editor.ITextModel,
+      position: monacoEditor.Position,
+    ) => {
+      const word = model.getWordUntilPosition(position);
+      const range = {
+        startLineNumber: position.lineNumber,
+        endLineNumber: position.lineNumber,
+        startColumn: word.startColumn,
+        endColumn: word.endColumn,
+      };
+
+      const textUntilPosition = model.getValueInRange({
+        startLineNumber: position.lineNumber,
+        startColumn: 1,
+        endLineNumber: position.lineNumber,
+        endColumn: position.column,
+      });
+
+      // db. or db.collection.
+      const suggestions: any[] = [];
+
+      if (textUntilPosition.endsWith("db.")) {
+        // Suggest collections
+        tablesRef.current.forEach((table) => {
+          suggestions.push({
+            label: table,
+            kind: monaco.languages.CompletionItemKind.Class,
+            insertText: table,
+            range: range,
+          });
+        });
+      }
+
+      // Add MongoDB keywords anyway for general use
+      MONGO_KEYWORDS.forEach((keyword) => {
+        suggestions.push({
+          label: keyword,
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          insertText: keyword,
+          range: range,
+        });
+      });
 
       return { suggestions };
     },

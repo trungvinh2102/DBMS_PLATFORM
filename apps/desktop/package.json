@@ -6,55 +6,13 @@
   "author": "DBMS Platform Team",
   "private": true,
   "scripts": {
-    "dev": "electron .",
-    "start": "cross-env STANDALONE=true electron .",
-    "standalone": "cross-env STANDALONE=true ./node_modules/.bin/electron .",
-    "prebuild": "node scripts/copy-assets.js",
-    "build": "bun run prebuild && electron-builder",
-    "dist": "bun run prebuild && electron-builder --win",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "tauri": "tauri"
   },
   "dependencies": {
-    "electron-is-dev": "^3.0.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.1.0",
-    "cross-env": "^7.0.3",
-    "electron": "33.2.1",
-    "electron-builder": "^24.13.3"
-  },
-  "build": {
-    "appId": "com.dbms.platform",
-    "productName": "DBMS Platform",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "main.js",
-      "web-dist/**/*",
-      "api-bin/**/*"
-    ],
-    "asar": true,
-    "asarUnpack": [
-      "api-bin/**/*"
-    ],
-    "win": {
-      "target": [
-        "zip"
-      ],
-      "icon": "src-tauri/icons/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "artifactName": "dbms-platform-setup.exe",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "DBMS Platform",
-      "installerIcon": "src-tauri/icons/icon.ico",
-      "uninstallerIcon": "src-tauri/icons/icon.ico",
-      "uninstallDisplayName": "DBMS Platform",
-      "runAfterFinish": true
-    }
+    "@tauri-apps/cli": "^2.1.0"
   }
 }

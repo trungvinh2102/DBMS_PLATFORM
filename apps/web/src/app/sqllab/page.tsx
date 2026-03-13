@@ -240,6 +240,7 @@ function SQLLabContent() {
             onRollback={handleRollback}
             showAISidebar={showAISidebar}
             setShowAISidebar={setShowAISidebar}
+            dataSources={dataSources}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -270,6 +271,13 @@ function SQLLabContent() {
                       undoTrigger={undoTrigger}
                       redoTrigger={redoTrigger}
                       onErrorsChange={setSyntaxErrors}
+                      sqlDialect={
+                        dataSources.find((ds: any) => ds.id === selectedDS)
+                          ?.type?.toLowerCase() === "mongodb"
+                          ? "mongodb"
+                          : (dataSources.find((ds: any) => ds.id === selectedDS)
+                              ?.type?.toLowerCase() as any) || "postgresql"
+                      }
                     />
                   </ResizablePanel>
 
@@ -335,6 +343,7 @@ function SQLLabContent() {
                       tableInfo={tableInfo}
                       tableDDL={tableDDL}
                       triggers={triggers}
+                      dataSourceType={dataSources.find((ds: any) => ds.id === selectedDS)?.type}
                     />
                   ) : rightPanelMode === "history" ? (
                     <SQLLabHistoryPanel

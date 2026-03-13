@@ -69,6 +69,7 @@ interface SQLLabObjectPanelProps {
   tableInfo?: any;
   tableDDL?: string;
   triggers?: string[];
+  dataSourceType?: string;
 }
 
 const ObjectIcon = ({
@@ -112,6 +113,7 @@ export function SQLLabObjectPanel({
   tableInfo,
   tableDDL,
   triggers,
+  dataSourceType,
 }: SQLLabObjectPanelProps) {
   const [structureSearch, setStructureSearch] = useState("");
   const { theme } = useTheme();
@@ -128,7 +130,12 @@ export function SQLLabObjectPanel({
     "Info",
     "Script",
   ];
-  if (selectedObjectType === "view") {
+
+  if (dataSourceType?.toLowerCase() === "mongodb") {
+    // For MongoDB, user wants to remove: Relation, Trigger, Info, Script
+    // Keeping: Data, Structure, Index (if applicable)
+    availableTabs = ["Data", "Structure", "Index"];
+  } else if (selectedObjectType === "view") {
     availableTabs = ["Data", "Structure", "Info", "Script"];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(

@@ -77,7 +77,7 @@ export interface ValidationOptions {
   /** Enable strict mode validation */
   strict?: boolean;
   /** SQL dialect for SQL validation */
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "bigquery" | "mariadb";
+  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "bigquery" | "mariadb" | "mongodb";
   /** Custom validation rules */
   customRules?: ValidationRule[];
 }

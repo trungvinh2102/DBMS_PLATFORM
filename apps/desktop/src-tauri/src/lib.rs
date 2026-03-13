@@ -1,21 +1,57 @@
-use tauri_plugin_shell::ShellExt;
+use std::process::Command;
+use std::os::windows::process::CommandExt;
+use tauri::Manager;
+use std::env;
+use std::fs;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
-    .plugin(tauri_plugin_shell::init())
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      let handle = app.handle().clone();
+      
+      tauri::async_runtime::spawn(async move {
+        // Chung ta se thu ca 2 ten file: ten goc va ten sau khi bi bundle strip suffix
+        let sidecar_names = vec!["api.exe", "api-x86_64-pc-windows-gnu.exe"];
+        
+        let curr_executable = env::current_exe().unwrap_or_default();
+        let curr_dir = curr_executable.parent().unwrap_or(&std::path::Path::new("."));
+        let res_dir = handle.path().resource_dir().unwrap_or_default();
 
-      let shell = app.shell();
-      let sidecar_command = shell.sidecar("api").map_err(|e| e.to_string())?;
-      let (_rx, _child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
+        let mut paths_to_try = Vec::new();
+        
+        for name in sidecar_names {
+            paths_to_try.push(curr_dir.join(name));
+            paths_to_try.push(res_dir.join(name));
+            paths_to_try.push(res_dir.join("bin").join(name));
+            paths_to_try.push(res_dir.join("_up_").join("bin").join(name));
+        }
+
+        let mut started = false;
+        for path in paths_to_try {
+            if path.exists() {
+                println!("[FOUND] Dang khoi chay: {:?}", path);
+                let mut cmd = Command::new(&path);
+                
+                // Match cmd.spawn() but let it show the window for debugging
+                // #[cfg(windows)]
+                // cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+                match cmd.spawn() {
+                    Ok(_) => {
+                        println!("[SUCCESS] Backend da duoc kich hoat.");
+                        started = true;
+                        break;
+                    }
+                    Err(e) => println!("[ERROR] Spawn error: {}", e),
+                }
+            }
+        }
+
+        if !started {
+            println!("!!! KHONG TIM THAY BACKEND - VUI LONG KIEM TRA FILE API.EXE !!!");
+        }
+      });
 
       Ok(())
     })

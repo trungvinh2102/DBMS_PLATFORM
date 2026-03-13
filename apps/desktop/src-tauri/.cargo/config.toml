@@ -1,0 +1,11 @@
+[build]
+target = "x86_64-pc-windows-gnu"
+
+[target.x86_64-pc-windows-gnu]
+linker = "gcc"
+ar = "ar"
+rustflags = [
+    "-C", "link-arg=-static",
+    "-C", "target-feature=+crt-static",
+    "-L", "C:/ProgramData/mingw64/mingw64/x86_64-w64-mingw32/lib"
+]

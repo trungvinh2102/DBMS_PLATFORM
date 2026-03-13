@@ -11,25 +11,48 @@ from dotenv import load_dotenv
 import os
 
 # Load environment variables BEFORE importing routes/services
-# because models/metadata.py reads DATABASE_URL at import time
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(dotenv_path=env_path)
+import sys
+# Detect if running as PyInstaller bundle
+if getattr(sys, 'frozen', False):
+    base_path = os.path.dirname(sys.executable)
+else:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
+# Try loading from executable dir FIRST (for production)
+env_path = os.path.join(base_path, '.env')
+# Also check resources folder (Tauri standard)
+res_env_path = os.path.join(base_path, 'resources', '.env')
+
+if os.path.exists(env_path):
+    print(f"Backend: Detected .env at {env_path}")
+    load_dotenv(dotenv_path=env_path)
+elif os.path.exists(res_env_path):
+    print(f"Backend: Detected .env in resources at {res_env_path}")
+    load_dotenv(dotenv_path=res_env_path)
+else:
+    # Try current working directory as fallback
+    load_dotenv()
 
 from routes.database import database_bp
 from routes.auth import auth_bp
 from routes.user import user_bp
 from routes.ai import ai_bp
 
+# Explicit imports to help PyInstaller find them
+import models.metadata
+import services.auth_service
+import passlib.handlers.bcrypt
+from models.metadata import User
+from services.auth_service import auth_service
+
 def create_app():
     """Application factory for Flask."""
     app = Flask(__name__)
     
-    # Configure CORS - Use exact origins and support common headers
-    CORS(app, resources={r"/*": {
-        "origins": ["http://localhost:3001", "http://127.0.0.1:3001", "app://."],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    }})
+    # Configure CORS - Allow Tauri origins explicitly when supporting credentials
+    CORS(app, resources={r"/api/*": {
+        "origins": ["tauri://localhost", "http://tauri.localhost", "http://localhost:3001", "http://127.0.0.1:3001"]
+    }}, supports_credentials=True)
     # No manual headers needed, flask-cors will handle it.
 
     # Register Blueprints
@@ -59,6 +82,24 @@ def create_app():
     return app
 
 if __name__ == '__main__':
+    # Ensure database tables are created
+    from models.metadata import Base, engine, SessionLocal
+    if engine:
+        print("Backend: Creating database tables if they don't exist...")
+        Base.metadata.create_all(engine)
+        
+        # SEED: Create default admin if no users exist
+        session = SessionLocal()
+        if session.query(User).count() == 0:
+            print("Backend: Seeding default admin user (admin / admin123)...")
+            auth_service.register({
+                "username": "admin",
+                "email": "admin@example.com",
+                "password": "admin123",
+                "fullName": "System Admin"
+            })
+        session.close()
+        
     app = create_app()
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     # Bind to 0.0.0.0 to ensure accessibility from within desktop apps (Electron/Tauri)
