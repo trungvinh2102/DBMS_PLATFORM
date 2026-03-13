@@ -33,9 +33,8 @@ pub fn run() {
                 println!("[FOUND] Dang khoi chay: {:?}", path);
                 let mut cmd = Command::new(&path);
                 
-                // Match cmd.spawn() but let it show the window for debugging
-                // #[cfg(windows)]
-                // cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+                #[cfg(windows)]
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
                 match cmd.spawn() {
                     Ok(_) => {

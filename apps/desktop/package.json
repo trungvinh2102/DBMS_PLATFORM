@@ -1,6 +1,6 @@
 {
   "name": "desktop",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Desktop app for DBMS Platform",
   "main": "main.js",
   "author": "DBMS Platform Team",
