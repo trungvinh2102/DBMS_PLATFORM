@@ -97,7 +97,7 @@ export function StructureTabView({
             .map((col: any) => (
               <div
                 key={col.name}
-                className="flex items-center justify-between text-[11px] p-3 bg-muted/20 border border-transparent rounded-lg hover:bg-muted/40 hover:border-border/60 transition-all group"
+                className="flex items-center justify-between text-[11px] p-3 bg-muted/20 border border-border/50 rounded-lg hover:bg-muted/40 hover:border-border transition-all group shadow-sm dark:shadow-none dark:border-transparent dark:hover:border-border/60"
               >
                 <div className="flex items-center gap-3">
                   <div className="h-2 w-2 rounded-full bg-primary/20 border border-primary/40" />

@@ -6,12 +6,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
+import { useTheme } from "next-themes";
+
 interface NoSQLResultsProps {
   data: any[];
 }
 
 export function NoSQLResults({ data }: NoSQLResultsProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const { theme } = useTheme();
 
   const filteredData = React.useMemo(() => {
     if (!searchTerm) return data;
@@ -31,27 +34,27 @@ export function NoSQLResults({ data }: NoSQLResultsProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#050505] overflow-hidden">
-      <div className="p-3 border-b border-white/5 bg-white/2 flex items-center gap-3">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
+      <div className="p-3 border-b border-border bg-muted/30 flex items-center gap-3">
         <div className="relative flex-1 group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20 group-focus-within:text-primary transition-colors" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
           <input
             type="text"
             placeholder="Search documents..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-8 pl-9 pr-8 bg-white/5 border border-white/10 rounded-md text-[11px] text-white/80 placeholder:text-white/20 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all font-mono"
+            className="w-full h-8 pl-9 pr-8 bg-muted/50 border border-border rounded-md text-[11px] text-foreground/80 placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/50 focus:bg-muted transition-all font-mono"
           />
           {searchTerm && (
             <button 
               onClick={() => setSearchTerm("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 hover:text-white text-white/40"
+              className="absolute right-2 top-1/2 -translate-y-1/2 hover:text-foreground text-muted-foreground/60"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        <div className="text-[9px] font-black text-white/20 uppercase tracking-widest whitespace-nowrap">
+        <div className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest whitespace-nowrap">
           {filteredData.length} of {data.length} docs
         </div>
       </div>
@@ -61,7 +64,7 @@ export function NoSQLResults({ data }: NoSQLResultsProps) {
             <DocumentNode key={idx} data={doc} index={idx} isRoot searchTerm={searchTerm} />
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-white/20">
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground/20">
             <Search className="h-8 w-8 mb-4 opacity-10" />
             <p className="text-[10px] uppercase font-black tracking-widest">No matches found</p>
           </div>
@@ -98,32 +101,32 @@ function DocumentNode({ data, label, index, isRoot = false, searchTerm = "" }: {
   };
 
   const renderValue = () => {
-    if (data === null) return <span className="text-pink-500 font-mono italic">null</span>;
-    if (type === 'string') return <span className="text-emerald-400 font-mono">"{data}"</span>;
-    if (type === 'number') return <span className="text-amber-400 font-mono">{data}</span>;
-    if (type === 'boolean') return <span className="text-blue-400 font-mono">{data.toString()}</span>;
+    if (data === null) return <span className="text-pink-600 dark:text-pink-500 font-mono italic">null</span>;
+    if (type === 'string') return <span className="text-emerald-600 dark:text-emerald-400 font-mono">"{data}"</span>;
+    if (type === 'number') return <span className="text-amber-600 dark:text-amber-400 font-mono">{data}</span>;
+    if (type === 'boolean') return <span className="text-blue-600 dark:text-blue-400 font-mono">{data.toString()}</span>;
     return null;
   };
 
   return (
     <div className={cn(
       "flex flex-col",
-      isRoot ? "mb-4 border border-white/5 rounded-lg bg-white/2 shadow-2xl p-2" : "ml-4 border-l border-white/10"
+      isRoot ? "mb-4 border border-border bg-muted/10 rounded-lg shadow-sm p-2" : "ml-4 border-l border-border"
     )}>
       <div 
         className={cn(
-          "flex items-center py-1 px-2 rounded hover:bg-white/5 transition-colors cursor-pointer group",
-          isRoot && "bg-white/3 mb-1"
+          "flex items-center py-1 px-2 rounded hover:bg-muted/50 transition-colors cursor-pointer group",
+          isRoot && "bg-muted/30 mb-1"
         )}
         onClick={isObject ? toggle : undefined}
       >
         {isObject ? (
-          isOpen ? <ChevronDown className="h-3 w-3 mr-1 text-white/40" /> : <ChevronRight className="h-3 w-3 mr-1 text-white/40" />
+          isOpen ? <ChevronDown className="h-3 w-3 mr-1 text-muted-foreground/60" /> : <ChevronRight className="h-3 w-3 mr-1 text-muted-foreground/60" />
         ) : (
           <div className="w-4" />
         )}
         
-        {label && <span className="text-white/60 font-mono text-xs mr-2">{label}:</span>}
+        {label && <span className="text-muted-foreground font-mono text-xs mr-2">{label}:</span>}
         
         {!isObject ? (
           <div className="flex-1 flex items-center justify-between">
@@ -131,13 +134,13 @@ function DocumentNode({ data, label, index, isRoot = false, searchTerm = "" }: {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-between">
-            <span className="text-white/30 text-[10px] font-black uppercase tracking-widest">
+            <span className="text-muted-foreground/40 text-[10px] font-black uppercase tracking-widest">
               {Array.isArray(data) ? `Array [${data.length}]` : `Object {${Object.keys(data).length}}`}
             </span>
             {isRoot && (
               <button 
                 onClick={copyToClipboard}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all text-white/40"
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all text-muted-foreground/60"
               >
                 <Copy className="h-3 w-3" />
               </button>
