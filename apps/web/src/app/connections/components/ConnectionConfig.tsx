@@ -25,6 +25,7 @@ import {
   EnvironmentSection,
   SecuritySection,
   PermissionsSection,
+  PoolingSection,
 } from "./ConfigSections";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
@@ -49,6 +50,16 @@ export function ConnectionConfig({
   );
   const [isReadOnly, setIsReadOnly] = useState(activeConn.isReadOnly || false);
   const [sslMode, setSslMode] = useState(activeConn.sslMode || "DISABLE");
+  const [pooling, setPooling] = useState({
+    pool_size: activeConn.config?.pool_size || 5,
+    max_overflow: activeConn.config?.max_overflow || 10,
+    pool_timeout: activeConn.config?.pool_timeout || 30,
+    pool_recycle: activeConn.config?.pool_recycle || 1800,
+  });
+
+  const handlePoolingChange = (field: string, value: number) => {
+    setPooling((prev) => ({ ...prev, [field]: value }));
+  };
 
   // Find the database type info
   const dbType =
@@ -75,7 +86,10 @@ export function ConnectionConfig({
       environment,
       isReadOnly,
       sslMode,
-      config: activeConn.config,
+      config: {
+        ...(activeConn.config || {}),
+        ...pooling,
+      },
     });
   };
 
@@ -298,10 +312,22 @@ export function ConnectionConfig({
         </div>
 
         <div className="grid grid-cols-2 gap-8 py-2">
-          <ToggleField label="Read Only Mode" />
+          <ToggleField
+            label="Read Only Mode"
+            checked={isReadOnly}
+            onCheckedChange={setIsReadOnly}
+          />
         </div>
 
         <PermissionsSection />
+        
+        {/* Connection Pooling Section */}
+        {activeConn.type !== 'mongodb' && (
+          <PoolingSection 
+            {...pooling}
+            onChange={handlePoolingChange}
+          />
+        )}
       </section>
 
       {/* SSL / SSH */}

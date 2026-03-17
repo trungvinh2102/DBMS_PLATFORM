@@ -8,19 +8,35 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface ToggleFieldProps {
   label: string;
+  checked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
 }
 
-export function ToggleField({ label }: ToggleFieldProps) {
+export function ToggleField({ label, checked, onCheckedChange }: ToggleFieldProps) {
   return (
     <div className="space-y-3">
       <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
         {label}
       </Label>
       <div className="flex bg-muted/20 p-1 border border-border w-fit rounded-md">
-        <button className="px-3 py-1 text-[10px] font-semibold uppercase bg-background text-foreground shadow-sm border border-border transition-all rounded-sm">
+        <button
+          onClick={() => onCheckedChange?.(true)}
+          className={`px-3 py-1 text-[10px] font-semibold uppercase transition-all rounded-sm ${
+            checked
+              ? "bg-background text-foreground shadow-sm border border-border"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
           On
         </button>
-        <button className="px-3 py-1 text-[10px] font-semibold uppercase text-muted-foreground hover:text-foreground transition-all">
+        <button
+          onClick={() => onCheckedChange?.(false)}
+          className={`px-3 py-1 text-[10px] font-semibold uppercase transition-all rounded-sm ${
+            !checked
+              ? "bg-background text-foreground shadow-sm border border-border"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
           Off
         </button>
       </div>

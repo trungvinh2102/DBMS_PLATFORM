@@ -3,7 +3,7 @@
  * @description Major sections for database connection configuration.
  */
 
-import { Clock, Key, Lock } from "lucide-react";
+import { Clock, Key, Lock, Database } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -163,3 +163,89 @@ export function PermissionsSection() {
     </div>
   );
 }
+
+interface PoolingSectionProps {
+  pool_size: number;
+  max_overflow: number;
+  pool_timeout: number;
+  pool_recycle: number;
+  onChange: (field: string, value: number) => void;
+}
+
+export function PoolingSection({
+  pool_size,
+  max_overflow,
+  pool_timeout,
+  pool_recycle,
+  onChange,
+}: PoolingSectionProps) {
+  return (
+    <div className="pt-8 border-t border-border">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 bg-muted/10 rounded-full flex items-center justify-center border border-border">
+          <Database className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold uppercase tracking-tight">
+            Connection Pooling
+          </h3>
+          <p className="text-[10px] text-muted-foreground font-medium">
+            Performance tuning and resource management
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="space-y-2">
+          <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+            Pool Size
+          </Label>
+          <Input
+            type="number"
+            value={pool_size}
+            onChange={(e) => onChange("pool_size", parseInt(e.target.value) || 5)}
+            className="h-9 border-border bg-muted/10 rounded-md font-medium text-xs"
+          />
+          <p className="text-[9px] text-muted-foreground">Number of permanent connections</p>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+            Max Overflow
+          </Label>
+          <Input
+            type="number"
+            value={max_overflow}
+            onChange={(e) => onChange("max_overflow", parseInt(e.target.value) || 10)}
+            className="h-9 border-border bg-muted/10 rounded-md font-medium text-xs"
+          />
+          <p className="text-[9px] text-muted-foreground">Allowable burst above pool size</p>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+            Timeout (s)
+          </Label>
+          <Input
+            type="number"
+            value={pool_timeout}
+            onChange={(e) => onChange("pool_timeout", parseInt(e.target.value) || 30)}
+            className="h-9 border-border bg-muted/10 rounded-md font-medium text-xs"
+          />
+          <p className="text-[9px] text-muted-foreground">Seconds to wait for a connection</p>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+            Recycle (s)
+          </Label>
+          <Input
+            type="number"
+            value={pool_recycle}
+            onChange={(e) => onChange("pool_recycle", parseInt(e.target.value) || 1800)}
+            className="h-9 border-border bg-muted/10 rounded-md font-medium text-xs"
+          />
+          <p className="text-[9px] text-muted-foreground">Age at which connections close</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
