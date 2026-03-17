@@ -29,7 +29,8 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "../../api/.env"
+      "../../api/.env",
+      "../../../docker-compose.yml"
     ],
     "externalBin": [
       "bin/api"
@@ -41,5 +42,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "shell": {
+      "sidecar": [
+        {
+          "name": "api",
+          "command": "bin/api",
+          "sidecar": true
+        }
+      ]
+    }
   }
 }

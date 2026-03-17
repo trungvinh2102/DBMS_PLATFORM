@@ -20,15 +20,23 @@ else:
 
 # Try loading from executable dir FIRST (for production)
 env_path = os.path.join(base_path, '.env')
+api_env_path = os.path.join(base_path, 'api.env')
 # Also check resources folder (Tauri standard)
 res_env_path = os.path.join(base_path, 'resources', '.env')
+res_api_env_path = os.path.join(base_path, 'resources', 'api.env')
 
 if os.path.exists(env_path):
     print(f"Backend: Detected .env at {env_path}")
     load_dotenv(dotenv_path=env_path)
+elif os.path.exists(api_env_path):
+    print(f"Backend: Detected api.env at {api_env_path}")
+    load_dotenv(dotenv_path=api_env_path)
 elif os.path.exists(res_env_path):
     print(f"Backend: Detected .env in resources at {res_env_path}")
     load_dotenv(dotenv_path=res_env_path)
+elif os.path.exists(res_api_env_path):
+    print(f"Backend: Detected api.env in resources at {res_api_env_path}")
+    load_dotenv(dotenv_path=res_api_env_path)
 else:
     # Try current working directory as fallback
     load_dotenv()
