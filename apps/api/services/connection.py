@@ -129,6 +129,10 @@ class ConnectionService(BaseDatabaseService):
                 db.config = config
 
             session.commit()
+            
+            # Invalidate cache so next request uses new config
+            self.invalidate_cache(db_id)
+            
             return {"id": db.id, "config": mask_config(db.config)}
         finally:
             session.close()
@@ -156,6 +160,8 @@ class ConnectionService(BaseDatabaseService):
             if db:
                 session.delete(db)
                 session.commit()
+                # Invalidate cache
+                self.invalidate_cache(db_id)
                 return True
             session.commit() # Commit deletion of history even if db record is missing
             return False

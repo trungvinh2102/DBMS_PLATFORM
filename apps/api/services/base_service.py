@@ -13,13 +13,34 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Cache for database engines to manage connection pooling globally
-_engine_cache = {}
-_mongo_cache = {}
+_engine_cache = {} # Map db_id -> engine
+_mongo_cache = {}  # Map db_id -> client
 
 class BaseDatabaseService:
     """
     Base class for services interacting with database configurations.
     """
+
+    @staticmethod
+    def invalidate_cache(db_id: str):
+        """
+        Invalidates cached engine/client for a specific database.
+        """
+        if db_id in _engine_cache:
+            engine = _engine_cache.pop(db_id)
+            try:
+                engine.dispose()
+                logger.info(f"Disposed cached SQLAlchemy engine for {db_id}")
+            except Exception as e:
+                logger.error(f"Failed to dispose engine for {db_id}: {e}")
+        
+        if db_id in _mongo_cache:
+            client = _mongo_cache.pop(db_id)
+            try:
+                client.close()
+                logger.info(f"Closed cached MongoClient for {db_id}")
+            except Exception as e:
+                logger.error(f"Failed to close MongoClient for {db_id}: {e}")
 
     def get_db_config(self, db_id: str, session: Session):
         """
@@ -56,15 +77,19 @@ class BaseDatabaseService:
             
         return db.type, config
 
-    def create_connection_engine(self, db_type, config):
+    def create_connection_engine(self, db_type, config, db_id=None):
         """
         Creates an SQLAlchemy engine based on configuration.
 
         Args:
             db_type (str): The type of database (e.g., 'postgres').
             config (dict): The connection configuration.
-
+            db_id (str, optional): The database ID for caching.
         """
+        # Caching logic
+        if db_id and db_id in _engine_cache:
+            return _engine_cache[db_id]
+
         if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite']:
             raise Exception(f"Database type '{db_type}' is not currently supported.")
             
@@ -80,8 +105,6 @@ class BaseDatabaseService:
                 conn_str = conn_str.replace('postgres://', 'postgresql+psycopg2://')
             elif conn_str.startswith('postgresql://'):
                  conn_str = conn_str.replace('postgresql://', 'postgresql+psycopg2://')
-            
-            # Update config for consistency if needed, but conn_str is what matters here
         else:
             user = config.get('user')
             password = config.get('password')
@@ -109,27 +132,30 @@ class BaseDatabaseService:
         if '@' in conn_str:
             masked_conn_str = '***' + conn_str[conn_str.find('@'):]
         
-        # Caching logic
-        cache_key = conn_str
-        if cache_key in _engine_cache:
-            return _engine_cache[cache_key]
-
         # Create engine with connection pooling and timeout
         connect_args = {}
             
         try:
             logger.info(f"Creating SQLAlchemy engine for: {masked_conn_str}")
-            # print(f"DEBUG: Target engine create with: {masked_conn_str}") # Add this for immediate console feedback
+            
+            # Extract pooling parameters from config or use defaults
+            pool_size = int(config.get('pool_size', 5))
+            max_overflow = int(config.get('max_overflow', 10))
+            pool_timeout = int(config.get('pool_timeout', 30))
+            pool_recycle = int(config.get('pool_recycle', 1800))
+
             engine = create_engine(
                 conn_str,
                 poolclass=pool.QueuePool,
-                pool_size=5,
-                max_overflow=10,
-                pool_timeout=30,
-                pool_recycle=1800,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                pool_timeout=pool_timeout,
+                pool_recycle=pool_recycle,
                 connect_args=connect_args
             )
-            _engine_cache[cache_key] = engine
+            
+            if db_id:
+                _engine_cache[db_id] = engine
             return engine
         except Exception as e:
             logger.error(f"SQLAlchemy engine creation FAILED for {masked_conn_str}: {e}")
@@ -151,7 +177,7 @@ class BaseDatabaseService:
         connection = None
         try:
             db_type, config = self.get_db_config(database_id, session)
-            engine = self.create_connection_engine(db_type, config)
+            engine = self.create_connection_engine(db_type, config, db_id=database_id)
             connection = engine.connect()
             return callback(connection)
         except Exception as e:
@@ -173,17 +199,20 @@ class BaseDatabaseService:
             return None, None
 
         # Create a stable cache key
+        if database_id in _mongo_cache:
+            return _mongo_cache[database_id], config.get('database', 'test')
+
         host = config.get('host', '127.0.0.1')
         port = config.get('port', 27017)
         user = config.get('user', '')
-        # Use a combination of host, port, user, and database for the cache key
-        cache_key = f"{host}:{port}:{user}:{config.get('database', '')}"
-
-        if cache_key in _mongo_cache:
-            return _mongo_cache[cache_key], config.get('database', 'test')
 
         from pymongo import MongoClient
         try:
+            # Extract pooling parameters from config
+            pool_size = int(config.get('pool_size', 10))
+            # pool_recycle translates roughly to maxIdleTimeMS in MongoDB
+            max_idle_time_ms = int(config.get('pool_recycle', 1800)) * 1000
+            
             client = MongoClient(
                 host=host,
                 port=int(port) if port else 27017,
@@ -192,12 +221,13 @@ class BaseDatabaseService:
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=5000,
                 # Enable pooling
-                maxPoolSize=10,
-                minPoolSize=1
+                maxPoolSize=pool_size,
+                minPoolSize=1,
+                maxIdleTimeMS=max_idle_time_ms
             )
             # Basic connectivity check
             client.admin.command('ping')
-            _mongo_cache[cache_key] = client
+            _mongo_cache[database_id] = client
             return client, config.get('database', 'test')
         except Exception as e:
             logger.error(f"Failed to create MongoClient for {database_id}: {e}")
