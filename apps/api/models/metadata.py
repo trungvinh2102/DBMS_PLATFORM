@@ -32,7 +32,7 @@ class Db(Base):
     sshConfig = Column(JSON, nullable=True)
     
     # Tags handling: Postgres uses ARRAY, others (like SQLite) use JSON or Text
-    tags = Column(JSON, nullable=True) 
+    tags = Column(ARRAY(String), nullable=True)
     
     username = Column(String, nullable=True)
     password = Column(String, nullable=True)

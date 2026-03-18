@@ -14,6 +14,7 @@ import { validateSQL } from "./validators/sql-validator";
 import { validateJSON } from "./validators/json-validator";
 import { validateJavaScript } from "./validators/js-validator";
 import { validatePython } from "./validators/python-validator";
+import { validateRedis } from "./validators/redis-validator";
 import { getSeverityLabel } from "./validators/validator-utils";
 
 /**
@@ -34,6 +35,8 @@ export function validateCode(
       return validateJavaScript(code);
     case "python":
       return validatePython(code);
+    case "redis":
+      return validateRedis(code);
     default:
       return {
         isValid: true,

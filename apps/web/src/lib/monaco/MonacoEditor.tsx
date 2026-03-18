@@ -19,6 +19,7 @@ import { useSettingsStore } from "@/stores/use-settings-store";
 import { defineThemes } from "@/lib/monaco/themes";
 import { registerSqlAutocomplete } from "@/lib/monaco/sql-autocomplete";
 import { registerMongoAutocomplete } from "@/lib/monaco/mongodb-autocomplete";
+import { registerRedisAutocomplete } from "@/lib/monaco/redis-autocomplete";
 import { registerEditorCommands } from "../../app/sqllab/hooks/use-editor-commands";
 
 interface SQLEditorProps {
@@ -88,13 +89,15 @@ export function SQLEditor({
     [sqlDialect],
   );
 
+  const isRelational = !["mongodb", "redis"].includes(sqlDialect);
+
   const { errors, validate, clearMarkers } = useEditorValidation({
     monacoRef,
     editorRef,
-    language: language === "sql" ? "sql" : "javascript", // Use javascript for MQL or fallback
+    language: language === "sql" ? "sql" : (language as any),
     debounceMs: validationDebounceMs,
     validationOptions,
-    enabled: enableValidation && language === "sql", // Disable SQL validation for non-SQL
+    enabled: enableValidation && (language === "sql" || !isRelational),
     markerId: "sql-syntax-validator",
     onValidationComplete: (result) => {
       const eCount = result.markers.filter((m) => m.severity === 8).length;
@@ -172,6 +175,7 @@ export function SQLEditor({
 
       registerSqlAutocomplete(monaco, tablesRef, columnsRef);
       registerMongoAutocomplete(monaco, tablesRef, columnsRef);
+      registerRedisAutocomplete(monaco, tablesRef);
       registerEditorCommands({
         editor,
         monaco,

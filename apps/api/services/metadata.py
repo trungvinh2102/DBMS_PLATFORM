@@ -24,10 +24,15 @@ class MetadataService(BaseDatabaseService):
         """Lists schemas/databases in the database."""
         session = SessionLocal()
         try:
-            db_type, _ = self.get_db_config(database_id, session)
+            db_type, config = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, _ = self._get_mongo_client(database_id, session)
+                client, _ = self.get_mongo_client(database_id, session)
                 return client.list_database_names() if client else []
+            if db_type == 'redis':
+                # Redis typically has 16 databases (0-15) by default. 
+                # INFO keyspace only returns databases with keys. 
+                # We'll return 0-15 as "schemas" for exploration.
+                return [str(i) for i in range(16)]
         except Exception as e:
             logger.error(f"Error in MongoDB get_schemas: {e}")
             return []
@@ -48,9 +53,9 @@ class MetadataService(BaseDatabaseService):
         """
         session = SessionLocal()
         try:
-            db_type, _ = self.get_db_config(database_id, session)
+            db_type, config = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, default_db = self._get_mongo_client(database_id, session)
+                client, default_db = self.get_mongo_client(database_id, session)
                 if client:
                     target_db = schema if schema and schema != 'public' else default_db
                     all_names = client[target_db].list_collection_names()
@@ -60,6 +65,31 @@ class MetadataService(BaseDatabaseService):
                         return [name for name in all_names if name not in view_names and not name.startswith('system.')]
                     except:
                         return [name for name in all_names if not name.startswith('system.')]
+                return []
+            if db_type == 'redis':
+                # Use schema as database index if it's a number
+                db_index = 0
+                try:
+                    db_index = int(schema) if schema and schema.isdigit() else int(config.get('database', 0))
+                except:
+                    pass
+                
+                client, _ = self.get_redis_client(database_id, session)
+                if client:
+                    try:
+                        # Select the database
+                        client.select(db_index)
+                        
+                        # Use SCAN to be safe
+                        keys = []
+                        for k in client.scan_iter(match='*', count=1000):
+                            keys.append(k)
+                            if len(keys) >= 1000: break
+                        return sorted(keys)
+                    except Exception as e:
+                        logger.error(f"Error scanning Redis keys (DB {db_index}): {e}")
+                        return []
+            if db_type == 'mongodb' or db_type == 'redis':
                 return []
         except Exception as e:
             logger.error(f"Error in MongoDB get_tables: {e}")
@@ -80,7 +110,7 @@ class MetadataService(BaseDatabaseService):
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, default_db = self._get_mongo_client(database_id, session)
+                client, default_db = self.get_mongo_client(database_id, session) # Fixed method name
                 if client:
                     target_db = schema if schema and schema != 'public' else default_db
                     try:
@@ -89,6 +119,8 @@ class MetadataService(BaseDatabaseService):
                     except Exception as e:
                         logger.error(f"Error listing MongoDB views: {e}")
                         return []
+                return []
+            if db_type == 'redis':
                 return []
         finally:
             session.close()
@@ -106,7 +138,7 @@ class MetadataService(BaseDatabaseService):
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
-            if db_type == 'mongodb':
+            if db_type in ['mongodb', 'redis']:
                 return []
         finally:
             session.close()
@@ -128,7 +160,7 @@ class MetadataService(BaseDatabaseService):
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
-            if db_type == 'mongodb':
+            if db_type in ['mongodb', 'redis']:
                 return []
         finally:
             session.close()
@@ -150,7 +182,7 @@ class MetadataService(BaseDatabaseService):
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
-            if db_type == 'mongodb':
+            if db_type in ['mongodb', 'redis']:
                 return []
         finally:
             session.close()
@@ -172,7 +204,7 @@ class MetadataService(BaseDatabaseService):
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
-            if db_type == 'mongodb':
+            if db_type in ['mongodb', 'redis']:
                 return []
         finally:
             session.close()
@@ -195,7 +227,7 @@ class MetadataService(BaseDatabaseService):
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, default_db = self._get_mongo_client(database_id, session)
+                client, default_db = self.get_mongo_client(database_id, session)
                 if not client: return []
                 target_db = schema if schema and schema != 'public' else default_db
                 collection = client[target_db][table]
@@ -210,6 +242,30 @@ class MetadataService(BaseDatabaseService):
                             all_fields[key] = type(value).__name__
                 if not all_fields: return []
                 return [{"name": key, "type": val_type, "nullable": True} for key, val_type in all_fields.items()]
+            if db_type == 'redis':
+                # Use schema as database index
+                db_index = 0
+                try:
+                    db_index = int(schema) if schema and schema.isdigit() else 0
+                except:
+                    pass
+                
+                client, _ = self.get_redis_client(database_id, session)
+                if not client: return []
+                
+                try:
+                    client.select(db_index)
+                    key_type = client.type(table)
+                    cols = [{"name": "key", "type": "String", "nullable": False}, {"name": "type", "type": "String", "nullable": False}]
+                    if key_type == 'string':
+                        cols.append({"name": "value", "type": "String", "nullable": True})
+                    elif key_type == 'hash':
+                        fields = client.hkeys(table)
+                        for f in fields[:50]:
+                            cols.append({"name": f, "type": "HashField", "nullable": True})
+                    return cols
+                except:
+                    return []
         except Exception as e:
             logger.error(f"Error in MongoDB get_columns: {e}")
             return []
@@ -233,7 +289,7 @@ class MetadataService(BaseDatabaseService):
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, default_db = self._get_mongo_client(database_id, session)
+                client, default_db = self.get_mongo_client(database_id, session) # Fixed method name
                 if not client: return {}
                 target_db = schema if schema and schema != 'public' else default_db
                 collections = client[target_db].list_collection_names()
@@ -245,6 +301,8 @@ class MetadataService(BaseDatabaseService):
                     else:
                         result[coll] = []
                 return result
+            if db_type == 'redis':
+                return {}
         except Exception as e:
             logger.error(f"Error in MongoDB get_all_columns: {e}")
             return {}
@@ -268,7 +326,7 @@ class MetadataService(BaseDatabaseService):
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
-            if db_type == 'mongodb':
+            if db_type in ['mongodb', 'redis']:
                 return []
         finally:
             session.close()
@@ -299,12 +357,14 @@ class MetadataService(BaseDatabaseService):
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, default_db = self._get_mongo_client(database_id, session)
+                client, default_db = self.get_mongo_client(database_id, session) # Fixed method name
                 if not client: return []
                 target_db = schema if schema and schema != 'public' else default_db
                 collection = client[target_db][table]
                 indexes = list(collection.list_indexes())
                 return [{"indexname": idx.get('name'), "indexdef": str(idx.get('key'))} for idx in indexes]
+            if db_type == 'redis':
+                return []
         except Exception as e:
             logger.error(f"Error in MongoDB get_indexes: {e}")
             return []
@@ -325,7 +385,7 @@ class MetadataService(BaseDatabaseService):
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
-            if db_type == 'mongodb':
+            if db_type in ['mongodb', 'redis']:
                 return []
         finally:
             session.close()
@@ -351,7 +411,7 @@ class MetadataService(BaseDatabaseService):
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                client, default_db = self._get_mongo_client(database_id, session)
+                client, default_db = self.get_mongo_client(database_id, session)
                 target_db = schema if schema and schema != 'public' else default_db
                 stats = client[target_db].command("collstats", table)
                 return {
@@ -359,6 +419,24 @@ class MetadataService(BaseDatabaseService):
                     "data_size": f"{stats.get('size', 0) / 1024:.2f} KB",
                     "index_size": f"{stats.get('totalIndexSize', 0) / 1024:.2f} KB",
                     "row_count": stats.get('count', 0)
+                }
+            if db_type == 'redis':
+                client, _ = self.get_redis_client(database_id, session)
+                if not client: return {}
+                key_type = client.type(table)
+                ttl = client.ttl(table)
+                size = 0
+                if key_type == 'string': size = client.strlen(table)
+                elif key_type == 'hash': size = client.hlen(table)
+                elif key_type == 'list': size = client.llen(table)
+                elif key_type == 'set': size = client.scard(table)
+                elif key_type == 'zset': size = client.zcard(table)
+                
+                return {
+                    "type": key_type,
+                    "ttl": f"{ttl}s" if ttl >= 0 else ("Infinity" if ttl == -1 else "n/a"),
+                    "element_count": size,
+                    "memory_usage": f"{client.memory_usage(table) or 0} bytes"
                 }
         except Exception:
             return {}
@@ -403,6 +481,10 @@ class MetadataService(BaseDatabaseService):
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
                 return f"-- MongoDB Collection: {schema}.{table}\n-- No DDL available for NoSQL"
+            if db_type == 'redis':
+                client, _ = self.get_redis_client(database_id, session)
+                key_type = client.type(table) if client else "unknown"
+                return f"-- Redis Key: {table} (DB {schema})\n-- Type: {key_type}\n-- No DDL available for NoSQL"
         finally:
             session.close()
 

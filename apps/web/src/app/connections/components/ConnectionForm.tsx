@@ -1,14 +1,12 @@
-/**
- * @file ConnectionForm.tsx
- * @description Unified form component for database connection with bidirectional URI/fields sync.
- */
+"use client";
 
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Globe, ShieldCheck, Lock, Database, Terminal } from "lucide-react";
+import { Globe, ShieldCheck, Lock, Database, Terminal, Eye, EyeOff } from "lucide-react";
 import { DEFAULT_PORTS } from "./constants";
-import { useConnectionSync } from "../lib/use-connection-sync";
-import type { ConnectionFormData } from "../lib/use-connection-sync";
+import { useConnectionSync, type ConnectionFormData } from "../lib/use-connection-sync";
+import { maskPasswordInUri } from "../lib/uri-utils";
 
 interface ConnectionFormProps {
   formData: ConnectionFormData;
@@ -21,6 +19,8 @@ export function ConnectionForm({
   setFormData,
   selectedType,
 }: ConnectionFormProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  
   const { handleFieldChange, handleUriChange } = useConnectionSync(
     formData,
     setFormData,
@@ -84,11 +84,11 @@ export function ConnectionForm({
             <div className="relative">
               <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-white/20" />
               <Input
-                required
+                required={selectedType !== "redis" && selectedType !== "mongodb"}
                 value={formData.user}
                 onChange={(e) => handleFieldChange("user", e.target.value)}
                 className="h-11 pl-10 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-slate-700 dark:text-white/80"
-                placeholder="postgres"
+                placeholder={selectedType === "redis" || selectedType === "mongodb" ? "optional" : "username"}
               />
             </div>
           </div>
@@ -99,12 +99,20 @@ export function ConnectionForm({
             <div className="relative">
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-white/20" />
               <Input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={(e) => handleFieldChange("password", e.target.value)}
-                className="h-11 pl-10 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-slate-700 dark:text-white/80"
+                className="h-11 pl-10 pr-10 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-slate-700 dark:text-white/80"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-white/20 dark:hover:text-white/50 transition-colors"
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
         </div>
@@ -154,12 +162,23 @@ export function ConnectionForm({
                       ? "mongodb://user:password@localhost:27017/database"
                       : selectedType === "clickhouse"
                       ? "clickhouse://user:password@localhost:8123/database"
-                      : "oracle://user:password@localhost:1521/database"
+                      : selectedType === "redis"
+                        ? "redis://:password@localhost:6379/0"
+                        : "oracle://user:password@localhost:1521/database"
               }
-              value={formData.uri}
-              onChange={(e) => handleUriChange(e.target.value)}
-              className="h-12 pl-12 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-mono font-bold text-slate-600 dark:text-white/60"
+              value={showPassword ? formData.uri : maskPasswordInUri(formData.uri)}
+              onChange={(e) => showPassword && handleUriChange(e.target.value)}
+              readOnly={!showPassword}
+              className="h-12 pl-12 pr-12 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-mono font-bold text-slate-600 dark:text-white/60"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-white/20 dark:hover:text-white/50 transition-colors"
+              title={showPassword ? "Hide password in URI" : "Show password in URI"}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
           <p className="text-[10px] text-slate-400 dark:text-white/30 ml-1">
             Enter URI directly or fill in the fields below - they sync

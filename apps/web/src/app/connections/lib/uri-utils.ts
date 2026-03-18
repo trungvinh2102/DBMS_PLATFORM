@@ -65,3 +65,33 @@ export function buildUri(
     return `${protocol}://${userPart}${host || "localhost"}${portPart}/${database}`;
   }
 }
+/**
+ * Masks the password part of a connection URI.
+ * Example: postgresql://user:password@host:port/db -> postgresql://user:********@host:port/db
+ */
+export function maskPasswordInUri(uri: string): string {
+  if (!uri) return "";
+  
+  try {
+    // Find the last '@' which separates credentials from host
+    const lastAtIndex = uri.lastIndexOf("@");
+    if (lastAtIndex === -1) return uri;
+    
+    const credentialsPart = uri.substring(0, lastAtIndex);
+    const hostPart = uri.substring(lastAtIndex);
+    
+    // Find the last colon in the credentials part (after the protocol)
+    const protocolEndIndex = credentialsPart.indexOf("://");
+    const searchFrom = protocolEndIndex === -1 ? 0 : protocolEndIndex + 3;
+    const lastColonIndex = credentialsPart.lastIndexOf(":");
+    
+    if (lastColonIndex > searchFrom - 1) {
+      const maskedCredentials = credentialsPart.substring(0, lastColonIndex + 1) + "********";
+      return maskedCredentials + hostPart;
+    }
+    
+    return uri;
+  } catch {
+    return uri.replace(/:(.*)@/, ":********@");
+  }
+}

@@ -274,7 +274,7 @@ function SQLLabContent() {
                       onRenameTab={renameTab}
                       undoTrigger={undoTrigger}
                       redoTrigger={redoTrigger}
-                      language={isRelational ? "sql" : "javascript"}
+                      language={isRelational ? "sql" : (selectedDSType === "redis" ? "redis" : "javascript")}
                       sqlDialect={selectedDSType as any}
                       onErrorsChange={setSyntaxErrors}
                     />

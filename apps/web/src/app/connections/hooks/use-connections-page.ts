@@ -12,6 +12,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
+import { encrypt } from "@/lib/crypto";
 import { DEFAULT_PORTS } from "../components/constants";
 
 export function useConnectionsPage() {
@@ -57,11 +58,11 @@ export function useConnectionsPage() {
     e.preventDefault();
     try {
       const config = {
-        uri: formData.uri || undefined,
+        uri: formData.uri ? encrypt(formData.uri) : undefined,
         host: formData.host,
         port: formData.port ? parseInt(formData.port) : undefined,
         user: formData.user,
-        password: formData.password || undefined,
+        password: formData.password ? encrypt(formData.password) : undefined,
         database: formData.database,
       };
 
