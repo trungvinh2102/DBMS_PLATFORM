@@ -6,7 +6,7 @@ Service for retrieving database schema information.
 
 from services.base_service import BaseDatabaseService
 from models.metadata import SessionLocal
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,24 +21,13 @@ class MetadataService(BaseDatabaseService):
         return self.get_mongo_client(database_id, session)
 
     def get_schemas(self, database_id: str):
-        """
-        Lists schemas in the database.
-
-        Args:
-            database_id (str): The database ID.
-
-        Returns:
-            list[str]: A list of schema names.
-        """
+        """Lists schemas/databases in the database."""
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
                 client, _ = self._get_mongo_client(database_id, session)
-                if client:
-                    # In MongoDB, "schemas" can be interpreted as databases
-                    return client.list_database_names()
-                return []
+                return client.list_database_names() if client else []
         except Exception as e:
             logger.error(f"Error in MongoDB get_schemas: {e}")
             return []
@@ -46,27 +35,16 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            query = text("""
-                SELECT schema_name FROM information_schema.schemata 
-                WHERE schema_name NOT IN ('pg_catalog', 'pg_toast')
-                AND schema_name NOT LIKE 'pg_temp_%'
-                AND schema_name NOT LIKE 'pg_toast_temp_%'
-                ORDER BY schema_name
-            """)
-            result = conn.execute(query)
-            return [row[0] for row in result]
+            # ClickHouse dialect's get_schema_names may use raw strings in SQLAlchemy 2.0
+            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                res = conn.execute(text("SHOW DATABASES"))
+                return [row[0] for row in res]
+            return inspect(conn).get_schema_names()
         return self.run_dynamic_query(database_id, _op)
 
     def get_tables(self, database_id: str, schema: str = 'public'):
         """
         Lists tables in a schema.
-
-        Args:
-            database_id (str): The database ID.
-            schema (str): The schema name.
-
-        Returns:
-            list[str]: A list of table names.
         """
         session = SessionLocal()
         try:
@@ -74,20 +52,13 @@ class MetadataService(BaseDatabaseService):
             if db_type == 'mongodb':
                 client, default_db = self._get_mongo_client(database_id, session)
                 if client:
-                    # In MongoDB, "tables" are collections. 
-                    # If schema is 'public' (relational default) or empty, use the configured database
                     target_db = schema if schema and schema != 'public' else default_db
-                    
-                    # More robust way: Get all names first
                     all_names = client[target_db].list_collection_names()
-                    
-                    # Try to get views to filter them out from tables
                     try:
                         collections_info = list(client[target_db].list_collections())
                         view_names = [c['name'] for c in collections_info if c.get('type') == 'view']
                         return [name for name in all_names if name not in view_names and not name.startswith('system.')]
                     except:
-                        # Fallback: if list_collections fails, just show everything except system.
                         return [name for name in all_names if not name.startswith('system.')]
                 return []
         except Exception as e:
@@ -97,13 +68,11 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            query = text("""
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_schema = :schema AND table_type = 'BASE TABLE'
-                ORDER BY table_name
-            """)
-            result = conn.execute(query, {"schema": schema})
-            return [row[0] for row in result]
+            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                target_schema = 'default' if schema == 'public' else schema
+                res = conn.execute(text(f"SHOW TABLES FROM `{target_schema}`"))
+                return [row[0] for row in res]
+            return inspect(conn).get_table_names(schema=schema)
         return self.run_dynamic_query(database_id, _op)
 
     def get_views(self, database_id: str, schema: str = 'public'):
@@ -115,7 +84,6 @@ class MetadataService(BaseDatabaseService):
                 if client:
                     target_db = schema if schema and schema != 'public' else default_db
                     try:
-                        # Get only the collections that are of type 'view'
                         collections = client[target_db].list_collections()
                         return [c['name'] for c in collections if c.get('type') == 'view']
                     except Exception as e:
@@ -126,16 +94,12 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            query = text("""
-                SELECT table_name FROM information_schema.views 
-                WHERE table_schema = :schema
-                ORDER BY table_name
-            """)
-            try:
-                result = conn.execute(query, {"schema": schema})
-                return [row[0] for row in result]
-            except Exception:
-                return []
+            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                target_schema = 'default' if schema == 'public' else schema
+                # Views in ClickHouse are listed in SHOW TABLES but have different types in system.tables
+                res = conn.execute(text(f"SELECT name FROM system.tables WHERE database = :schema AND engine LIKE '%View'"), {"schema": target_schema})
+                return [row[0] for row in res]
+            return inspect(conn).get_view_names(schema=schema)
         return self.run_dynamic_query(database_id, _op)
 
     def get_functions(self, database_id: str, schema: str = 'public'):
@@ -227,50 +191,25 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_columns(self, database_id: str, schema: str, table: str):
-        """
-        Lists columns for a table.
-
-        Args:
-            database_id (str): The database ID.
-            schema (str): The schema name.
-            table (str): The table name.
-
-        Returns:
-            list[dict]: A list of column metadata.
-        """
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
                 client, default_db = self._get_mongo_client(database_id, session)
                 if not client: return []
-                
-                # Sample documents to find all frequent fields using $sample for performance
                 target_db = schema if schema and schema != 'public' else default_db
                 collection = client[target_db][table]
-                
-                # Use $sample aggregation stage for better distribution in large collections
                 try:
                     cursor = collection.aggregate([{"$sample": {"size": 20}}])
                 except Exception:
-                    # Fallback for old versions or restricted environments
                     cursor = collection.find().limit(20)
-                
-                all_fields = {} # name -> type
-                
+                all_fields = {}
                 for doc in cursor:
                     for key, value in doc.items():
                         if key not in all_fields or (all_fields[key] == 'NoneType' and value is not None):
                             all_fields[key] = type(value).__name__
-                
-                if not all_fields:
-                    return []
-                    
-                return [{
-                    "name": key,
-                    "type": val_type,
-                    "nullable": True
-                } for key, val_type in all_fields.items()]
+                if not all_fields: return []
+                return [{"name": key, "type": val_type, "nullable": True} for key, val_type in all_fields.items()]
         except Exception as e:
             logger.error(f"Error in MongoDB get_columns: {e}")
             return []
@@ -278,46 +217,31 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            query = text("""
-                SELECT column_name, data_type, is_nullable 
-                FROM information_schema.columns 
-                WHERE table_schema = :schema AND table_name = :table
-                ORDER BY ordinal_position
-            """)
-            rows = conn.execute(query, {"schema": schema, "table": table})
-            return [{
-                "name": r[0],
-                "type": r[1],
-                "nullable": r[2] == "YES"
-            } for r in rows]
+            # ClickHouse columns if inspect fails
+            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                target_schema = 'default' if schema == 'public' else schema
+                res = conn.execute(text(f"DESCRIBE TABLE `{target_schema}`.`{table}`"))
+                return [{"name": row[0], "type": row[1], "nullable": True} for row in res]
+            
+            # Using inspector for others as it is more robust for columns across dialects
+            return [{"name": c["name"], "type": str(c["type"]), "nullable": c.get("nullable", True)} 
+                    for c in inspect(conn).get_columns(table, schema=schema)]
         return self.run_dynamic_query(database_id, _op)
 
     def get_all_columns(self, database_id: str, schema: str):
-        """
-        Lists all columns for all tables in a schema.
-        Supports both Relational (via Inspector) and MongoDB.
-        """
-        from sqlalchemy import inspect
-        
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
                 client, default_db = self._get_mongo_client(database_id, session)
                 if not client: return {}
-                
                 target_db = schema if schema and schema != 'public' else default_db
                 collections = client[target_db].list_collection_names()
                 result = {}
                 for coll in collections:
-                    # For performance, we limit sampling when getting "all"
                     doc = client[target_db][coll].find_one()
                     if doc:
-                         result[coll] = [{
-                            "name": key,
-                            "type": type(value).__name__,
-                            "nullable": True
-                        } for key, value in doc.items()]
+                         result[coll] = [{"name": key, "type": type(value).__name__, "nullable": True} for key, value in doc.items()]
                     else:
                         result[coll] = []
                 return result
@@ -332,26 +256,20 @@ class MetadataService(BaseDatabaseService):
             tables = inspector.get_table_names(schema=schema)
             result = {}
             for table in tables:
-                cols = inspector.get_columns(table, schema=schema)
-                result[table] = [{
-                    "name": c["name"],
-                    "type": str(c["type"]),
-                    "nullable": c.get("nullable", True)
-                } for c in cols]
+                try:
+                    cols = inspector.get_columns(table, schema=schema)
+                    result[table] = [{"name": c["name"], "type": str(c["type"]), "nullable": c.get("nullable", True)} for c in cols]
+                except:
+                    result[table] = []
             return result
         return self.run_dynamic_query(database_id, _op)
 
     def get_all_foreign_keys(self, database_id: str, schema: str):
-        """
-        Lists all foreign keys in a schema using Inspector for cross-db support.
-        """
-        from sqlalchemy import inspect
-        
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
-                return [] # No FKs in MongoDB natively
+                return []
         finally:
             session.close()
             
@@ -360,55 +278,50 @@ class MetadataService(BaseDatabaseService):
             tables = inspector.get_table_names(schema=schema)
             all_fks = []
             for table in tables:
-                fks = inspector.get_foreign_keys(table, schema=schema)
-                for fk in fks:
-                    # fk is usually like: {'name': ..., 'constrained_columns': [...], 'referred_schema': ..., 'referred_table': ..., 'referred_columns': [...]}
-                    for i, col in enumerate(fk['constrained_columns']):
-                        all_fks.append({
-                            "table": table,
-                            "column": col,
-                            "foreignSchema": fk.get('referred_schema') or schema,
-                            "foreignTable": fk['referred_table'],
-                            "foreignColumn": fk['referred_columns'][i] if i < len(fk['referred_columns']) else None
-                        })
+                try:
+                    fks = inspector.get_foreign_keys(table, schema=schema)
+                    for fk in fks:
+                        for i, col in enumerate(fk['constrained_columns']):
+                            all_fks.append({
+                                "table": table,
+                                "column": col,
+                                "foreignSchema": fk.get('referred_schema') or schema,
+                                "foreignTable": fk['referred_table'],
+                                "foreignColumn": fk['referred_columns'][i] if i < len(fk['referred_columns']) else None
+                            })
+                except:
+                    continue
             return all_fks
         return self.run_dynamic_query(database_id, _op)
 
     def get_indexes(self, database_id: str, schema: str, table: str):
-         """
-         Lists indexes for a table/collection.
-         """
-         session = SessionLocal()
-         try:
+        session = SessionLocal()
+        try:
             db_type, _ = self.get_db_config(database_id, session)
             if db_type == 'mongodb':
                 client, default_db = self._get_mongo_client(database_id, session)
                 if not client: return []
-                
                 target_db = schema if schema and schema != 'public' else default_db
                 collection = client[target_db][table]
                 indexes = list(collection.list_indexes())
-                
-                return [{
-                    "indexname": idx.get('name'),
-                    "indexdef": str(idx.get('key'))
-                } for idx in indexes]
-         except Exception as e:
-                logger.error(f"Error in MongoDB get_indexes: {e}")
-                return []
-         finally:
+                return [{"indexname": idx.get('name'), "indexdef": str(idx.get('key'))} for idx in indexes]
+        except Exception as e:
+            logger.error(f"Error in MongoDB get_indexes: {e}")
+            return []
+        finally:
             session.close()
 
-         def _op(conn):
-            query = text("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = :schema AND tablename = :table")
-            rows = conn.execute(query, {"schema": schema, "table": table})
-            return [{"indexname": r[0], "indexdef": r[1]} for r in rows]
-         return self.run_dynamic_query(database_id, _op)
+        def _op(conn):
+            try:
+                if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                    return []
+                return [{"indexname": idx["name"], "indexdef": str(idx["column_names"])} 
+                        for idx in inspect(conn).get_indexes(table, schema=schema)]
+            except Exception:
+                return []
+        return self.run_dynamic_query(database_id, _op)
 
     def get_foreign_keys(self, database_id: str, schema: str, table: str):
-        """
-        Lists foreign keys for a table.
-        """
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -418,37 +331,22 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            query = text("""
-                SELECT
-                    tc.constraint_name,
-                    kcu.column_name,
-                    ccu.table_schema AS foreign_table_schema,
-                    ccu.table_name AS foreign_table_name,
-                    ccu.column_name AS foreign_column_name
-                FROM
-                    information_schema.table_constraints AS tc
-                    JOIN information_schema.key_column_usage AS kcu
-                      ON tc.constraint_name = kcu.constraint_name
-                      AND tc.table_schema = kcu.table_schema
-                    JOIN information_schema.constraint_column_usage AS ccu
-                      ON ccu.constraint_name = tc.constraint_name
-                      AND ccu.table_schema = tc.table_schema
-                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = :schema AND tc.table_name = :table
-            """)
-            rows = conn.execute(query, {"schema": schema, "table": table})
-            return [{
-                "constraint": r[0],
-                "column": r[1],
-                "foreignSchema": r[2],
-                "foreignTable": r[3],
-                "foreignColumn": r[4],
-            } for r in rows]
+            try:
+                if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                    return []
+                fks = inspect(conn).get_foreign_keys(table, schema=schema)
+                return [{
+                    "constraint": fk.get("name"),
+                    "column": ", ".join(fk["constrained_columns"]),
+                    "foreignSchema": fk.get("referred_schema"),
+                    "foreignTable": fk["referred_table"],
+                    "foreignColumn": ", ".join(fk["referred_columns"]),
+                } for fk in fks]
+            except Exception:
+                return []
         return self.run_dynamic_query(database_id, _op)
-    
+
     def get_table_info(self, database_id: str, schema: str, table: str):
-        """
-        Gets detailed table statistics.
-        """
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -468,14 +366,24 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            query = text("""
-                SELECT
-                  pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as total_size,
-                  pg_size_pretty(pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as data_size,
-                  pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table)) - pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as index_size,
-                  (SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = :schema AND relname = :table) as row_count
-            """)
             try:
+                if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                    target_schema = 'default' if schema == 'public' else schema
+                    query = text(f"SELECT sum(bytes_on_disk), count() FROM system.parts WHERE database = :schema AND table = :table AND active")
+                    res = conn.execute(query, {"schema": target_schema, "table": table}).fetchone()
+                    if res:
+                        return {
+                            "total_size": f"{res[0] / 1024 / 1024:.2f} MB" if res[0] else "0 MB",
+                            "row_count": res[1] or 0
+                        }
+
+                query = text("""
+                    SELECT
+                      pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as total_size,
+                      pg_size_pretty(pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as data_size,
+                      pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table)) - pg_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as index_size,
+                      (SELECT n_live_tup FROM pg_stat_user_tables WHERE schemaname = :schema AND relname = :table) as row_count
+                """)
                 result = conn.execute(query, {"schema": schema, "table": table}).fetchone()
                 if result:
                      return {
@@ -490,9 +398,6 @@ class MetadataService(BaseDatabaseService):
         return self.run_dynamic_query(database_id, _op)
 
     def get_table_ddl(self, database_id: str, schema: str, table: str):
-        """
-        Generates DDL for a table (Prototype).
-        """
         session = SessionLocal()
         try:
             db_type, _ = self.get_db_config(database_id, session)
@@ -502,41 +407,48 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
         def _op(conn):
-            cols_query = text("""
-                SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
-                FROM information_schema.columns
-                WHERE table_schema = :schema AND table_name = :table
-                ORDER BY ordinal_position
-            """)
-            cols = conn.execute(cols_query, {"schema": schema, "table": table})
-            
-            pk_query = text("""
-                SELECT kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                ON tc.constraint_name = kcu.constraint_name
-                AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'PRIMARY KEY'
-                AND tc.table_schema = :schema
-                AND tc.table_name = :table
-            """)
-            pks = [r[0] for r in conn.execute(pk_query, {"schema": schema, "table": table})]
-            
-            lines = []
-            for col in cols:
-                line = f'  "{col[0]}" {col[1].upper()}'
-                if col[2]: line += f'({col[2]})'
-                if col[3] == "NO": line += " NOT NULL"
-                if col[4]: line += f" DEFAULT {col[4]}"
-                lines.append(line)
+            try:
+                if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+                    target_schema = 'default' if schema == 'public' else schema
+                    res = conn.execute(text(f"SHOW CREATE TABLE `{target_schema}`.`{table}`")).fetchone()
+                    return res[0] if res else ""
+
+                cols_query = text("""
+                    SELECT column_name, data_type, character_maximum_length, is_nullable, column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = :schema AND table_name = :table
+                    ORDER BY ordinal_position
+                """)
+                cols = conn.execute(cols_query, {"schema": schema, "table": table})
                 
-            if pks:
-                pk_str = ", ".join([f'"{k}"' for k in pks])
-                lines.append(f"  PRIMARY KEY ({pk_str})")
-            
-            sql = f'CREATE TABLE "{schema}"."{table}" (\n' + ",\n".join(lines) + "\n);"
-            return sql
-            
+                pk_query = text("""
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                    ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                    AND tc.table_schema = :schema
+                    AND tc.table_name = :table
+                """)
+                pks = [r[0] for r in conn.execute(pk_query, {"schema": schema, "table": table})]
+                
+                lines = []
+                for col in cols:
+                    line = f'  "{col[0]}" {col[1].upper()}'
+                    if col[2]: line += f'({col[2]})'
+                    if col[3] == "NO": line += " NOT NULL"
+                    if col[4]: line += f" DEFAULT {col[4]}"
+                    lines.append(line)
+                    
+                if pks:
+                    pk_str = ", ".join([f'"{k}"' for k in pks])
+                    lines.append(f"  PRIMARY KEY ({pk_str})")
+                
+                sql = f'CREATE TABLE "{schema}"."{table}" (\n' + ",\n".join(lines) + "\n);"
+                return sql
+            except Exception as e:
+                return f"-- Failed to generate DDL: {e}"
         return self.run_dynamic_query(database_id, _op)
 
 metadata_service = MetadataService()

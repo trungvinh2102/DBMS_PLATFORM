@@ -18,6 +18,24 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+  
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: dbms_platform_clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=password
+    volumes:
+      - dbms_platform_clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: unless-stopped
 
 volumes:
   dbms_platform_postgres_data:
+  dbms_platform_clickhouse_data:

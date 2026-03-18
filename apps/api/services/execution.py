@@ -220,7 +220,7 @@ class ExecutionService(BaseDatabaseService):
 
                 # Prepare connection with autocommit if requested
                 exec_conn = conn
-                if auto_commit:
+                if auto_commit and dialect not in ['clickhouse', 'clickhousedb']:
                     exec_conn = conn.execution_options(isolation_level="AUTOCOMMIT")
 
                 # Add basic timeouts for postgresql to prevent runaway queries

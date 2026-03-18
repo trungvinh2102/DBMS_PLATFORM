@@ -70,6 +70,7 @@ interface SQLLabObjectPanelProps {
   tableDDL?: string;
   triggers?: string[];
   isRelational: boolean;
+  selectedDSType?: string;
 }
 
 const ObjectIcon = ({
@@ -114,6 +115,7 @@ export function SQLLabObjectPanel({
   tableDDL,
   triggers,
   isRelational,
+  selectedDSType,
 }: SQLLabObjectPanelProps) {
   const [structureSearch, setStructureSearch] = useState("");
   const { theme } = useTheme();
@@ -125,7 +127,7 @@ export function SQLLabObjectPanel({
     "Data",
     "Structure",
     "Index",
-    ...(isRelational ? ["Relation", "Trigger"] : []),
+    ...(isRelational && selectedDSType !== "clickhouse" ? ["Relation", "Trigger"] : []),
     "Info",
     ...(isRelational ? ["Script"] : []),
   ];

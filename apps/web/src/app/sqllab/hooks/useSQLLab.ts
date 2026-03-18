@@ -68,6 +68,8 @@ export function useSQLLab() {
     selectedTable,
   });
 
+  const selectedDSType = dataSources?.find((ds: any) => ds.id === activeTab.selectedDS)?.type || "";
+
   const {
     handleRun,
     handleFormat,
@@ -135,11 +137,16 @@ export function useSQLLab() {
     const s = schemas as unknown as string[];
     if (s && s.length > 0) {
       if (!activeTab.selectedSchema || !s.includes(activeTab.selectedSchema)) {
-        const def = s.includes("public") ? "public" : s[0];
+        let def = s[0];
+        if (selectedDSType === "clickhouse") {
+          def = s.includes("default") ? "default" : s[0];
+        } else {
+          def = s.includes("public") ? "public" : s[0];
+        }
         updateActiveTab({ selectedSchema: def });
       }
     }
-  }, [schemas, activeTab.selectedSchema, updateActiveTab]);
+  }, [schemas, activeTab.selectedSchema, updateActiveTab, selectedDSType]);
 
   // Handle panel mode switching for NoSQL
   const isRelational = dataSources?.find((ds: any) => ds.id === activeTab.selectedDS)?.type !== "mongodb";
@@ -270,6 +277,9 @@ export function useSQLLab() {
     selectedDSName:
       dataSources.find((ds: any) => ds.id === activeTab.selectedDS)
         ?.databaseName || "",
+    selectedDSType:
+      dataSources.find((ds: any) => ds.id === activeTab.selectedDS)
+        ?.type || "",
     isRelational,
     handleRun: (sqlOverride?: string | React.SyntheticEvent) => {
       const actualSql =

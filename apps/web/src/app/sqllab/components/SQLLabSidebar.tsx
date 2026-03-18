@@ -21,6 +21,7 @@ import {
   SiSqlite,
   SiMongodb,
   SiRedis,
+  SiClickhouse,
 } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ interface SQLLabSidebarProps {
   setSelectedTable: (table: string) => void;
   onRefreshTables: () => void;
   isRelational: boolean;
+  selectedDSType?: string;
 }
 
 export function SQLLabSidebar({
@@ -81,6 +83,7 @@ export function SQLLabSidebar({
   setSelectedTable,
   onRefreshTables,
   isRelational,
+  selectedDSType,
 }: SQLLabSidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -122,6 +125,8 @@ export function SQLLabSidebar({
       return <SiMongodb className="h-5 w-5 text-emerald-500" />;
     if (t.includes("redis"))
       return <SiRedis className="h-5 w-5 text-red-500" />;
+    if (t.includes("clickhouse"))
+      return <SiClickhouse className="h-5 w-5 text-orange-500" />;
     return <Database className="h-5 w-5" />;
   };
 
@@ -273,7 +278,7 @@ export function SQLLabSidebar({
           filteredViews,
           filteredViews?.length,
         )}
-        {isRelational &&
+        {isRelational && selectedDSType !== "clickhouse" &&
           folderItem(
             "events",
             "Events",
@@ -281,7 +286,7 @@ export function SQLLabSidebar({
             filteredEvents,
             filteredEvents?.length,
           )}
-        {isRelational &&
+        {isRelational && selectedDSType !== "clickhouse" &&
           folderItem(
             "functions",
             "Functions",
@@ -289,7 +294,7 @@ export function SQLLabSidebar({
             filteredFunctions,
             filteredFunctions?.length,
           )}
-        {isRelational &&
+        {isRelational && selectedDSType !== "clickhouse" &&
           folderItem(
             "procedures",
             "Procedures",
@@ -297,7 +302,7 @@ export function SQLLabSidebar({
             filteredProcedures,
             filteredProcedures?.length,
           )}
-        {isRelational &&
+        {isRelational && selectedDSType !== "clickhouse" &&
           folderItem(
             "triggers",
             "Triggers",

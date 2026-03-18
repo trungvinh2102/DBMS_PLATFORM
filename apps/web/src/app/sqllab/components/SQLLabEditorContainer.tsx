@@ -55,8 +55,7 @@ interface SQLLabEditorContainerProps {
   enableValidation?: boolean;
   /** Show error panel below editor (default: false) */
   showErrorPanel?: boolean;
-  /** SQL dialect for validation (default: 'postgresql') */
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery";
+  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery" | "clickhouse";
   /** Editor language (default: 'sql') */
   language?: string;
   /** Callback when syntax errors change */

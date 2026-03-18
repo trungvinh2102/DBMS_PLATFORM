@@ -152,6 +152,8 @@ export function ConnectionForm({
                       ? "sqlserver://user:password@localhost:1433/database"
                       : selectedType === "mongodb"
                       ? "mongodb://user:password@localhost:27017/database"
+                      : selectedType === "clickhouse"
+                      ? "clickhouse://user:password@localhost:8123/database"
                       : "oracle://user:password@localhost:1521/database"
               }
               value={formData.uri}

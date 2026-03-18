@@ -70,6 +70,7 @@ interface SQLLabResultPanelProps {
   selectedDS?: string;
   selectedSchema?: string;
   onFixWithAI?: (error: string) => void;
+  selectedDSType?: string;
 }
 
 type TabType = "results" | "messages" | "problems" | "charts" | "lineage";
@@ -92,6 +93,7 @@ export function SQLLabResultPanel({
   selectedDS,
   selectedSchema,
   onFixWithAI,
+  selectedDSType,
 }: SQLLabResultPanelProps) {
   // const [activeTab, setActiveTab] = useState<TabType>("results");
 
@@ -136,7 +138,7 @@ export function SQLLabResultPanel({
           >
             Charts
           </TabButton>
-          {!isMongoDB && (
+          {!isMongoDB && selectedDSType !== "clickhouse" && (
             <TabButton
               active={effectiveTab === "lineage"}
               onClick={() => onTabChange("lineage")}
