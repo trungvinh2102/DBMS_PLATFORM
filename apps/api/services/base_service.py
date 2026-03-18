@@ -90,7 +90,7 @@ class BaseDatabaseService:
         if db_id and db_id in _engine_cache:
             return _engine_cache[db_id]
 
-        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite']:
+        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse']:
             raise Exception(f"Database type '{db_type}' is not currently supported.")
             
         conn_str = ""
@@ -126,6 +126,12 @@ class BaseDatabaseService:
                 conn_str = f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}?driver=ODBC+Driver+17+for+SQL+Server"
             elif db_type == 'sqlite':
                 conn_str = f"sqlite:///{dbname}"
+            elif db_type == 'clickhouse':
+                port = port or 8123
+                # clickhouse-connect SQLAlchemy dialect uses 'clickhousedb://'
+                conn_str = f"clickhousedb://{user}:{password}@{host}:{port}/{dbname}"
+                if config.get('ssl'):
+                    conn_str += "?secure=True"
 
         # Masking for safe logging
         masked_conn_str = conn_str

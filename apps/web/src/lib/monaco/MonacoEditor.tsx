@@ -37,7 +37,7 @@ interface SQLEditorProps {
   redoTrigger?: number;
   enableValidation?: boolean;
   showErrorPanel?: boolean;
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery";
+  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery" | "clickhouse";
   language?: string;
   validationDebounceMs?: number;
   onValidationChange?: (errorCount: number, warningCount: number) => void;

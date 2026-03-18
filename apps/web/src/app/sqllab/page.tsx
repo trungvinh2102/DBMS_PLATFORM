@@ -154,6 +154,7 @@ function SQLLabContent() {
     currentTColumns,
     loadingTData,
     selectedDSName,
+    selectedDSType,
     isRelational,
     executionTime,
 
@@ -215,6 +216,7 @@ function SQLLabContent() {
           setSelectedTable={setSelectedTable}
           onRefreshTables={refetchTables}
           isRelational={isRelational}
+          selectedDSType={selectedDSType}
         />
 
         <div className="flex-1 flex flex-col overflow-hidden bg-muted/5">
@@ -242,6 +244,7 @@ function SQLLabContent() {
             showAISidebar={showAISidebar}
             setShowAISidebar={setShowAISidebar}
             isRelational={isRelational}
+            selectedDSType={selectedDSType}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -272,6 +275,7 @@ function SQLLabContent() {
                       undoTrigger={undoTrigger}
                       redoTrigger={redoTrigger}
                       language={isRelational ? "sql" : "javascript"}
+                      sqlDialect={selectedDSType as any}
                       onErrorsChange={setSyntaxErrors}
                     />
                   </ResizablePanel>
@@ -296,6 +300,7 @@ function SQLLabContent() {
                       dataSources={dataSources}
                       selectedDS={selectedDS}
                       selectedSchema={selectedSchema}
+                      selectedDSType={selectedDSType}
                       onFixWithAI={(errMsg) => {
                         setFixSQLError(errMsg);
                         setShowAISidebar(true);
@@ -339,6 +344,7 @@ function SQLLabContent() {
                       tableDDL={tableDDL}
                       triggers={triggers}
                       isRelational={isRelational}
+                      selectedDSType={selectedDSType}
                     />
                   ) : rightPanelMode === "history" ? (
                     <SQLLabHistoryPanel

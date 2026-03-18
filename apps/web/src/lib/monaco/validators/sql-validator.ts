@@ -27,6 +27,7 @@ const SQL_DIALECT_MAP: Record<string, string> = {
   sqlite: "SQLite",
   mariadb: "MariaDB",
   bigquery: "BigQuery",
+  clickhouse: "ClickHouse",
 };
 
 export function validateSQL(

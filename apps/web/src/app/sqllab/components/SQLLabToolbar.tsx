@@ -25,6 +25,8 @@ interface SQLLabToolbarProps {
   handleRun: () => void;
   executing: boolean;
   selectedDS: string;
+  selectedSchema?: string;
+  onFixWithAI?: (error: string) => void;
   showRightPanel: boolean;
   setShowRightPanel: (show: boolean) => void;
   rightPanelMode: "object" | "history" | "schema";
@@ -45,12 +47,15 @@ interface SQLLabToolbarProps {
   showAISidebar: boolean;
   setShowAISidebar: (show: boolean) => void;
   isRelational: boolean;
+  selectedDSType?: string;
 }
 
 export function SQLLabToolbar({
   handleRun,
   executing,
   selectedDS,
+  selectedSchema,
+  onFixWithAI,
   showRightPanel,
   setShowRightPanel,
   rightPanelMode,
@@ -71,6 +76,7 @@ export function SQLLabToolbar({
   showAISidebar,
   setShowAISidebar,
   isRelational,
+  selectedDSType,
 }: SQLLabToolbarProps) {
   return (
     <header className="flex items-center h-14 border-b bg-background/80 backdrop-blur-md sticky top-0 z-10 px-3 shrink-0 gap-1 overflow-x-auto no-scrollbar">
@@ -130,39 +136,43 @@ export function SQLLabToolbar({
         onClick={handleFormat}
       />
 
-      <div className="w-px h-6 bg-border/60 mx-1" />
+      {isRelational && selectedDSType !== "clickhouse" && (
+        <>
+          <div className="w-px h-6 bg-border/60 mx-1" />
 
-      {/* Auto Commit Toggle */}
-      <div
-        role="switch"
-        aria-checked={autoCommit}
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            setAutoCommit(!autoCommit);
-          }
-        }}
-        className="flex items-center gap-2 px-3 h-9 hover:bg-muted/50 transition-colors rounded-md cursor-pointer border border-transparent hover:border-border/50"
-        onClick={() => setAutoCommit(!autoCommit)}
-      >
-        <div
-          className={cn(
-            "relative w-8 h-4 rounded-full transition-all",
-            autoCommit ? "bg-primary" : "bg-muted",
-          )}
-        >
+          {/* Auto Commit Toggle */}
           <div
-            className={cn(
-              "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm",
-              autoCommit ? "left-4.5" : "left-0.5",
-            )}
-          />
-        </div>
-        <span className="text-[10px] font-bold uppercase tracking-tight opacity-70">
-          Auto Commit
-        </span>
-      </div>
+            role="switch"
+            aria-checked={autoCommit}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setAutoCommit(!autoCommit);
+              }
+            }}
+            className="flex items-center gap-2 px-3 h-9 hover:bg-muted/50 transition-colors rounded-md cursor-pointer border border-transparent hover:border-border/50"
+            onClick={() => setAutoCommit(!autoCommit)}
+          >
+            <div
+              className={cn(
+                "relative w-8 h-4 rounded-full transition-all",
+                autoCommit ? "bg-primary" : "bg-muted",
+              )}
+            >
+              <div
+                className={cn(
+                  "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm",
+                  autoCommit ? "left-4.5" : "left-0.5",
+                )}
+              />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-tight opacity-70">
+              Auto Commit
+            </span>
+          </div>
+        </>
+      )}
 
       <div className="w-px h-6 bg-border/60 mx-1" />
 
@@ -180,11 +190,13 @@ export function SQLLabToolbar({
         />
       </div>
 
-      <ToolbarButton
-        icon={<RotateCcw className="h-4 w-4 text-amber-500" />}
-        label="Rollback"
-        onClick={onRollback}
-      />
+      {isRelational && selectedDSType !== "clickhouse" && (
+        <ToolbarButton
+          icon={<RotateCcw className="h-4 w-4 text-amber-500" />}
+          label="Rollback"
+          onClick={onRollback}
+        />
+      )}
 
       <div className="w-px h-6 bg-border/60 mx-1" />
 
@@ -222,7 +234,7 @@ export function SQLLabToolbar({
         )}
       />
 
-      {isRelational && (
+      {isRelational && selectedDSType !== "clickhouse" && (
         <ToolbarButton
           icon={<LayoutGrid className="h-4 w-4 text-emerald-500" />}
           label="Schema"

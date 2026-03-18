@@ -16,3 +16,6 @@ pymongo
 pymysql
 # AI
 google-generativeai
+
+# ClickHouse
+clickhouse-connect
