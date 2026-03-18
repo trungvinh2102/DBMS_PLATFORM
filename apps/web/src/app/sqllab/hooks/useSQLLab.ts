@@ -140,6 +140,8 @@ export function useSQLLab() {
         let def = s[0];
         if (selectedDSType === "clickhouse") {
           def = s.includes("default") ? "default" : s[0];
+        } else if (selectedDSType === "redis") {
+          def = s.includes("0") ? "0" : s[0];
         } else {
           def = s.includes("public") ? "public" : s[0];
         }
@@ -149,7 +151,7 @@ export function useSQLLab() {
   }, [schemas, activeTab.selectedSchema, updateActiveTab, selectedDSType]);
 
   // Handle panel mode switching for NoSQL
-  const isRelational = dataSources?.find((ds: any) => ds.id === activeTab.selectedDS)?.type !== "mongodb";
+  const isRelational = !["mongodb", "redis"].includes(dataSources?.find((ds: any) => ds.id === activeTab.selectedDS)?.type);
 
   useEffect(() => {
     if (!isRelational && rightPanelMode === "schema") {
@@ -187,9 +189,14 @@ export function useSQLLab() {
       activeRightTab === "data" &&
       (selectedObjectType === "table" || selectedObjectType === "view")
     ) {
+      const isRedis = selectedDSType === "redis";
+      const sql = isRedis 
+        ? `GET "${selectedTable}"` // Generic starting point for Redis, backend handles it
+        : `SELECT * FROM "${selectedTable}" LIMIT 100`;
+
       tableDataMutation.mutate({
         databaseId: activeTab.selectedDS,
-        sql: `SELECT * FROM "${selectedTable}" LIMIT 100`,
+        sql: sql,
       });
     }
   }, [selectedTable, activeTab.selectedDS, activeRightTab, selectedObjectType]);

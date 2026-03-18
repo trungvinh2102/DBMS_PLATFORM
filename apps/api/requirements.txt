@@ -14,8 +14,12 @@ passlib[bcrypt]
 # DB
 pymongo
 pymysql
+sqlalchemy-pytds
 # AI
 google-generativeai
 
 # ClickHouse
 clickhouse-connect
+
+# Redis
+redis

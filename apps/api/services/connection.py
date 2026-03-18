@@ -56,6 +56,11 @@ class ConnectionService(BaseDatabaseService):
         """
         session = SessionLocal()
         try:
+            # Enforce Test Connection before creation
+            test_result = self.test_connection(data)
+            if not test_result['success']:
+                raise Exception(f"Connection test failed. Please verify your settings. Detail: {test_result['message']}")
+
             config = data['config'].copy()
             if config.get('password'):
                 config['password'] = encrypt(config['password'])
@@ -103,6 +108,16 @@ class ConnectionService(BaseDatabaseService):
             db = session.query(Db).filter(Db.id == db_id).first()
             if not db:
                 raise Exception("Database not found")
+
+            # Enforce Test Connection before update
+            test_payload = {
+                'id': db_id,
+                'type': data.get('type', db.type),
+                'config': data.get('config')
+            }
+            test_result = self.test_connection(test_payload)
+            if not test_result['success']:
+                raise Exception(f"Connection test failed. Update aborted. Detail: {test_result['message']}")
 
             # Update fields
             if 'databaseName' in data: db.databaseName = data['databaseName']
@@ -180,13 +195,23 @@ class ConnectionService(BaseDatabaseService):
         """
         try:
             config = data.get('config')
-            db_type = data.get('type')
+            db_type = data.get('type').lower() if data.get('type') else None
 
-            # Fetch existing if ID provided
+            # Fetch existing if ID provided (to merge with fields not provided in test)
             if data.get('id'):
                 session = SessionLocal()
                 try:
-                    db_type, config = self.get_db_config(data['id'], session)
+                    existing_db_type, existing_config = self.get_db_config(data['id'], session)
+                    # If type not explicitly provided in test, use existing
+                    if not db_type:
+                        db_type = existing_db_type
+                    # Merge config: test config overrides existing config
+                    if config:
+                        merged_config = existing_config.copy()
+                        merged_config.update(config)
+                        config = merged_config
+                    else:
+                        config = existing_config
                 finally:
                     session.close()
             else:
@@ -197,28 +222,95 @@ class ConnectionService(BaseDatabaseService):
             if not config:
                 return {"success": False, "message": "Missing config"}
 
+            # Support encrypted password and URI in the raw config sent for testing
+            from utils.crypto import decrypt
+            from utils.common import decrypt_uri
+            
+            if config.get('password') and ':' in str(config['password']) and len(str(config['password']).split(':')[0]) == 32:
+                 try:
+                     config['password'] = decrypt(config['password'])
+                 except:
+                     pass
+                     
+            if config.get('uri'):
+                 config['uri'] = decrypt_uri(config['uri'])
+
             if db_type == 'mongodb':
                 # For MongoDB, we use pymongo directly for both health checks and queries
-                # to avoid the overhead and limitations of SQL-to-NoSQL bridges.
                 from pymongo import MongoClient
-                # Parse host and port from config
-                host = config.get('host', '127.0.0.1')
-                port = int(config.get('port', 27017))
-                user = config.get('user')
-                password = config.get('password')
                 
-                # We use a short timeout for the test
-                client = MongoClient(
-                    host=host,
-                    port=port,
-                    username=user,
-                    password=password,
-                    serverSelectionTimeoutMS=5000,
-                    connectTimeoutMS=5000
-                )
+                # Check for URI first
+                uri = config.get('uri')
+                if uri:
+                    # Fix for MongoDB authentication: Ensure authSource=admin is present
+                    # if not explicitly specified, to support root user authentication.
+                    if 'authSource' not in uri:
+                        separator = '&' if '?' in uri else '?'
+                        uri = f"{uri}{separator}authSource=admin"
+                    
+                    client = MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+                else:
+                    host = config.get('host', '127.0.0.1')
+                    try:
+                        port = int(config.get('port', 27017))
+                    except (ValueError, TypeError):
+                        port = 27017
+                    user = config.get('user')
+                    password = config.get('password')
+                    auth_source = config.get('authSource', 'admin')
+                    
+                    print(f"DEBUG: Testing MongoDB with user={user}, authSource={auth_source}, host={host}:{port}")
+                    
+                    client = MongoClient(
+                        host=host,
+                        port=port,
+                        username=user,
+                        password=password,
+                        authSource=auth_source,
+                        serverSelectionTimeoutMS=5000,
+                        connectTimeoutMS=5000
+                    )
                 client.admin.command('ping')
                 return {"success": True, "message": "Connection successful (Direct MongoDB)"}
             
+            if db_type == 'redis':
+                import redis
+                
+                # Check for URI first
+                uri = config.get('uri')
+                if uri:
+                    client = redis.Redis.from_url(
+                        uri, 
+                        socket_connect_timeout=5, 
+                        decode_responses=True
+                    )
+                else:
+                    host = config.get('host', '127.0.0.1')
+                    try:
+                        port = int(config.get('port', 6379))
+                    except (ValueError, TypeError):
+                        port = 6379
+                    
+                    username = config.get('user', '')
+                    password = config.get('password')
+                    
+                    try:
+                        db_index = int(config.get('database', 0))
+                    except (ValueError, TypeError):
+                        db_index = 0
+                    
+                    client = redis.Redis(
+                        host=host,
+                        port=port,
+                        username=username if username else None,
+                        password=password if password else None,
+                        db=db_index,
+                        socket_connect_timeout=5,
+                        decode_responses=True
+                    )
+                client.ping()
+                return {"success": True, "message": "Connection successful (Direct Redis)"}
+                
             engine = self.create_connection_engine(db_type, config)
             with engine.connect() as conn:
                 from sqlalchemy import text

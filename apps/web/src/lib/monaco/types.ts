@@ -68,7 +68,8 @@ export type SupportedLanguage =
   | "json"
   | "javascript"
   | "typescript"
-  | "python";
+  | "python"
+  | "redis";
 
 /**
  * Language-specific validation options.
@@ -77,7 +78,7 @@ export interface ValidationOptions {
   /** Enable strict mode validation */
   strict?: boolean;
   /** SQL dialect for SQL validation */
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "bigquery" | "mariadb" | "mongodb" | "clickhouse";
+  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "bigquery" | "mariadb" | "mongodb" | "redis" | "clickhouse";
   /** Custom validation rules */
   customRules?: ValidationRule[];
 }

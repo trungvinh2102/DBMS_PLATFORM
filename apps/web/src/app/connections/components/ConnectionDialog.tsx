@@ -27,6 +27,7 @@ import { ConnectionForm } from "./ConnectionForm";
 import { toast } from "sonner";
 import { databaseApi } from "@/lib/api-client";
 import { useMutation } from "@tanstack/react-query";
+import { encrypt } from "@/lib/crypto";
 
 interface ConnectionDialogProps {
   isOpen: boolean;
@@ -58,13 +59,13 @@ export function ConnectionDialog({
 
   const handleTestConnection = async () => {
     try {
-      // Build config from form data - send both URI and individual fields
+      // Build config from form data - encrypt sensitive fields
       const config = {
-        uri: formData.uri,
+        uri: formData.uri ? encrypt(formData.uri) : undefined,
         host: formData.host,
         port: parseInt(formData.port) || undefined,
         user: formData.user,
-        password: formData.password,
+        password: formData.password ? encrypt(formData.password) : undefined,
         database: formData.database,
       };
 
@@ -131,7 +132,7 @@ export function ConnectionDialog({
                 value={selectedType}
                 onValueChange={(value) => value && handleTypeChange(value)}
               >
-                <SelectTrigger className="h-12 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-slate-700 dark:text-white/80 transition-all focus:ring-blue-500">
+                <SelectTrigger className="px-4 h-12 border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 rounded-xl font-bold text-slate-700 dark:text-white/80 transition-all focus:ring-blue-500">
                   <SelectValue placeholder="Select database type">
                     <div className="flex items-center gap-3">
                       {selectedDbType && (
@@ -143,12 +144,12 @@ export function ConnectionDialog({
                     </div>
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent className="bg-white dark:bg-[#0c0c0e] border-slate-200 dark:border-white/10 shadow-2xl">
+                <SelectContent className="bg-white dark:bg-[#0c0c0e] border-slate-200 dark:border-white/10 shadow-2xl p-1">
                   {DB_TYPES.map((t) => (
                     <SelectItem
                       key={t.id}
                       value={t.id}
-                      className="font-medium py-3 focus:bg-slate-50 dark:focus:bg-white/5 cursor-pointer"
+                      className="font-medium py-3 px-4 focus:bg-slate-50 dark:focus:bg-white/5 cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
                         <span className={cn("text-xl", t.color)}>{t.icon}</span>

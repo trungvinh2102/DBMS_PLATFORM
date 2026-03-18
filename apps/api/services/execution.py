@@ -156,6 +156,76 @@ class ExecutionService(BaseDatabaseService):
         finally:
             session.close()
 
+    def _execute_redis(self, database_id, command_str, limit):
+        """Native Redis execution for raw commands."""
+        session = SessionLocal()
+        try:
+            db_type, config = self.get_db_config(database_id, session)
+            if db_type != 'redis': return None
+            
+            client, _ = self.get_redis_client(database_id, session)
+            if not client:
+                raise Exception("Failed to connect to Redis")
+            
+            import shlex
+            # Split command string into parts, handling quotes (e.g. SET "my key" "my value")
+            try:
+                parts = shlex.split(command_str)
+            except Exception as e:
+                # Fallback to simple split if shlex fails
+                parts = command_str.split()
+                
+            if not parts:
+                raise Exception("Empty Redis command")
+            
+            cmd = parts[0].lower()
+            args = parts[1:]
+            
+            # Smart translation for common SQL-like or generic 'GET' previews
+            if cmd == 'select' and len(parts) >= 4 and parts[2].lower() == 'from':
+                # Handle 'SELECT * FROM key'
+                cmd = 'get'
+                args = [parts[3].replace('"', '').replace("'", "")]
+            
+            if cmd == 'get' and len(args) == 1:
+                key = args[0]
+                try:
+                    actual_type = client.type(key)
+                    if actual_type == 'hash':
+                        cmd = 'hgetall'
+                    elif actual_type == 'list':
+                        cmd = 'lrange'
+                        args = [key, '0', '99'] # Preview first 100 items
+                    elif actual_type == 'set':
+                        cmd = 'smembers'
+                    elif actual_type == 'zset':
+                        cmd = 'zrange'
+                        args = [key, '0', '99', 'withscores']
+                except:
+                    pass
+
+            # Execute command using redis-py's execute_command
+            result = client.execute_command(cmd, *args)
+            
+            # Formulate response
+            processed_data = []
+            columns = ["result"]
+            
+            if isinstance(result, (list, tuple, set)):
+                columns = ["index", "value"]
+                for i, val in enumerate(result):
+                    if i >= limit: break
+                    processed_data.append({"index": i, "value": str(val)})
+            elif isinstance(result, dict):
+                columns = sorted(result.keys()) if result else ["result"]
+                processed_data.append({k: str(v) for k, v in result.items()})
+            else:
+                processed_data.append({"result": str(result)})
+                
+            return processed_data, columns
+        finally:
+            session.close()
+
     def execute_query(self, database_id: str, sql: str, auto_commit: bool = True, limit: int = 1000):
         """
         Executes a SQL query on the target database.
@@ -184,6 +254,16 @@ class ExecutionService(BaseDatabaseService):
                 db_type, _ = self.get_db_config(database_id, temp_session)
                 if db_type == 'mongodb':
                     result_data, columns = self._execute_mongodb(database_id, sql, limit)
+                    execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                    self._save_history(database_id, sql, 'SUCCESS', execution_time_ms, None)
+                    return {
+                        "data": result_data,
+                        "columns": columns,
+                        "executionTime": execution_time_ms,
+                        "error": None
+                    }
+                if db_type == 'redis':
+                    result_data, columns = self._execute_redis(database_id, sql, limit)
                     execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
                     self._save_history(database_id, sql, 'SUCCESS', execution_time_ms, None)
                     return {

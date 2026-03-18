@@ -25,8 +25,13 @@ def mask_config(config: dict) -> dict:
         masked['password'] = '********'
         
     if 'uri' in masked and isinstance(masked['uri'], str):
-        # Mask password in URI: protocol://user:pass@host -> protocol://user:****@host
-        masked['uri'] = re.sub(r'(://.*:)(.*)(@.*)', r'\1****\3', masked['uri'])
+        # Attempt to decrypt first if it's an encrypted blob
+        # This reveals the host/db structure but protects the secret parts
+        uri = decrypt_uri(masked['uri'])
+        # Mask password: protocol://user:password@host
+        # Group 1: protocol/user/colon, Group 2: password, Group 3: @host
+        uri = re.sub(r'(://[^/@]*:)([^/@]*)(@)', r'\1********\3', uri)
+        masked['uri'] = uri
         
     return masked
 

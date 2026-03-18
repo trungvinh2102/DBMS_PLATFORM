@@ -9,6 +9,7 @@ import {
   SiOracle,
   SiMongodb,
   SiClickhouse,
+  SiRedis,
 } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 
@@ -39,6 +40,12 @@ export const DB_TYPES = [
     icon: <SiClickhouse />,
     color: "text-orange-600",
   },
+  {
+    id: "redis",
+    name: "Redis",
+    icon: <SiRedis />,
+    color: "text-red-500",
+  },
 ] as const;
 
 export const DEFAULT_PORTS: Record<string, string> = {
@@ -48,6 +55,7 @@ export const DEFAULT_PORTS: Record<string, string> = {
   oracle: "1521",
   mongodb: "27017",
   clickhouse: "8123",
+  redis: "6379",
 };
 
 // URI protocol prefixes for each database type
@@ -58,4 +66,5 @@ export const DB_URI_PROTOCOLS: Record<string, string> = {
   oracle: "oracle",
   mongodb: "mongodb",
   clickhouse: "clickhouse",
+  redis: "redis",
 };
