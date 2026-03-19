@@ -2,7 +2,7 @@
  * @file app/unauthorized/page.tsx
  * @description Page displayed when user lacks permission
  */
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert } from "lucide-react";
 
@@ -26,7 +26,7 @@ export default function UnauthorizedPage() {
         variant="outline"
         className="border-neutral-800 hover:bg-neutral-900 text-white"
       >
-        <Link href="/">Return to Dashboard</Link>
+        <Link to="/">Return to Dashboard</Link>
       </Button>
     </div>
   );

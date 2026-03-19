@@ -44,62 +44,25 @@ import {
 } from "@/components/ui/select";
 import { SQLLabSidebarHeader } from "./SQLLabSidebarHeader";
 
-interface SQLLabSidebarProps {
-  dataSources: DataSource[];
-  selectedDS: string;
-  setSelectedDS: (id: string) => void;
-  schemas: string[];
-  selectedSchema: string;
-  setSelectedSchema: (schema: string) => void;
-  isLoadingTables: boolean;
-  tables: string[] | undefined;
-  views: string[] | undefined;
-  functions: string[] | undefined;
-  procedures: string[] | undefined;
-  triggers: string[] | undefined;
-  events: string[] | undefined;
-  selectedTable: string | null;
-  setSelectedTable: (table: string) => void;
-  onRefreshTables: () => void;
-  isRelational: boolean;
-  selectedDSType?: string;
-}
+import { useSQLLabContext } from "../context/SQLLabContext";
 
-export function SQLLabSidebar({
-  dataSources,
-  selectedDS,
-  setSelectedDS,
-  schemas,
-  selectedSchema,
-  setSelectedSchema,
-  isLoadingTables,
-  tables,
-  views,
-  functions,
-  procedures,
-  triggers,
-  events,
-  selectedTable,
-  setSelectedTable,
-  onRefreshTables,
-  isRelational,
-  selectedDSType,
-}: SQLLabSidebarProps) {
+export function SQLLabSidebar() {
+  const lab = useSQLLabContext();
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
-  const selectedDSData = dataSources?.find((ds) => ds.id === selectedDS);
+  const selectedDSData = lab.dataSources?.find((ds) => ds.id === lab.selectedDS);
 
   const filterList = (list?: string[]) =>
     list?.filter((item) =>
       item.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
-  const filteredTables = filterList(tables);
-  const filteredViews = filterList(views);
-  const filteredFunctions = filterList(functions);
-  const filteredProcedures = filterList(procedures);
-  const filteredTriggers = filterList(triggers);
-  const filteredEvents = filterList(events);
+  const filteredTables = filterList(lab.tables);
+  const filteredViews = filterList(lab.views);
+  const filteredFunctions = filterList(lab.functions);
+  const filteredProcedures = filterList(lab.procedures);
+  const filteredTriggers = filterList(lab.triggers);
+  const filteredEvents = filterList(lab.events);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) =>
@@ -176,14 +139,14 @@ export function SQLLabSidebar({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onRefreshTables();
+                lab.refetchTables();
               }}
               className="p-1 hover:bg-muted rounded transition-colors"
             >
               <RefreshCw
                 className={cn(
                   "h-3 w-3 opacity-40",
-                  isLoadingTables && "animate-spin opacity-100",
+                  lab.isLoadingTables && "animate-spin opacity-100",
                 )}
               />
             </button>
@@ -191,7 +154,7 @@ export function SQLLabSidebar({
         </div>
         {isExpanded && (
           <div className="flex flex-col border-l ml-4.5 mt-0.5 mb-1.5 pl-1.5 py-1 gap-px">
-            {isLoadingTables && id === "tables" ? (
+            {lab.isLoadingTables && id === "tables" ? (
               <div className="px-3 py-2 space-y-2 opacity-20">
                 <div className="h-2 bg-muted rounded w-3/4 animate-pulse" />
                 <div className="h-2 bg-muted rounded w-1/2 animate-pulse" />
@@ -205,26 +168,23 @@ export function SQLLabSidebar({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setSelectedTable(item);
+                      lab.setSelectedTable(item);
                     }
                   }}
                   className={cn(
                     "px-3 py-1.5 rounded cursor-pointer text-[11px] font-medium transition-all flex items-center gap-2 group/item",
-                    // Only tables are selectable for now in main view logic, but we can allow selecting others if needed
-                    // For now, only highlight if it matches selectedTable AND we are in the tables folder?
-                    // Or just generic selection if we want to show details for other objects.
-                    selectedTable === item
+                    lab.selectedTable === item
                       ? "bg-primary/10 text-primary font-bold shadow-sm"
                       : "text-muted-foreground/80 hover:bg-muted/30 hover:text-foreground",
                   )}
                   onClick={() => {
-                    setSelectedTable(item);
+                    lab.setSelectedTable(item);
                   }}
                 >
                   <div
                     className={cn(
                       "h-3.5 w-3.5 shrink-0 transition-all",
-                      selectedTable === item
+                      lab.selectedTable === item
                         ? "opacity-100 scale-110 drop-shadow-sm"
                         : "opacity-70 grayscale-30",
                     )}
@@ -250,13 +210,6 @@ export function SQLLabSidebar({
   return (
     <aside className="w-72 flex flex-col border-r bg-background shrink-0 shadow-sm z-10 font-sans">
       <SQLLabSidebarHeader
-        dataSources={dataSources}
-        selectedDS={selectedDS}
-        setSelectedDS={setSelectedDS}
-        selectedDSData={selectedDSData}
-        schemas={schemas}
-        selectedSchema={selectedSchema}
-        setSelectedSchema={setSelectedSchema}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         getDBIcon={getDBIcon}
@@ -278,7 +231,7 @@ export function SQLLabSidebar({
           filteredViews,
           filteredViews?.length,
         )}
-        {isRelational && selectedDSType !== "clickhouse" &&
+        {lab.isRelational && lab.selectedDSType !== "clickhouse" &&
           folderItem(
             "events",
             "Events",
@@ -286,7 +239,7 @@ export function SQLLabSidebar({
             filteredEvents,
             filteredEvents?.length,
           )}
-        {isRelational && selectedDSType !== "clickhouse" &&
+        {lab.isRelational && lab.selectedDSType !== "clickhouse" &&
           folderItem(
             "functions",
             "Functions",
@@ -294,7 +247,7 @@ export function SQLLabSidebar({
             filteredFunctions,
             filteredFunctions?.length,
           )}
-        {isRelational && selectedDSType !== "clickhouse" &&
+        {lab.isRelational && lab.selectedDSType !== "clickhouse" &&
           folderItem(
             "procedures",
             "Procedures",
@@ -302,7 +255,7 @@ export function SQLLabSidebar({
             filteredProcedures,
             filteredProcedures?.length,
           )}
-        {isRelational && selectedDSType !== "clickhouse" &&
+        {lab.isRelational && lab.selectedDSType !== "clickhouse" &&
           folderItem(
             "triggers",
             "Triggers",

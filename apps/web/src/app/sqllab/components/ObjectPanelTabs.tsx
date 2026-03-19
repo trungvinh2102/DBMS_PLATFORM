@@ -1,9 +1,8 @@
 import { Info, Database, Loader2, Search, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SQLLabDataTable } from "./SQLLabDataTable";
-import dynamic from "next/dynamic";
-
-const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+import React, { lazy, Suspense } from "react";
+const Editor = lazy(() => import("@monaco-editor/react"));
 
 export function EmptyObjectSelection() {
   return (
@@ -273,7 +272,8 @@ export function ScriptTabView({ tableDDL, monacoTheme }: any) {
       </div>
       <div className="flex-1 overflow-hidden relative">
         {tableDDL ? (
-          <Editor
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin" /></div>}>
+            <Editor
             height="100%"
             language="sql"
             theme={monacoTheme}
@@ -291,6 +291,7 @@ export function ScriptTabView({ tableDDL, monacoTheme }: any) {
               padding: { top: 16, bottom: 16 },
             }}
           />
+        </Suspense>
         ) : (
           <div className="flex items-center justify-center h-full p-4">
             <pre className="text-xs font-mono text-muted-foreground/50 italic whitespace-pre-wrap select-text">

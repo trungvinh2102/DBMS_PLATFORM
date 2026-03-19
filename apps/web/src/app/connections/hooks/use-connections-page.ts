@@ -9,15 +9,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { encrypt } from "@/lib/crypto";
 import { DEFAULT_PORTS } from "../components/constants";
 
 export function useConnectionsPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const connIdFromUrl = searchParams.get("id");
 
   const [selectedType, setSelectedType] = useState<string>("postgres");
@@ -156,15 +156,15 @@ export function useConnectionsPage() {
   const handleEdit = useCallback(
     (conn: any) => {
       setActiveConn(conn);
-      router.push(`/connections?id=${conn.id}` as any);
+      navigate(`/connections?id=${conn.id}`);
     },
-    [router],
+    [navigate],
   );
 
   const handleBack = useCallback(() => {
     setActiveConn(null);
-    router.push("/connections");
-  }, [router]);
+    navigate("/connections");
+  }, [navigate]);
 
   const filteredConnections = ((connections as any) || []).filter(
     (conn: any) =>

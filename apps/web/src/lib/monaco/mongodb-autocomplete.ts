@@ -206,7 +206,7 @@ export const registerMongoAutocomplete = (
                   : monaco.languages.CompletionItemKind.Method,
                 insertText: snippet ? snippet.insertText : cmd,
                 insertTextRules: snippet
-                  ? monaco.languages.CompletionItemInsertValueRule.InsertAsSnippet
+                  ? (monaco.languages as any).CompletionItemInsertTextRule.InsertAsSnippet
                   : undefined,
                 detail: snippet ? snippet.detail : `MongoDB ${cmd} command`,
                 documentation: snippet ? snippet.documentation : undefined,

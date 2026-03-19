@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Clock, Database, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -41,7 +41,7 @@ export function ConnectionConfig({
   activeConn,
   onBack,
 }: ConnectionConfigProps) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // Initialize form state from activeConn data
@@ -123,7 +123,7 @@ export function ConnectionConfig({
           <Button
             variant="outline"
             className="h-8 px-3 font-semibold uppercase tracking-wide text-[10px] border-border hover:bg-muted/10 rounded-md gap-2"
-            onClick={() => router.push(`/sqllab?ds=${activeConn.id}` as any)}
+            onClick={() => navigate(`/sqllab?ds=${activeConn.id}`)}
           >
             <Database className="h-3.5 w-3.5" />
             Explore Data

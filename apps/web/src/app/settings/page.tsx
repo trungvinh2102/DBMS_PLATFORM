@@ -1,16 +1,9 @@
 /**
  * @file page.tsx
  * @description Settings page for managing user preferences and account details.
- *
- * @performance Implements lazy loading for tab content components:
- * - Only one tab is visible at a time, so lazy loading reduces initial bundle
- * - EditorSettings, DataSettings, AccountSettings load on-demand
  */
 
-"use client";
-
-import { useEffect, useState, useRef } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useState, useRef, lazy, Suspense } from "react";
 import { useTheme } from "next-themes";
 import {
   Palette,
@@ -39,26 +32,11 @@ const SettingsCardSkeleton = () => (
   </div>
 );
 
-// Lazy-loaded tab content components
-const GeneralSettings = dynamic(
-  () => import("./components/GeneralSettings").then((m) => m.GeneralSettings),
-  { loading: () => <SettingsCardSkeleton /> },
-);
-
-const EditorSettings = dynamic(
-  () => import("./components/EditorSettings").then((m) => m.EditorSettings),
-  { loading: () => <SettingsCardSkeleton /> },
-);
-
-const DataSettings = dynamic(
-  () => import("./components/DataSettings").then((m) => m.DataSettings),
-  { loading: () => <SettingsCardSkeleton /> },
-);
-
-const AccountSettings = dynamic(
-  () => import("./components/AccountSettings").then((m) => m.AccountSettings),
-  { loading: () => <SettingsCardSkeleton /> },
-);
+// Lazy-loaded tab content components using standard React lazy
+const GeneralSettings = lazy(() => import("./components/GeneralSettings").then((m) => ({ default: m.GeneralSettings })));
+const EditorSettings = lazy(() => import("./components/EditorSettings").then((m) => ({ default: m.EditorSettings })));
+const DataSettings = lazy(() => import("./components/DataSettings").then((m) => ({ default: m.DataSettings })));
+const AccountSettings = lazy(() => import("./components/AccountSettings").then((m) => ({ default: m.AccountSettings })));
 
 export default function SettingsPage() {
   const { setTheme: setNextTheme } = useTheme();
@@ -87,7 +65,7 @@ export default function SettingsPage() {
       store.updateData(dbSettings);
       if (dbSettings.theme) setNextTheme(dbSettings.theme);
     }
-  }, [dbSettings]);
+  }, [dbSettings, setNextTheme, store]);
 
   useEffect(() => setMounted(true), []);
 
@@ -141,11 +119,11 @@ export default function SettingsPage() {
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
-            onClick={() => (
-              store.resetDefaults(),
-              setNextTheme("system"),
-              toast.info("Reset to defaults")
-            )}
+            onClick={() => {
+              store.resetDefaults();
+              setNextTheme("system");
+              toast.info("Reset to defaults");
+            }}
           >
             <RotateCcw className="mr-2 h-4 w-4" /> Reset
           </Button>
@@ -175,26 +153,28 @@ export default function SettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general">
-          <GeneralSettings
-            theme={store.theme}
-            onThemeChange={(t) => {
-              if (t) {
-                store.setTheme(t as any);
-                setNextTheme(t);
-              }
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="editor">
-          <EditorSettings settings={store} updateEditor={store.updateEditor} />
-        </TabsContent>
-        <TabsContent value="data">
-          <DataSettings settings={store} updateData={store.updateData} />
-        </TabsContent>
-        <TabsContent value="account">
-          <AccountSettings user={user} />
-        </TabsContent>
+        <Suspense fallback={<SettingsCardSkeleton />}>
+          <TabsContent value="general">
+            <GeneralSettings
+              theme={store.theme}
+              onThemeChange={(t) => {
+                if (t) {
+                  store.setTheme(t as any);
+                  setNextTheme(t);
+                }
+              }}
+            />
+          </TabsContent>
+          <TabsContent value="editor">
+            <EditorSettings settings={store} updateEditor={store.updateEditor} />
+          </TabsContent>
+          <TabsContent value="data">
+            <DataSettings settings={store} updateData={store.updateData} />
+          </TabsContent>
+          <TabsContent value="account">
+            <AccountSettings user={user} />
+          </TabsContent>
+        </Suspense>
       </Tabs>
     </div>
   );

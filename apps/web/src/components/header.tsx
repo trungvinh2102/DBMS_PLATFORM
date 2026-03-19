@@ -3,15 +3,11 @@
  * @description Main application header providing global navigation and user profile access.
  */
 
-"use client";
-
 import * as React from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeCheck,
   Bell,
-  ChevronsUpDown,
   CreditCard,
   GalleryVerticalEnd,
   LogOut,
@@ -70,7 +66,9 @@ const data = {
 export function Header() {
   // Use destructured state for better control and access to actions
   const { user, token, logout, setUser } = useAuth();
-  const pathname = usePathname();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pathname = location.pathname;
   const isAuthPage = pathname?.startsWith("/auth");
   const [mounted, setMounted] = React.useState(false);
 
@@ -99,14 +97,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="flex h-14 items-center px-4 gap-4">
-        <div className="flex items-center gap-2">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <GalleryVerticalEnd className="size-4" />
-          </div>
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <img src="/logo.png" alt="DBMS Platform" className="size-8 object-contain" />
           <div className="hidden md:block flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">DBMS</span>
           </div>
-        </div>
+        </Link>
 
         <div className="w-px h-6 bg-border mx-2" />
 
@@ -115,7 +111,7 @@ export function Header() {
           {data.navMain.map((item) => (
             <Link
               key={item.url}
-              href={item.url as any}
+              to={item.url}
               className={cn(
                 "transition-colors hover:text-foreground/80",
                 pathname === item.url || pathname?.startsWith(item.url + "/")
@@ -200,7 +196,7 @@ export function Header() {
                   <DropdownMenuItem
                     onClick={() => {
                       logout();
-                      window.location.href = "/auth/login";
+                      navigate("/auth/login");
                     }}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
@@ -213,7 +209,7 @@ export function Header() {
             )
           ) : (
             <Link
-              href="/auth/login"
+              to="/auth/login"
               className={buttonVariants({ variant: "default", size: "sm" })}
             >
               Sign In

@@ -23,17 +23,10 @@ import { useState, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { toast } from "sonner";
 
-interface SQLLabHistoryPanelProps {
-  onSelectQuery: (sql: string) => void;
-  selectedDS?: string;
-  selectedSchema?: string;
-}
+import { useSQLLabContext } from "../context/SQLLabContext";
 
-export function SQLLabHistoryPanel({
-  onSelectQuery,
-  selectedDS,
-  selectedSchema,
-}: SQLLabHistoryPanelProps) {
+export function SQLLabHistoryPanel() {
+  const lab = useSQLLabContext();
   const [searchTerm, setSearchTerm] = useState("");
 
   const {
@@ -41,9 +34,9 @@ export function SQLLabHistoryPanel({
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["queryHistory", selectedDS],
-    queryFn: () => databaseApi.getHistory(selectedDS),
-    enabled: !!selectedDS,
+    queryKey: ["queryHistory", lab.selectedDS],
+    queryFn: () => databaseApi.getHistory(lab.selectedDS),
+    enabled: !!lab.selectedDS,
   });
 
   const filteredHistory = (history as unknown as any[])?.filter((h: any) => {
@@ -95,7 +88,7 @@ export function SQLLabHistoryPanel({
       <div className="flex items-center h-10 px-5 bg-background border-b text-[10px] text-muted-foreground/60 gap-2 shrink-0 font-bold uppercase tracking-tight">
         <Database className="h-3.5 w-3.5 opacity-40 shrink-0" />
         <span className="text-foreground/80 truncate">
-          {selectedSchema || "public"}
+          {lab.selectedSchema || "public"}
         </span>
       </div>
 
@@ -126,7 +119,7 @@ export function SQLLabHistoryPanel({
             className="divide-y divide-border/40 relative w-full"
             style={{ height: `${totalSize}px` }}
           >
-            {virtualItems.map((virtualRow) => {
+            {virtualItems.map((virtualRow: any) => {
               const item = filteredHistory[virtualRow.index];
               return (
                 <div
@@ -177,7 +170,10 @@ export function SQLLabHistoryPanel({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 text-primary"
-                        onClick={() => onSelectQuery(item.sql)}
+                        onClick={() => {
+                          lab.setSql(item.sql);
+                          toast.info("SQL loaded from history");
+                        }}
                         title="Open in Editor"
                       >
                         <Play className="h-3.5 w-3.5" />

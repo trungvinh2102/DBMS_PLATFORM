@@ -3,7 +3,7 @@
  * @description Panel for displaying query results, messages, syntax problems, and execution status.
  */
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import {
   Loader2,
   Terminal,
@@ -23,85 +23,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import dynamic from "next/dynamic";
 import { SQLLabDataTable } from "./SQLLabDataTable";
 import { NoSQLResults } from "./NoSQLResults";
 import { exportData } from "@/lib/export";
 import { ProblemsList } from "./ProblemsList";
 
-const ChartViewer = dynamic(
-  () => import("./ChartViewer").then((m) => m.ChartViewer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse">
-        Loading charts...
-      </div>
-    ),
-  },
-);
+const ChartViewer = lazy(() => import("./ChartViewer").then((m) => ({ default: m.ChartViewer })));
+const LineageViewer = lazy(() => import("./LineageViewer").then((m) => ({ default: m.LineageViewer })));
 
-const LineageViewer = dynamic(
-  () => import("./LineageViewer").then((m) => m.LineageViewer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse text-[10px] font-black uppercase tracking-widest">
-        Loading lineage...
-      </div>
-    ),
-  },
-);
-
-
-interface SQLLabResultPanelProps {
-  executing: boolean;
-  error: string | null;
-  results: Record<string, unknown>[];
-  columns: string[];
-  cursorPos: { lineNumber: number; column: number };
-  tabSize?: number;
-  syntaxErrors?: any[];
-  onErrorClick?: (line: number, column: number) => void;
-  activeTab: TabType;
-  onTabChange: (tab: TabType) => void;
-  sql: string;
-  dataSources?: any[];
-  selectedDS?: string;
-  selectedSchema?: string;
-  onFixWithAI?: (error: string) => void;
-  selectedDSType?: string;
-}
+import { useSQLLabContext } from "../context/SQLLabContext";
 
 type TabType = "results" | "messages" | "problems" | "charts" | "lineage";
 
 const EMPTY_SYNTAX_ERRORS: any[] = [];
 
 export function SQLLabResultPanel({
-  executing,
-  error,
-  results,
-  columns,
-  cursorPos,
-  tabSize = 4,
   syntaxErrors = EMPTY_SYNTAX_ERRORS,
   onErrorClick,
-  activeTab,
-  onTabChange,
-  sql,
-  dataSources = [],
-  selectedDS,
-  selectedSchema,
-  onFixWithAI,
-  selectedDSType,
-}: SQLLabResultPanelProps) {
-  // const [activeTab, setActiveTab] = useState<TabType>("results");
-
-  const isMongoDB = dataSources?.find((ds: any) => ds.id === selectedDS)?.type === "mongodb";
+}: {
+  syntaxErrors?: any[];
+  onErrorClick?: (line: number, column: number) => void;
+}) {
+  const lab = useSQLLabContext();
+  const isMongoDB = lab.selectedDSType === "mongodb";
   const errorCount = syntaxErrors.filter((e) => e.severity === 8).length;
   const warningCount = syntaxErrors.filter((e) => e.severity === 4).length;
   const totalProblems = syntaxErrors.length;
-  const effectiveTab = error ? "messages" : activeTab;
+  const effectiveTab = lab.error ? "messages" : lab.activeResultTab;
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden border-r">
@@ -109,24 +57,24 @@ export function SQLLabResultPanel({
         <div className="flex items-center gap-8 h-full font-black text-[10px] uppercase tracking-[0.2em]">
           <TabButton
             active={effectiveTab === "results"}
-            onClick={() => onTabChange("results")}
-            count={results.length}
+            onClick={() => lab.setActiveResultTab("results")}
+            count={lab.results.length}
           >
             Results
           </TabButton>
           <TabButton
             active={effectiveTab === "messages"}
-            onClick={() => onTabChange("messages")}
-            hasError={!!error}
+            onClick={() => lab.setActiveResultTab("messages")}
+            hasError={!!lab.error}
           >
             Messages{" "}
-            {error && (
+            {lab.error && (
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-1" />
             )}
           </TabButton>
           <TabButton
             active={effectiveTab === "problems"}
-            onClick={() => onTabChange("problems")}
+            onClick={() => lab.setActiveResultTab("problems")}
             count={totalProblems}
             errorCount={errorCount}
           >
@@ -134,51 +82,52 @@ export function SQLLabResultPanel({
           </TabButton>
           <TabButton
             active={effectiveTab === "charts"}
-            onClick={() => onTabChange("charts")}
+            onClick={() => lab.setActiveResultTab("charts")}
           >
             Charts
           </TabButton>
-          {!isMongoDB && selectedDSType !== "clickhouse" && (
+          {!isMongoDB && lab.selectedDSType !== "clickhouse" && (
             <TabButton
               active={effectiveTab === "lineage"}
-              onClick={() => onTabChange("lineage")}
+              onClick={() => lab.setActiveResultTab("lineage")}
             >
               Lineage
             </TabButton>
           )}
         </div>
 
-        {results.length > 0 && effectiveTab === "results" && (
-          <ExportDropdown results={results} columns={columns} />
+        {lab.results.length > 0 && effectiveTab === "results" && (
+          <ExportDropdown results={lab.results} columns={lab.columns} />
         )}
       </div>
 
       <div className="flex-1 bg-background relative overflow-hidden">
-        {executing ? (
+        {lab.executing ? (
           <LoadingState />
         ) : (
           <PanelContent
             tab={effectiveTab}
-            results={results}
-            columns={columns}
-            error={error}
+            results={lab.results}
+            columns={lab.columns}
+            error={lab.error}
             syntaxErrors={syntaxErrors}
             onErrorClick={onErrorClick}
-            sql={sql}
-            dataSources={dataSources}
-            selectedDS={selectedDS}
-            selectedSchema={selectedSchema}
-            onFixWithAI={onFixWithAI}
+            sql={lab.sql}
+            dataSources={lab.dataSources}
+            selectedDS={lab.selectedDS}
+            selectedSchema={lab.selectedSchema}
+            onFixWithAI={lab.setFixSQLError}
+            selectedDSType={lab.selectedDSType}
           />
         )}
       </div>
 
       <Footer
-        cursorPos={cursorPos}
-        tabSize={tabSize}
+        cursorPos={lab.cursorPos}
+        tabSize={lab.tabSize}
         errorCount={errorCount}
         warningCount={warningCount}
-        setActiveTab={onTabChange}
+        setActiveTab={lab.setActiveResultTab}
       />
     </div>
   );
@@ -244,6 +193,7 @@ function PanelContent({
   selectedDS,
   selectedSchema,
   onFixWithAI,
+  selectedDSType,
 }: any) {
   const isMongoDB = dataSources?.find((ds: any) => ds.id === selectedDS)?.type === "mongodb";
 
@@ -264,19 +214,35 @@ function PanelContent({
     );
   }
   if (tab === "charts") {
-    return results.length > 0 ? (
-      <ChartViewer results={results} columns={columns} />
-    ) : (
-      <EmptyState
-        icon={<Terminal className="h-12 w-12 mb-6" />}
-        title="No Data for Charts"
-        desc="Execute a query returning data to generate charts."
-      />
+    return (
+      <Suspense fallback={
+        <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse">
+          Loading charts...
+        </div>
+      }>
+        {results.length > 0 ? (
+          <ChartViewer results={results} columns={columns} />
+        ) : (
+          <EmptyState
+            icon={<Terminal className="h-12 w-12 mb-6" />}
+            title="No Data for Charts"
+            desc="Execute a query returning data to generate charts."
+          />
+        )}
+      </Suspense>
     );
   }
   if (tab === "lineage") {
     const ds = dataSources?.find((d: any) => d.id === selectedDS);
-    return <LineageViewer sql={sql} dataSource={ds} />;
+    return (
+      <Suspense fallback={
+        <div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse text-[10px] font-black uppercase tracking-widest">
+          Loading lineage...
+        </div>
+      }>
+        <LineageViewer sql={sql} dataSource={ds} />
+      </Suspense>
+    );
   }
 
   if (tab === "messages") {

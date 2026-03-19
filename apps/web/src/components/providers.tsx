@@ -10,6 +10,7 @@ import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  console.log('Providers: Rendering');
   return (
     <ThemeProvider
       attribute="class"

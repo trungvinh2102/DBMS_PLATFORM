@@ -2,13 +2,12 @@
  * @file app/auth/login/page.tsx
  * @description Login page with simplified glassmorphic design
  */
-"use client";
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useRouter } from "next/navigation";
+import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, User } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -26,7 +25,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import Link from "next/link";
 
 const formSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -34,7 +32,7 @@ const formSchema = z.object({
 });
 
 export default function LoginPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { setAuth } = useAuth();
 
   const loginMutation = useMutation({
@@ -42,7 +40,7 @@ export default function LoginPage() {
     onSuccess: (data: any) => {
       setAuth(data.token, data.user);
       toast.success("Welcome back!");
-      router.push("/"); // Or wherever 'home' is
+      navigate("/"); // Or wherever 'home' is
     },
     onError: (error: any) => {
       toast.error(error.message);
@@ -146,7 +144,7 @@ export default function LoginPage() {
             <div className="text-sm text-center text-neutral-400 pt-2">
               Don&apos;t have an account?{" "}
               <Link
-                href={"/auth/register" as any}
+                to="/auth/register"
                 className="text-white hover:text-purple-400 font-semibold transition-colors"
               >
                 Sign up

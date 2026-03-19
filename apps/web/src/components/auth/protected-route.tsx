@@ -2,10 +2,9 @@
  * @file components/auth/protected-route.tsx
  * @description Wrapper component to protect routes based on authentication and RBAC
  */
-"use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
@@ -19,22 +18,22 @@ export function ProtectedRoute({
   allowedRoles,
 }: ProtectedRouteProps) {
   const { user, token } = useAuth();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // 1. Check if user is logged in
     if (!token || !user) {
-      router.push("/auth/login" as any);
+      navigate("/auth/login", { replace: true });
       return;
     }
 
     // 2. Check Role-based access
     if (allowedRoles && allowedRoles.length > 0) {
       if (!allowedRoles.includes(user.role)) {
-        router.push("/unauthorized" as any); // Or dashboard
+        navigate("/unauthorized", { replace: true }); // Or dashboard
       }
     }
-  }, [user, token, router, allowedRoles]);
+  }, [user, token, navigate, allowedRoles]);
 
   // While checking (or if unauthorized), you might want to show a spinner or nothing
   // Ideally, valid state renders quickly.

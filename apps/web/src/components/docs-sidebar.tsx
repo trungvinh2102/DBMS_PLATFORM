@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 import {
   ChevronDown,
   BookOpen,
@@ -69,7 +68,7 @@ function SidebarSection({
           {items.map((item) => (
             <Link
               key={item.href}
-              href={item.href as any}
+              to={item.href}
               className={cn(
                 "mx-3 px-4 py-2 text-[13px] font-medium transition-all cursor-pointer rounded-md pl-10 block",
                 isActive(item.href)
@@ -110,7 +109,8 @@ export function DocsSidebarNav({
   items,
   ...props
 }: DocsSidebarNavProps) {
-  const pathname = usePathname();
+  const location = useLocation();
+  const pathname = location.pathname;
   const [currentHash, setCurrentHash] = useState("");
 
   useEffect(() => {
