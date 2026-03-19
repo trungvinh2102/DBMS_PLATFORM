@@ -38,7 +38,8 @@ import { cn } from "@/lib/utils";
 
 export function DataSettings({ settings, updateData }: any) {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-6">
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Query Performance & Limits */}
       <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm">
         <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-indigo-600" />
@@ -257,6 +258,7 @@ export function DataSettings({ settings, updateData }: any) {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
