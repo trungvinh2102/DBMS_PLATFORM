@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/card";
 import { 
   Palette, 
-  Languages, 
   Eye, 
   Zap, 
   Monitor, 
@@ -154,59 +153,6 @@ export function GeneralSettings({
             </CardContent>
           </Card>
 
-          {/* Language & Local Grid */}
-          <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm group/card">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-emerald-500 to-teal-600 transition-all group-hover/card:w-1.5" />
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-500/10 shadow-sm border border-emerald-500/20 group-hover/card:scale-110 transition-transform">
-                  <Languages className="h-5 w-5 text-emerald-500" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-                    Locale & Language
-                  </CardTitle>
-                  <CardDescription>
-                    The app currently supports English and Vietnamese.
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Active Language</Label>
-                  <Select defaultValue="en">
-                    <SelectTrigger className="bg-muted/20 border-border/40 h-12 rounded-2xl focus:ring-emerald-500/40">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">🇺🇸</span>
-                        <SelectValue placeholder="English" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">
-                        <div className="flex items-center gap-2">
-                          <span className="text-md">🇺🇸</span> English (Standard)
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="vi">
-                        <div className="flex items-center gap-2 opacity-60">
-                          <span className="text-md">🇻🇳</span> Tiếng Việt (Beta)
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3 opacity-60 pointer-events-none">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground/70">Region Settings</Label>
-                  <div className="h-12 border-2 border-dashed border-border/30 rounded-2xl flex items-center justify-center text-[11px] text-muted-foreground italic tracking-tight">
-                    Currency & Timezone Auto-detection
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Visual Comfort Section (Accessibility) */}
           <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm group/card">
