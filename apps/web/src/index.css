@@ -156,3 +156,14 @@
     scrollbar-color: var(--muted-foreground) transparent;
   }
 }
+
+@layer utilities {
+  .shadow-premium {
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 5px 15px -5px rgba(0, 0, 0, 0.02);
+  }
+  
+  .bg-gradient-premium {
+    background: linear-gradient(135deg, oklch(0.6 0.2 30), oklch(0.7 0.2 65));
+  }
+}
+

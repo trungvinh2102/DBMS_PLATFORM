@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useRef, lazy, Suspense } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
   Palette,
@@ -39,6 +40,9 @@ const DataSettings = lazy(() => import("./components/DataSettings").then((m) => 
 const AccountSettings = lazy(() => import("./components/AccountSettings").then((m) => ({ default: m.AccountSettings })));
 
 export default function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "general";
+  
   const { setTheme: setNextTheme } = useTheme();
   const store = useSettingsStore();
   const { user } = useAuth();
@@ -59,13 +63,17 @@ export default function SettingsPage() {
     onError: (err: any) => toast.error(`Save failed: ${err.message}`),
   });
 
+  const initialized = useRef(false);
+
   useEffect(() => {
-    if (dbSettings) {
-      store.updateEditor(dbSettings);
-      store.updateData(dbSettings);
+    if (dbSettings && !initialized.current) {
+      const { updateEditor, updateData } = useSettingsStore.getState();
+      updateEditor(dbSettings);
+      updateData(dbSettings);
       if (dbSettings.theme) setNextTheme(dbSettings.theme);
+      initialized.current = true;
     }
-  }, [dbSettings, setNextTheme, store]);
+  }, [dbSettings, setNextTheme]);
 
   useEffect(() => setMounted(true), []);
 
@@ -133,7 +141,11 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs 
+        value={activeTab} 
+        onValueChange={(val) => setSearchParams({ tab: val })}
+        className="space-y-4"
+      >
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-100">
           <TabsTrigger value="general">
             <Palette className="mr-2 h-4 w-4" />
