@@ -18,6 +18,8 @@ export interface SettingsState {
 
   // Data
   defaultQueryLimit: number;
+  queryTimeout: boolean;
+  autoExplain: boolean;
   showNullAs: string;
   dateTimeFormat: string;
   csvDelimiter: "," | ";";
@@ -43,7 +45,10 @@ const defaultSettings = {
   editorFormatOnPaste: true,
   editorFormatOnSave: false,
 
+  // Data
   defaultQueryLimit: 1000,
+  queryTimeout: true,
+  autoExplain: false,
   showNullAs: "(null)",
   dateTimeFormat: "YYYY-MM-DD HH:mm:ss",
   csvDelimiter: "," as const,
