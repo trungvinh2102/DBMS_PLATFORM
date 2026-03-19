@@ -1,5 +1,5 @@
 """
-backend/app.py
+app.py
 
 Main Flask application entry point.
 Initializes the app, CORS, and registers blueprints.
@@ -9,9 +9,14 @@ from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables BEFORE importing routes/services
-import sys
 # Detect if running as PyInstaller bundle
 if getattr(sys, 'frozen', False):
     base_path = os.path.dirname(sys.executable)
@@ -41,7 +46,9 @@ else:
     # Try current working directory as fallback
     load_dotenv()
 
-from routes.database import database_bp
+from routes.connection_routes import connection_bp
+from routes.metadata_routes import metadata_bp
+from routes.execution_routes import execution_bp
 from routes.auth import auth_bp
 from routes.user import user_bp
 from routes.ai import ai_bp
@@ -63,8 +70,12 @@ def create_app():
     }}, supports_credentials=True)
     # No manual headers needed, flask-cors will handle it.
 
-    # Register Blueprints
-    app.register_blueprint(database_bp, url_prefix='/api/database')
+    # Register Blueprints (Granular Database Routes)
+    app.register_blueprint(connection_bp, url_prefix='/api/database')
+    app.register_blueprint(metadata_bp, url_prefix='/api/database')
+    app.register_blueprint(execution_bp, url_prefix='/api/database')
+    
+    # Other Blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
@@ -84,29 +95,55 @@ def create_app():
         
     @app.errorhandler(404)
     def handle_404(e):
-        print(f"404 Error: {request.method} {request.path}")
         return jsonify(error="Not Found", path=request.path), 404
+
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        """Global exception handler for unhandled server errors."""
+        app.logger.error(f"Unhandled Exception: {e}", exc_info=True)
+        return jsonify(error="Internal Server Error", message=str(e)), 500
 
     return app
 
 if __name__ == '__main__':
-    # Ensure database tables are created
-    from models.metadata import Base, engine, SessionLocal
+    # Ensure database tables are created and seeded
+    from models.metadata import Base, engine, Role, User, SessionLocal
     if engine:
-        print("Backend: Creating database tables if they don't exist...")
+        logger.info("Backend: Creating database tables if they don't exist...")
         Base.metadata.create_all(engine)
+        
+        # Seed initial roles if missing
+        session = SessionLocal()
+        try:
+            if not session.query(Role).filter(Role.name == "Default").first():
+                logger.info("Backend: Seeding initial 'Default' role...")
+                session.add(Role(id="default", name="Default"))
+                session.commit()
+                logger.info("Backend: 'Default' role seeded successfully.")
+            else:
+                logger.info("Backend: 'Default' role already exists.")
+        except Exception as e:
+            logger.error(f"Backend: Failed to seed roles: {e}", exc_info=True)
+            session.rollback() # Rollback in case of error
+        finally:
+            session.close()
         
         # SEED: Create default admin if no users exist
         session = SessionLocal()
-        if session.query(User).count() == 0:
-            print("Backend: Seeding default admin user (admin / admin123)...")
-            auth_service.register({
-                "username": "admin",
-                "email": "admin@example.com",
-                "password": "admin123",
-                "fullName": "System Admin"
-            })
-        session.close()
+        try:
+            if session.query(User).count() == 0:
+                logger.info("Backend: Seeding default admin user (admin / admin123)...")
+                from services.auth_service import auth_service
+                auth_service.register({
+                    "username": "admin",
+                    "email": "admin@example.com",
+                    "password": "admin123",
+                    "name": "System Admin"
+                })
+        except Exception as e:
+            logger.error(f"Backend: Failed to seed admin user: {e}")
+        finally:
+            session.close()
         
     app = create_app()
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'

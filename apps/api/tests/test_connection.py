@@ -28,7 +28,7 @@ def test_list_databases(client, mock_session):
     assert data[0]['databaseName'] == "Test DB"
     assert data[0]['config']['password'] == "********"
 
-def test_create_database(client, mock_session):
+def test_create_database(client, mock_session, mock_engine):
     """Test creating a database encrypts password."""
     payload = {
         "databaseName": "New DB",

@@ -1,17 +1,28 @@
+"""
+crypto.py
+
+Core encryption and decryption utilities for sensitive data protection.
+Uses AES-256-CBC with PKCS7 padding.
+"""
+
 import hashlib
 import os
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
 
+from typing import Optional
+
 # Configuration from environment or defaults matching Node.js implementation
 ENV_SECRET = os.getenv("JWT_SECRET", "fallback-secret-key-must-be-secure")
 
 def get_key(secret: str) -> bytes:
+    """Derives a 32-byte key from a secret string using scrypt."""
     # Node default for scryptSync: N=16384, r=8, p=1
     return hashlib.scrypt(secret.encode(), salt=b"salt", n=16384, r=8, p=1, dklen=32)
 
-def encrypt(text: str, secret: str = None) -> str:
+def encrypt(text: str, secret: Optional[str] = None) -> str:
+    """Encrypts text using AES-256-CBC."""
     if secret is None:
         secret = ENV_SECRET
     
@@ -27,7 +38,8 @@ def encrypt(text: str, secret: str = None) -> str:
     ciphertext = encryptor.update(padded_data) + encryptor.finalize()
     return iv.hex() + ":" + ciphertext.hex()
 
-def decrypt(encrypted_text: str, secret: str = None) -> str:
+def decrypt(encrypted_text: str, secret: Optional[str] = None) -> str:
+    """Decrypts text using AES-256-CBC."""
     if secret is None:
         secret = ENV_SECRET
         
