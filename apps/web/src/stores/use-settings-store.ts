@@ -5,6 +5,9 @@ export interface SettingsState {
   // General
   theme: "light" | "dark" | "system";
   language: "en" | "vi";
+  dynamicColorInjection: boolean;
+  reducedMotion: boolean;
+  enableBlurEffects: boolean;
 
   // Editor
   editorFontSize: number;
@@ -29,12 +32,16 @@ export interface SettingsState {
   setLanguage: (lang: "en" | "vi") => void;
   updateEditor: (settings: Partial<SettingsState>) => void;
   updateData: (settings: Partial<SettingsState>) => void;
+  updateGeneral: (settings: Partial<SettingsState>) => void;
   resetDefaults: () => void;
 }
 
 const defaultSettings = {
   theme: "system" as const,
   language: "en" as const,
+  dynamicColorInjection: true,
+  reducedMotion: false,
+  enableBlurEffects: true,
 
   editorFontSize: 14,
   editorFontFamily: "'Fira Code', 'JetBrains Mono', Consolas, monospace",
@@ -63,6 +70,7 @@ export const useSettingsStore = create<SettingsState>()(
       setLanguage: (language) => set({ language }),
       updateEditor: (settings) => set((state) => ({ ...state, ...settings })),
       updateData: (settings) => set((state) => ({ ...state, ...settings })),
+      updateGeneral: (settings) => set((state) => ({ ...state, ...settings })),
       resetDefaults: () => set(defaultSettings),
     }),
     {

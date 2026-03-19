@@ -13,6 +13,7 @@ import {
   User,
   Save,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
 import {
   useSettingsStore,
@@ -67,9 +68,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (dbSettings && !initialized.current) {
-      const { updateEditor, updateData } = useSettingsStore.getState();
+      const { updateEditor, updateData, updateGeneral } = useSettingsStore.getState();
       updateEditor(dbSettings);
       updateData(dbSettings);
+      updateGeneral(dbSettings);
       if (dbSettings.theme) setNextTheme(dbSettings.theme);
       initialized.current = true;
     }
@@ -78,24 +80,16 @@ export default function SettingsPage() {
   useEffect(() => setMounted(true), []);
 
   const handleSave = async () => {
-    await updateMutation.mutateAsync({
-      theme: store.theme,
-      language: store.language,
-      editorFontSize: store.editorFontSize,
-      editorFontFamily: store.editorFontFamily,
-      editorTabSize: store.editorTabSize,
-      editorMinimap: store.editorMinimap,
-      editorWordWrap: store.editorWordWrap,
-      editorLineNumbers: store.editorLineNumbers,
-      editorFormatOnPaste: store.editorFormatOnPaste,
-      editorFormatOnSave: store.editorFormatOnSave,
-      defaultQueryLimit: store.defaultQueryLimit,
-      queryTimeout: store.queryTimeout,
-      autoExplain: store.autoExplain,
-      showNullAs: store.showNullAs,
-      dateTimeFormat: store.dateTimeFormat,
-      csvDelimiter: store.csvDelimiter,
-    });
+    // Extract only the state values from the store, excluding functions
+    const state = useSettingsStore.getState();
+    const dataToSave = Object.keys(state).reduce((acc: any, key) => {
+      if (typeof (state as any)[key] !== "function") {
+        acc[key] = (state as any)[key];
+      }
+      return acc;
+    }, {});
+
+    await updateMutation.mutateAsync(dataToSave);
     refetch();
   };
 
@@ -117,6 +111,13 @@ export default function SettingsPage() {
 
   if (!mounted) return null;
 
+  const TABS = [
+    { value: "general", label: "General", icon: Palette },
+    { value: "editor", label: "Editor", icon: Settings2 },
+    { value: "data", label: "Data", icon: Database },
+    { value: "account", label: "Account", icon: User },
+  ];
+
   return (
     <div className="container mx-auto py-10 px-4 md:px-8 max-w-6xl">
       <header className="flex items-center justify-between mb-8">
@@ -137,8 +138,13 @@ export default function SettingsPage() {
           >
             <RotateCcw className="mr-2 h-4 w-4" /> Reset
           </Button>
-          <Button onClick={handleSave}>
-            <Save className="mr-2 h-4 w-4" /> Save
+          <Button onClick={handleSave} disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Save
           </Button>
         </div>
       </header>
@@ -149,28 +155,20 @@ export default function SettingsPage() {
         className="space-y-4"
       >
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-100">
-          <TabsTrigger value="general">
-            <Palette className="mr-2 h-4 w-4" />
-            General
-          </TabsTrigger>
-          <TabsTrigger value="editor">
-            <Settings2 className="mr-2 h-4 w-4" />
-            Editor
-          </TabsTrigger>
-          <TabsTrigger value="data">
-            <Database className="mr-2 h-4 w-4" />
-            Data
-          </TabsTrigger>
-          <TabsTrigger value="account">
-            <User className="mr-2 h-4 w-4" />
-            Account
-          </TabsTrigger>
+          {TABS.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              <tab.icon className="mr-2 h-4 w-4" />
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <Suspense fallback={<SettingsCardSkeleton />}>
           <TabsContent value="general">
             <GeneralSettings
               theme={store.theme}
+              settings={store}
+              updateGeneral={store.updateGeneral}
               onThemeChange={(t) => {
                 if (t) {
                   store.setTheme(t as any);
