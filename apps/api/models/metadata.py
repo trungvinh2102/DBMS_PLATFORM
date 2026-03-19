@@ -90,6 +90,8 @@ class User(Base):
     username = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
     name = Column(String)
+    avatarUrl = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)
     roleId = Column(String, ForeignKey("roles.id"), nullable=False)
 
     role = relationship("Role")

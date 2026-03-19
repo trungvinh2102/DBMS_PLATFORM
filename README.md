@@ -1,6 +1,6 @@
 # DBMS Platform
 
-A modern, high-performance Database Management System platform built with a Next.js frontend, Flask backend, and cross-platform Desktop support.
+A modern, high-performance Database Management System platform built with a ReactJS frontend, Flask backend, and cross-platform Desktop support.
 
 ## 🚀 Quick Launch
 
@@ -35,7 +35,7 @@ To generate a fresh `.exe` installer:
 
 ## 🛠️ Architecture
 
-- **Frontend (`apps/web`)**: Next.js 15, TailwindCSS, shadcn/ui, TanStack Query.
+- **Frontend (`apps/web`)**: ReactJS 19, TailwindCSS, shadcn/ui, TanStack Query.
 - **Backend (`apps/api`)**: Flask (Python), PostgreSQL, SQLAlchemy.
 - **Desktop (`apps/desktop`)**: Tauri wrapper with automated backend lifecycle management.
 

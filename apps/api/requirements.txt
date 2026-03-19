@@ -21,5 +21,6 @@ google-generativeai
 # ClickHouse
 clickhouse-connect
 
-# Redis
+# Utils
 redis
+cloudinary

@@ -32,7 +32,7 @@ import { ModeToggle } from "./mode-toggle";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { userApi } from "@/lib/api-client";
+import { userApi, resolveUrl } from "@/lib/api-client";
 
 // Sample data from app-sidebar.tsx
 const data = {
@@ -138,7 +138,7 @@ export function Header() {
                   )}
                 >
                   <Avatar className="h-8 w-8">
-                    {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
+                    {user.avatarUrl && <AvatarImage src={resolveUrl(user.avatarUrl)} alt={user.name || ""} />}
                     <AvatarFallback className="bg-primary/10 text-primary">
                       {user.name && user.name.trim().length > 0
                         ? user.name
@@ -153,10 +153,13 @@ export function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56" align="end">
                   <DropdownMenuGroup>
-                    <DropdownMenuLabel className="font-normal">
+                    <DropdownMenuLabel 
+                      className="font-normal cursor-pointer hover:bg-muted/50 transition-colors rounded-sm" 
+                      onClick={() => navigate("/settings?tab=account")}
+                    >
                       <div className="flex items-center gap-2 text-sm">
                         <Avatar className="h-8 w-8">
-                          {/* <AvatarImage src={user.avatar} alt={user.name || ""} /> */}
+                          {user.avatarUrl && <AvatarImage src={resolveUrl(user.avatarUrl)} alt={user.name || ""} />}
                           <AvatarFallback>
                             {user.name && user.name.trim().length > 0
                               ? user.name
@@ -183,7 +186,7 @@ export function Header() {
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/settings?tab=account")}>
                       <BadgeCheck className="mr-2 h-4 w-4" />
                       Account
                     </DropdownMenuItem>

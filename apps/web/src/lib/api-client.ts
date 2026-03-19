@@ -145,6 +145,8 @@ export const userApi = {
   getMe: () => req(api.get("user/me")),
   getSettings: () => req(api.get("user/settings")),
   updateSettings: (data: any) => req(api.post("user/settings", data)),
+  updateProfile: (data: { name?: string; avatarUrl?: string; bio?: string }) => req(api.post("user/profile", data)),
+  changePassword: (data: any) => req(api.post("user/change-password", data)),
 };
 
 export const aiApi = {
@@ -152,6 +154,14 @@ export const aiApi = {
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
   fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
+};
+
+export const resolveUrl = (path: string | null | undefined) => {
+  if (!path) return "";
+  if (path.startsWith("http") || path.startsWith("data:")) return path;
+  // Remove /api/ from end of baseURL and append path
+  const base = getBaseURL().replace(/\/api\/$/, "");
+  return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
 export { api };

@@ -17,6 +17,31 @@ def get_me():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@user_bp.route('/profile', methods=['POST'])
+@login_required
+def update_profile():
+    data = request.json
+    try:
+        res = user_service.update_profile(g.user['userId'], data)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@user_bp.route('/change-password', methods=['POST'])
+@login_required
+def change_password():
+    data = request.json
+    try:
+        old_password = data.get('oldPassword')
+        new_password = data.get('newPassword')
+        if not old_password or not new_password:
+            return jsonify({'error': 'Old and new passwords are required'}), 400
+            
+        res = user_service.change_password(g.user['userId'], old_password, new_password)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @user_bp.route('/settings', methods=['GET'])
 @login_required
 def get_settings():
