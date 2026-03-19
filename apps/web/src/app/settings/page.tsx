@@ -90,6 +90,8 @@ export default function SettingsPage() {
       editorFormatOnPaste: store.editorFormatOnPaste,
       editorFormatOnSave: store.editorFormatOnSave,
       defaultQueryLimit: store.defaultQueryLimit,
+      queryTimeout: store.queryTimeout,
+      autoExplain: store.autoExplain,
       showNullAs: store.showNullAs,
       dateTimeFormat: store.dateTimeFormat,
       csvDelimiter: store.csvDelimiter,
