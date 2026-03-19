@@ -5,7 +5,7 @@
 
 "use client";
 
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { Plus, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ export function QuickActions() {
       </CardHeader>
       <CardContent className="grid gap-4 flex-1">
         <div className="grid grid-cols-2 gap-4">
-          <Link href="/sqllab" className="block h-full">
+          <Link to="/sqllab" className="block h-full">
             <Button
               variant="outline"
               className="w-full h-24 flex flex-col gap-3 items-center justify-center hover:bg-primary/5 hover:border-primary/30 transition-all border-dashed"
@@ -35,7 +35,7 @@ export function QuickActions() {
               <span className="font-semibold">Open SQL Lab</span>
             </Button>
           </Link>
-          <Link href="/connections" className="block h-full">
+          <Link to="/connections" className="block h-full">
             <Button
               variant="outline"
               className="w-full h-24 flex flex-col gap-3 items-center justify-center hover:bg-blue-500/5 hover:border-blue-500/30 transition-all border-dashed"

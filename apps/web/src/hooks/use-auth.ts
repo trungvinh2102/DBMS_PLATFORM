@@ -33,7 +33,7 @@ export const useAuth = create<AuthState>()(
           setCookie("auth-token", token, {
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
-            secure: process.env.NODE_ENV === "production",
+            secure: import.meta.env.PROD,
             sameSite: "lax",
           });
         } catch (e) {

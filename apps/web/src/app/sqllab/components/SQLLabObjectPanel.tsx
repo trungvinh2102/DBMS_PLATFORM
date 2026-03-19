@@ -8,8 +8,9 @@ import {
   ChevronRight,
   Table,
   RotateCcw,
-  Search,
   Loader2,
+  Table as TableIcon,
+  Search,
   Info,
   Clock,
   ChevronLeft,
@@ -34,8 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SQLLabDataTable } from "./SQLLabDataTable";
 
-import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
+import { useState } from "react";
 import { useTheme } from "next-themes";
 import {
   EmptyObjectSelection,
@@ -48,30 +48,7 @@ import {
   ScriptTabView,
 } from "./ObjectPanelTabs";
 
-// Dynamically import Monaco Editor to avoid heavy bundle and hydration mismatch
-const Editor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
-
-interface SQLLabObjectPanelProps {
-  activeRightTab: string;
-  setActiveRightTab: (tab: string) => void;
-  selectedSchema: string;
-  selectedTable: string | null;
-  selectedObjectType?: string;
-  onRefreshTables: () => void;
-  loadingTData: boolean;
-  currentTData: any[];
-  currentTColumns: string[];
-  executionTime?: number;
-  isLoadingColumns: boolean;
-  columnsData: any[] | undefined;
-  indexes?: any[];
-  foreignKeys?: any[];
-  tableInfo?: any;
-  tableDDL?: string;
-  triggers?: string[];
-  isRelational: boolean;
-  selectedDSType?: string;
-}
+import { useSQLLabContext } from "../context/SQLLabContext";
 
 const ObjectIcon = ({
   selectedObjectType,
@@ -92,57 +69,35 @@ const ObjectIcon = ({
     case "trigger":
       return <Zap className="h-3.5 w-3.5 text-green-500 shrink-0" />;
     default:
-      return <Table className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
+      return <TableIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
   }
 };
 
-export function SQLLabObjectPanel({
-  activeRightTab,
-  setActiveRightTab,
-  selectedSchema,
-  selectedTable,
-  selectedObjectType,
-  onRefreshTables,
-  loadingTData,
-  currentTData,
-  currentTColumns,
-  executionTime,
-  isLoadingColumns,
-  columnsData,
-  indexes,
-  foreignKeys,
-  tableInfo,
-  tableDDL,
-  triggers,
-  isRelational,
-  selectedDSType,
-}: SQLLabObjectPanelProps) {
+export function SQLLabObjectPanel() {
+  const lab = useSQLLabContext();
   const [structureSearch, setStructureSearch] = useState("");
   const { theme } = useTheme();
-  // Use the same custom themes as the main SQLEditor to prevent global theme override
   const monacoTheme = theme === "dark" ? "querypie-dark" : "querypie-light";
 
-  // availableTabs is determined based on selectedObjectType
   let availableTabs = [
     "Data",
     "Structure",
     "Index",
-    ...(isRelational && selectedDSType !== "clickhouse" ? ["Relation", "Trigger"] : []),
+    ...(lab.isRelational && lab.selectedDSType !== "clickhouse" ? ["Relation", "Trigger"] : []),
     "Info",
-    ...(isRelational ? ["Script"] : []),
+    ...(lab.isRelational ? ["Script"] : []),
   ];
-  if (selectedObjectType === "view") {
-    availableTabs = ["Data", "Structure", "Info", ...(isRelational ? ["Script"] : [])];
+  if (lab.selectedObjectType === "view") {
+    availableTabs = ["Data", "Structure", "Info", ...(lab.isRelational ? ["Script"] : [])];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
-      selectedObjectType || "",
+      lab.selectedObjectType || "",
     )
   ) {
-    availableTabs = ["Info", ...(isRelational ? ["Script"] : [])];
+    availableTabs = ["Info", ...(lab.isRelational ? ["Script"] : [])];
   }
 
-  // Ensure we always have a valid tab selected even if state is slightly behind
-  const activeTabLower = activeRightTab.toLowerCase();
+  const activeTabLower = lab.activeRightTab.toLowerCase();
   const lowerTabs = availableTabs.map((t) => t.toLowerCase());
   const effectiveTab = lowerTabs.includes(activeTabLower)
     ? activeTabLower
@@ -154,7 +109,7 @@ export function SQLLabObjectPanel({
         {availableTabs.map((t) => (
           <button
             key={t}
-            onClick={() => setActiveRightTab(t.toLowerCase())}
+            onClick={() => lab.setActiveRightTab(t.toLowerCase())}
             className={cn(
               "px-5 h-full text-[10px] font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap",
               effectiveTab === t.toLowerCase()
@@ -169,11 +124,11 @@ export function SQLLabObjectPanel({
 
       <div className="flex items-center h-10 px-5 bg-background border-b text-[10px] text-muted-foreground/60 gap-2 shrink-0 font-bold uppercase tracking-tight">
         <Database className="h-3.5 w-3.5 opacity-40 shrink-0" />
-        <span className="text-foreground/80 truncate">{selectedSchema}</span>
+        <span className="text-foreground/80 truncate">{lab.selectedSchema}</span>
         <ChevronRight className="h-3 w-3 opacity-20 shrink-0" />
-        <ObjectIcon selectedObjectType={selectedObjectType} />
+        <ObjectIcon selectedObjectType={lab.selectedObjectType} />
         <span className="text-foreground/80 truncate">
-          {selectedTable || "UNSELECTED"}
+          {lab.selectedTable || "UNSELECTED"}
         </span>
 
         <div className="ml-auto flex items-center gap-3">
@@ -181,11 +136,11 @@ export function SQLLabObjectPanel({
             variant="ghost"
             size="icon"
             className="h-7 w-7 opacity-50 hover:opacity-100"
-            onClick={onRefreshTables}
+            onClick={lab.refetchTables}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          {effectiveTab === "data" && currentTData.length > 0 && (
+          {effectiveTab === "data" && lab.currentTData.length > 0 && (
             <>
               <div className="w-px h-4 bg-border/60" />
               <DropdownMenu>
@@ -202,10 +157,10 @@ export function SQLLabObjectPanel({
                   <DropdownMenuItem
                     onClick={() =>
                       exportData(
-                        currentTData,
-                        currentTColumns,
+                        lab.currentTData,
+                        lab.currentTColumns,
                         "csv",
-                        selectedTable || "table_data",
+                        lab.selectedTable || "table_data",
                       )
                     }
                     className="cursor-pointer"
@@ -216,10 +171,10 @@ export function SQLLabObjectPanel({
                   <DropdownMenuItem
                     onClick={() =>
                       exportData(
-                        currentTData,
-                        currentTColumns,
+                        lab.currentTData,
+                        lab.currentTColumns,
                         "xlsx",
-                        selectedTable || "table_data",
+                        lab.selectedTable || "table_data",
                       )
                     }
                     className="cursor-pointer"
@@ -235,39 +190,39 @@ export function SQLLabObjectPanel({
       </div>
 
       <div className="flex-1 overflow-auto bg-background scrollbar-thin">
-        {!selectedTable ? (
+        {!lab.selectedTable ? (
           <EmptyObjectSelection />
         ) : effectiveTab === "data" ? (
           <DataTabView
-            loadingTData={loadingTData}
-            currentTData={currentTData}
-            currentTColumns={currentTColumns}
+            loadingTData={lab.loadingTData}
+            currentTData={lab.currentTData}
+            currentTColumns={lab.currentTColumns}
           />
         ) : effectiveTab === "structure" ? (
           <StructureTabView
-            isLoadingColumns={isLoadingColumns}
-            columnsData={columnsData}
+            isLoadingColumns={lab.isLoadingColumns}
+            columnsData={lab.allColumns as any}
             structureSearch={structureSearch}
             setStructureSearch={setStructureSearch}
           />
         ) : effectiveTab === "index" ? (
-          <IndexTabView indexes={indexes} />
+          <IndexTabView indexes={lab.indexes} />
         ) : effectiveTab === "relation" ? (
-          <RelationTabView foreignKeys={foreignKeys} />
+          <RelationTabView foreignKeys={lab.foreignKeys} />
         ) : effectiveTab === "trigger" ? (
-          <TriggerTabView triggers={triggers} />
+          <TriggerTabView triggers={lab.triggers} />
         ) : effectiveTab === "info" ? (
-          <InfoTabView tableInfo={tableInfo} />
+          <InfoTabView tableInfo={lab.tableInfo} />
         ) : effectiveTab === "script" ? (
-          <ScriptTabView tableDDL={tableDDL} monacoTheme={monacoTheme} />
+          <ScriptTabView tableDDL={lab.tableDDL} monacoTheme={monacoTheme} />
         ) : (
           <div className="flex items-center justify-center h-full p-16 text-center text-muted-foreground/5 font-black uppercase tracking-[1em] text-[10px]">
-            {activeRightTab}
+            {lab.activeRightTab}
           </div>
         )}
       </div>
 
-      {activeRightTab === "data" && currentTData.length > 0 && (
+      {lab.activeRightTab === "data" && lab.currentTData.length > 0 && (
         <div className="h-11 border-t flex items-center justify-between px-5 bg-muted/5 shrink-0 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">
           <div className="flex items-center gap-4">
             <button className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center">

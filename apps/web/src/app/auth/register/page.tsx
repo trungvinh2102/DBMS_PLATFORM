@@ -2,13 +2,12 @@
  * @file app/auth/register/page.tsx
  * @description Register page with simplified glassmorphic design
  */
-"use client";
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useRouter } from "next/navigation";
+import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, User, Mail, UserCircle } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -26,7 +25,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import Link from "next/link";
 
 const formSchema = z
   .object({
@@ -42,7 +40,7 @@ const formSchema = z
   });
 
 export default function RegisterPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { setAuth } = useAuth();
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
@@ -52,7 +50,7 @@ export default function RegisterPage() {
     onSuccess: (data: any) => {
       setAuth(data.token, data.user);
       toast.success("Account created successfully!");
-      router.push("/");
+      navigate("/");
     },
     onError: (error: any) => {
       toast.error(error.message);
@@ -240,7 +238,7 @@ export default function RegisterPage() {
             <div className="text-sm text-center text-neutral-400 pt-2">
               Already have an account?{" "}
               <Link
-                href={"/auth/login" as any}
+                to="/auth/login"
                 className="text-white hover:text-blue-400 font-semibold transition-colors"
               >
                 Sign in

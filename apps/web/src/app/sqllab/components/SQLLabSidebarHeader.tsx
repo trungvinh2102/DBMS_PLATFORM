@@ -17,31 +17,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface SQLLabSidebarHeaderProps {
-  dataSources: DataSource[];
-  selectedDS: string;
-  setSelectedDS: (id: string) => void;
-  selectedDSData?: DataSource;
-  schemas: string[];
-  selectedSchema: string;
-  setSelectedSchema: (schema: string) => void;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  getDBIcon: (type: string) => React.ReactNode;
-}
+import { useSQLLabContext } from "../context/SQLLabContext";
 
 export function SQLLabSidebarHeader({
-  dataSources,
-  selectedDS,
-  setSelectedDS,
-  selectedDSData,
-  schemas,
-  selectedSchema,
-  setSelectedSchema,
   searchQuery,
   setSearchQuery,
   getDBIcon,
-}: SQLLabSidebarHeaderProps) {
+}: {
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  getDBIcon: (type: string) => React.ReactNode;
+}) {
+  const lab = useSQLLabContext();
+  const selectedDSData = lab.dataSources?.find((ds) => ds.id === lab.selectedDS);
   return (
     <div className="p-3 pb-4 flex flex-col gap-3 border-b border-border/40">
       <DropdownMenu>
@@ -62,13 +50,13 @@ export function SQLLabSidebarHeader({
           </div>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-68 ml-2 shadow-2xl rounded-2xl border-muted-foreground/10 bg-background/95 backdrop-blur-md">
-          {dataSources.map((ds) => (
+          {lab.dataSources.map((ds: any) => (
             <DropdownMenuItem
               key={ds.id}
-              onClick={() => setSelectedDS(ds.id)}
+              onClick={() => lab.setSelectedDS(ds.id)}
               className={cn(
                 "flex items-center gap-3 py-2.5 px-3 cursor-pointer rounded-xl m-1",
-                selectedDS === ds.id
+                lab.selectedDS === ds.id
                   ? "bg-primary/10 text-primary font-bold"
                   : "hover:bg-muted/50",
               )}
@@ -90,8 +78,8 @@ export function SQLLabSidebarHeader({
       {/* Schema/Database Selector */}
       <div className="w-full py-1 flex items-center gap-2">
         <Select
-          value={selectedSchema}
-          onValueChange={(val) => val && setSelectedSchema(val)}
+          value={lab.selectedSchema}
+          onValueChange={(val) => val && lab.setSelectedSchema(val)}
         >
           <SelectTrigger className="w-full h-10 text-xs font-bold bg-muted/40 border border-border/40 hover:bg-muted/60 transition-all rounded-xl px-4 gap-2.5 shadow-sm outline-none ring-0 focus:ring-1 focus:ring-primary/20">
             <div className="flex items-center gap-2 flex-1 truncate">
@@ -103,7 +91,7 @@ export function SQLLabSidebarHeader({
             </div>
           </SelectTrigger>
           <SelectContent className="rounded-2xl border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5">
-            {schemas.map((s) => (
+            {lab.schemas.map((s: any) => (
               <SelectItem
                 key={s}
                 value={s}

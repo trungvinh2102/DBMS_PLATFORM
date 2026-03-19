@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { DB_TYPES } from "../components/constants";
 import { toast } from "sonner";
 import { databaseApi } from "@/lib/api-client";

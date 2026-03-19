@@ -66,7 +66,7 @@ def create_app():
     
     # Configure CORS - Allow Tauri origins explicitly when supporting credentials
     CORS(app, resources={r"/api/*": {
-        "origins": ["tauri://localhost", "http://tauri.localhost", "http://localhost:3001", "http://127.0.0.1:3001"]
+        "origins": ["tauri://localhost", "http://tauri.localhost", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3002", "http://127.0.0.1:3002"]
     }}, supports_credentials=True)
     # No manual headers needed, flask-cors will handle it.
 

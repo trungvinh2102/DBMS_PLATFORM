@@ -1,22 +1,11 @@
 /**
  * @file page.tsx
  * @description Main Connections page component for managing database connections.
- * This file serves as the container for connection listing, creation, and configuration.
- *
- * @performance Implements lazy loading for conditional components:
- * - ConnectionConfig: Only loads when a connection is selected for editing
- * - DeleteConnectionDialog: Only loads when delete dialog is triggered
- *
- * @example
- * // Next.js page component
- * export default function ConnectionsPage() ...
  */
 
 "use client";
 
-import { Suspense } from "react";
-import dynamic from "next/dynamic";
-
+import { Suspense, lazy } from "react";
 import { ConnectionTable } from "./components/ConnectionTable";
 import { ConnectionsHeader } from "./components/ConnectionsHeader";
 import { useConnectionsPage } from "./hooks/use-connections-page";
@@ -30,26 +19,8 @@ import {
 } from "@/components/ui/breadcrumb";
 
 // Lazy-loaded components for conditional rendering
-const ConnectionConfig = dynamic(
-  () => import("./components/ConnectionConfig").then((m) => m.ConnectionConfig),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="animate-pulse space-y-4 p-8">
-        <div className="h-8 w-48 bg-muted rounded" />
-        <div className="h-64 bg-muted rounded-lg" />
-      </div>
-    ),
-  },
-);
-
-const DeleteConnectionDialog = dynamic(
-  () =>
-    import("./components/DeleteConnectionDialog").then(
-      (m) => m.DeleteConnectionDialog,
-    ),
-  { ssr: false },
-);
+const ConnectionConfig = lazy(() => import("./components/ConnectionConfig").then((m) => ({ default: m.ConnectionConfig })));
+const DeleteConnectionDialog = lazy(() => import("./components/DeleteConnectionDialog").then((m) => ({ default: m.DeleteConnectionDialog })));
 
 export default function ConnectionsPage() {
   return (
@@ -125,7 +96,9 @@ function ConnectionsContent() {
               </Breadcrumb>
             </div>
             <div className="flex-1 overflow-auto p-8">
-              <ConnectionConfig activeConn={activeConn} onBack={handleBack} />
+              <Suspense fallback={<div className="animate-pulse space-y-4 p-8"><div className="h-8 w-48 bg-muted rounded" /><div className="h-64 bg-muted rounded-lg" /></div>}>
+                <ConnectionConfig activeConn={activeConn} onBack={handleBack} />
+              </Suspense>
             </div>
           </div>
         ) : (
@@ -169,12 +142,14 @@ function ConnectionsContent() {
         )}
       </main>
 
-      <DeleteConnectionDialog
-        deleteId={deleteId}
-        onOpenChange={(open) => !open && setDeleteId(null)}
-        onConfirm={confirmDelete}
-        isDeleting={isDeleting}
-      />
+      <Suspense fallback={null}>
+        <DeleteConnectionDialog
+          deleteId={deleteId}
+          onOpenChange={(open) => !open && setDeleteId(null)}
+          onConfirm={confirmDelete}
+          isDeleting={isDeleting}
+        />
+      </Suspense>
     </div>
   );
 }

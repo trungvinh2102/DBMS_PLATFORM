@@ -7,8 +7,8 @@ import axios from "axios";
 import { useAuth } from "@/hooks/use-auth";
 
 const getBaseURL = () => {
-    // Priority 1: Environment variable set at build time (Next.js)
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    // Priority 1: Environment variable set at build time (Vite)
+    const envUrl = import.meta.env.VITE_API_URL;
     if (envUrl && envUrl !== "undefined") {
         return envUrl.endsWith("/") ? envUrl : `${envUrl}/`;
     }

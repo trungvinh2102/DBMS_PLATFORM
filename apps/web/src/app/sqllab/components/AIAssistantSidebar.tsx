@@ -26,25 +26,10 @@ interface Message {
   isActionable?: boolean;
 }
 
-interface AIAssistantSidebarProps {
-  show: boolean;
-  onClose: () => void;
-  onApplySQL: (sql: string) => void;
-  databaseId: string;
-  schema?: string;
-  currentSQL?: string;
-  fixSQLError?: string | null;
-}
+import { useSQLLabContext } from "../context/SQLLabContext";
 
-export function AIAssistantSidebar({
-  show,
-  onClose,
-  onApplySQL,
-  databaseId,
-  schema,
-  currentSQL,
-  fixSQLError,
-}: AIAssistantSidebarProps) {
+export function AIAssistantSidebar() {
+  const lab = useSQLLabContext();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -74,16 +59,10 @@ export function AIAssistantSidebar({
   });
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    if (lab.fixSQLError && lab.sql && lab.showAISidebar) {
+      handleFix(lab.sql, lab.fixSQLError);
     }
-  }, [messages, isTyping]);
-
-  useEffect(() => {
-    if (fixSQLError && currentSQL && show) {
-      handleFix(currentSQL, fixSQLError);
-    }
-  }, [fixSQLError, show]);
+  }, [lab.fixSQLError, lab.showAISidebar]);
 
   const handleFix = async (sql: string, error: string) => {
     setIsTyping(true);
@@ -91,8 +70,8 @@ export function AIAssistantSidebar({
       const response = await fixSQLMutation.mutateAsync({
         sql,
         error,
-        databaseId,
-        schema,
+        databaseId: lab.selectedDS,
+        schema: lab.selectedSchema,
       });
       const assistantMessage: Message = {
         id: Date.now().toString(),
@@ -113,7 +92,7 @@ export function AIAssistantSidebar({
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
 
-    if (!databaseId) {
+    if (!lab.selectedDS) {
       toast.error("Please select a database connection first.");
       return;
     }
@@ -131,8 +110,8 @@ export function AIAssistantSidebar({
     try {
       const response = await generateSQLMutation.mutateAsync({
         prompt: input,
-        databaseId,
-        schema,
+        databaseId: lab.selectedDS,
+        schema: lab.selectedSchema,
       });
 
       const assistantMessage: Message = {
@@ -173,8 +152,8 @@ export function AIAssistantSidebar({
     try {
       const response = await optimizeSQLMutation.mutateAsync({
         sql,
-        databaseId,
-        schema,
+        databaseId: lab.selectedDS,
+        schema: lab.selectedSchema,
       });
       const assistantMessage: Message = {
         id: Date.now().toString(),
@@ -191,7 +170,7 @@ export function AIAssistantSidebar({
     }
   };
 
-  if (!show) return null;
+  if (!lab.showAISidebar) return null;
 
   return (
     <div className="w-full h-full flex flex-col glass animate-in fade-in slide-in-from-right duration-500 relative">
@@ -206,7 +185,7 @@ export function AIAssistantSidebar({
         <Button
           variant="ghost"
           size="icon"
-          onClick={onClose}
+          onClick={() => lab.setShowAISidebar(false)}
           className="h-8 w-8 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted"
         >
           <X className="h-4 w-4" />
@@ -281,7 +260,10 @@ export function AIAssistantSidebar({
 
                   <Button
                     className="w-full mt-2 h-9 bg-primary hover:bg-primary/90 text-primary-foreground border-none text-[11px] font-black uppercase tracking-[0.2em]"
-                    onClick={() => onApplySQL(message.sql!)}
+                    onClick={() => {
+                      lab.setSql(message.sql!);
+                      toast.success("AI SQL inserted into editor");
+                    }}
                   >
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Apply Query
@@ -311,7 +293,6 @@ export function AIAssistantSidebar({
             className="pr-14 py-7 rounded-2xl border-border focus-visible:ring-primary/30 bg-background shadow-inner text-sm"
           />
           <Button
-            size="icon"
             className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-xl bg-primary hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 active:scale-95"
             onClick={handleSend}
             disabled={isTyping || !input.trim()}
