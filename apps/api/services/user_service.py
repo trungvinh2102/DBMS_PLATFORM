@@ -1,6 +1,7 @@
 """
-backend/services/user_service.py
-User service for profile and settings.
+user_service.py
+
+User service for managing profiles, settings, and preferences.
 """
 from models.metadata import User, UserSetting, SessionLocal
 import uuid

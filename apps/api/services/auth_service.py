@@ -1,6 +1,7 @@
 """
-backend/services/auth_service.py
-Auth service for handling login and registration.
+auth_service.py
+
+Authentication service for handling user login, registration, and JWT token management.
 """
 import jwt
 import datetime

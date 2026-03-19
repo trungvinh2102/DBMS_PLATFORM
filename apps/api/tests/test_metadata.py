@@ -6,32 +6,26 @@ Tests for metadata fetching (schemas, tables, columns).
 
 from unittest.mock import MagicMock
 
-def test_get_tables(client, mock_session, mock_engine):
+def test_get_tables(client, mock_session, mock_engine, mocker):
     """Test fetching tables returns table names."""
     _, mock_conn = mock_engine
     
-    # Setup mock DB config retrieval first
-    # We need to mock get_db_config (BaseService) OR just mock the session query behavior
+    # Setup mock DB config retrieval
     db_mock = MagicMock()
     db_mock.type = "postgres"
     db_mock.config = {"user": "u", "password": "p"}
     mock_session.query.return_value.filter.return_value.first.return_value = db_mock
     
-    # Setup execution result
-    mock_result = MagicMock()
-    mock_result.__iter__.return_value = [("table1",), ("table2",)]
-    mock_conn.execute.return_value = mock_result
+    # Mock SQLAlchemy inspect
+    mock_inspect = mocker.patch("services.metadata.sql_provider.inspect")
+    mock_inspector = mock_inspect.return_value
+    mock_inspector.get_table_names.return_value = ["table1", "table2"]
     
     response = client.get('/api/database/tables?databaseId=123&schema=public')
     assert response.status_code == 200
     assert response.json == ["table1", "table2"]
-    
-    # Verify query params
-    call_args = mock_conn.execute.call_args
-    # First arg is SQL text, second is params
-    assert call_args[0][1] == {"schema": "public"}
 
-def test_get_columns(client, mock_session, mock_engine):
+def test_get_columns(client, mock_session, mock_engine, mocker):
     """Test fetching columns maps types correctly."""
     _, mock_conn = mock_engine
     
@@ -40,13 +34,13 @@ def test_get_columns(client, mock_session, mock_engine):
     db_mock.config = {}
     mock_session.query.return_value.filter.return_value.first.return_value = db_mock
     
-    # Mock result: name, type, is_nullable
-    mock_result = MagicMock()
-    mock_result.__iter__.return_value = [
-        ("id", "integer", "NO"),
-        ("name", "text", "YES")
+    # Mock SQLAlchemy inspect
+    mock_inspect = mocker.patch("services.metadata.sql_provider.inspect")
+    mock_inspector = mock_inspect.return_value
+    mock_inspector.get_columns.return_value = [
+        {"name": "id", "type": "INTEGER", "nullable": False},
+        {"name": "name", "type": "TEXT", "nullable": True}
     ]
-    mock_conn.execute.return_value = mock_result
     
     response = client.get('/api/database/columns?databaseId=1&table=users')
     assert response.status_code == 200

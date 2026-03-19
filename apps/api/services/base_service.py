@@ -1,14 +1,17 @@
 """
-backend/services/base_service.py
+base_service.py
 
-Base service for database operations providing shared functionality.
+Base service for database operations providing shared functionality like connection management.
 """
 
+from typing import Tuple, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from models.metadata import Db, SessionLocal
-from utils.common import decrypt_uri
 from sqlalchemy import create_engine, pool
 import logging
+
+from models.metadata import Db, SessionLocal
+from utils.common import decrypt_uri
+from utils.connection_utils import ConnectionStringBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +23,12 @@ _redis_cache = {}  # Map db_id -> client
 class BaseDatabaseService:
     """
     Base class for services interacting with database configurations.
+    Provides shared methods for config retrieval, caching, and engine creation.
     """
 
     @staticmethod
     def invalidate_cache(db_id: str):
+        """Removes and disposes cached connections for a specific database."""
         if db_id in _engine_cache:
             engine = _engine_cache.pop(db_id)
             try:
@@ -37,16 +42,17 @@ class BaseDatabaseService:
             try:
                 client.close()
             except Exception as e:
-                logger.error(e)
+                logger.error(f"Failed to close Mongo client for {db_id}: {e}")
 
         if db_id in _redis_cache:
             client = _redis_cache.pop(db_id)
             try:
                 client.close()
             except Exception as e:
-                logger.error(e)
+                logger.error(f"Failed to close Redis client for {db_id}: {e}")
 
-    def get_db_config(self, db_id: str, session: Session):
+    def get_db_config(self, db_id: str, session: Session) -> Tuple[str, Dict[str, Any]]:
+        """Retrieves and decrypts database configuration."""
         db = session.query(Db).filter(Db.id == db_id).first()
         if not db:
             raise Exception(f"Database connection with ID {db_id} not found")
@@ -58,15 +64,19 @@ class BaseDatabaseService:
         if config.get('password') and config['password'] != '********':
             try:
                 config['password'] = decrypt(config['password'])
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Password decryption skipped: {e}")
         
         if config.get('uri'):
             config['uri'] = decrypt_uri(config['uri'])
             
         return db.type.lower() if db.type else "unknown", config
 
-    def create_connection_engine(self, db_type, config, db_id=None):
+    def create_connection_engine(self, db_type: str, config: Dict[str, Any], db_id: Optional[str] = None):
+        """
+        Creates a SQLAlchemy engine for the given configuration.
+        Uses caching if db_id is provided.
+        """
         if db_id and db_id in _engine_cache:
             return _engine_cache[db_id]
 
@@ -78,87 +88,13 @@ class BaseDatabaseService:
             return None
 
         if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse']:
-            raise Exception(f"Database type '{db_type}' is not supported.")
+            raise Exception(f"Database type '{db_type}' is not supported via SQLAlchemy.")
 
-        mssql_driver = None
-        if db_type == 'mssql':
-            try:
-                import pyodbc
-                print('pyodbc.drivers() ', pyodbc.drivers())
-                drivers = pyodbc.drivers()
-                logger.info(f"Available ODBC drivers: {drivers}")
-                for d in [
-                    "ODBC Driver 18 for SQL Server",
-                    "ODBC Driver 17 for SQL Server",
-                    "SQL Server"
-                ]:
-                    if d in drivers:
-                        mssql_driver = d
-                        break
-                logger.info(f"Using MSSQL driver: {mssql_driver}")
-            except Exception as e:
-                logger.error(f"ODBC driver detection failed: {e}")
-
-        conn_str = ""
-
-        # ✅ HANDLE URI
-        if config.get('uri'):
-            uri = config['uri'].strip()
-
-            if (uri.startswith('"') and uri.endswith('"')) or (uri.startswith("'") and uri.endswith("'")):
-                uri = uri[1:-1].strip()
-
-            conn_str = uri.replace('localhost', '127.0.0.1')
-
-            if conn_str.startswith('postgres://'):
-                conn_str = conn_str.replace('postgres://', 'postgresql+psycopg2://')
-            elif conn_str.startswith('postgresql://'):
-                conn_str = conn_str.replace('postgresql://', 'postgresql+psycopg2://')
-            elif conn_str.startswith('mysql://'):
-                conn_str = conn_str.replace('mysql://', 'mysql+pymysql://')
-            elif conn_str.startswith('mssql://') or conn_str.startswith('sqlserver://'):
-                conn_str = conn_str.replace('sqlserver://', 'mssql+pyodbc://')
-                conn_str = conn_str.replace('mssql://', 'mssql+pyodbc://')
-
-                if "driver=" not in conn_str:
-                    driver = (mssql_driver or "ODBC Driver 17 for SQL Server").replace(" ", "+")
-                    separator = "&" if "?" in conn_str else "?"
-                    conn_str += f"{separator}driver={driver}&TrustServerCertificate=yes"
-
-        else:
-            user = config.get('user')
-            password = config.get('password')
-            host = config.get('host', '127.0.0.1')
-            port = config.get('port')
-            dbname = config.get('database', '')
-
-            if db_type == 'postgres':
-                port = port or 5432
-                conn_str = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
-
-            elif db_type == 'mysql':
-                port = port or 3306
-                conn_str = f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
-
-            elif db_type == 'mssql':
-                port = port or 1433
-                driver = (mssql_driver or "ODBC Driver 17 for SQL Server").replace(" ", "+")
-
-                conn_str = (
-                    f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}"
-                    f"?driver={driver}&TrustServerCertificate=yes"
-                )
-
-            elif db_type == 'sqlite':
-                conn_str = f"sqlite:///{dbname}"
-
-            elif db_type == 'clickhouse':
-                port = port or 8123
-                conn_str = f"clickhousedb://{user}:{password}@{host}:{port}/{dbname}"
-
-        # Mask log
+        conn_str = ConnectionStringBuilder.build_uri(db_type, config)
+        
+        # Mask credentials in logs
         masked_conn_str = '***' + conn_str.split('@')[-1] if '@' in conn_str else conn_str
-        logger.info(f"Connecting with: {masked_conn_str}")
+        logger.info(f"Connecting to {db_type} with: {masked_conn_str}")
 
         try:
             engine = create_engine(
@@ -179,7 +115,77 @@ class BaseDatabaseService:
             logger.error(f"Connection FAILED: {e}")
             raise Exception(f"Failed to connect to {db_type}: {str(e)}")
 
+    def get_mongo_client(self, db_id: str, session: Session):
+        """Acquires a cached or new pymongo MongoClient."""
+        if db_id in _mongo_cache:
+            client = _mongo_cache[db_id]
+            # Verify connection is still alive
+            try:
+                client.admin.command('ping')
+                return client, _mongo_cache.get(f"{db_id}_db", "test")
+            except:
+                self.invalidate_cache(db_id)
+
+        from pymongo import MongoClient
+        _, config = self.get_db_config(db_id, session)
+        
+        uri = config.get('uri')
+        if uri:
+            if 'authSource' not in uri:
+                separator = '&' if '?' in uri else '?'
+                uri = f"{uri}{separator}authSource=admin"
+            client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+            default_db = config.get('database', 'test')
+        else:
+            client = MongoClient(
+                host=config.get('host', '127.0.0.1'),
+                port=int(config.get('port', 27017)),
+                username=config.get('user'),
+                password=config.get('password'),
+                authSource=config.get('authSource', 'admin'),
+                serverSelectionTimeoutMS=5000
+            )
+            default_db = config.get('database', 'test')
+        
+        _mongo_cache[db_id] = client
+        _mongo_cache[f"{db_id}_db"] = default_db
+        return client, default_db
+
+    def get_redis_client(self, db_id: str, session: Session):
+        """Acquires a cached or new redis-py client."""
+        if db_id in _redis_cache:
+            client = _redis_cache[db_id]
+            try:
+                client.ping()
+                return client, _redis_cache.get(f"{db_id}_db", 0)
+            except:
+                self.invalidate_cache(db_id)
+
+        import redis
+        _, config = self.get_db_config(db_id, session)
+        
+        uri = config.get('uri')
+        if uri:
+            client = redis.Redis.from_url(uri, socket_connect_timeout=5, decode_responses=True)
+            default_db = 0 # Extracted from URI? Usually encoded in path
+        else:
+            client = redis.Redis(
+                host=config.get('host', '127.0.0.1'),
+                port=int(config.get('port', 6379)),
+                username=config.get('user'),
+                password=config.get('password'),
+                db=int(config.get('database', 0)),
+                socket_connect_timeout=5,
+                decode_responses=True
+            )
+            default_db = int(config.get('database', 0))
+            
+        _redis_cache[db_id] = client
+        _redis_cache[f"{db_id}_db"] = default_db
+        return client, default_db
+
     def run_dynamic_query(self, database_id: str, callback):
+        """Helper to run a callback function using a database connection."""
         session = SessionLocal()
         connection = None
         try:
@@ -187,13 +193,13 @@ class BaseDatabaseService:
             engine = self.create_connection_engine(db_type, config, db_id=database_id)
 
             if not engine:
-                raise Exception(f"{db_type} does not support SQL queries")
+                raise Exception(f"{db_type} does not support standard SQL queries via SQLAlchemy.")
 
             connection = engine.connect()
             return callback(connection)
 
         except Exception as e:
-            logger.error(f"Query error: {e}")
+            logger.error(f"Query execution error for {database_id}: {e}")
             raise e
 
         finally:

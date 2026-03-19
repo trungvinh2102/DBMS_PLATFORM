@@ -1,11 +1,14 @@
 """
-backend/utils/common.py
+common.py
 
 Utility functions for common operations like configuration masking and encryption wrappers.
 """
 
 from utils.crypto import encrypt, decrypt
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def mask_config(config: dict) -> dict:
     """
@@ -46,8 +49,11 @@ def decrypt_uri(uri: str) -> str:
         str: The decrypted URI, or the original if decryption fails.
     """
     try:
+        if not uri:
+            return uri
         return decrypt(uri)
-    except:
+    except Exception as e:
+        logger.debug(f"URI decryption skipped or failed: {e}")
         return uri
 
 def encrypt_uri(uri: str) -> str:
@@ -65,5 +71,5 @@ def encrypt_uri(uri: str) -> str:
     # Simple check if already encrypted (iv:ciphertext format expectation)
     # IV is 16 bytes = 32 hex chars usually. Loosely check for colon.
     if ":" in uri and len(uri.split(":")[0]) == 32: 
-            return uri
+        return uri
     return encrypt(uri)

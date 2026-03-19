@@ -7,11 +7,6 @@ from functools import wraps
 from flask import request, jsonify, g
 import jwt
 import os
-
-from functools import wraps
-from flask import request, jsonify, g
-import jwt
-import os
 from models.metadata import User, SessionLocal
 
 SECRET_KEY = os.getenv("JWT_SECRET", "secret")
