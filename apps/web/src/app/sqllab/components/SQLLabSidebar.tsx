@@ -50,7 +50,7 @@ export function SQLLabSidebar() {
   const lab = useSQLLabContext();
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
-  const selectedDSData = lab.dataSources?.find((ds) => ds.id === lab.selectedDS);
+  const selectedDSData = lab.dataSources?.find((ds: DataSource) => ds.id === lab.selectedDS);
 
   const filterList = (list?: string[]) =>
     list?.filter((item) =>
@@ -108,7 +108,7 @@ export function SQLLabSidebar() {
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
+            if (e.key === "Enter") {
               e.preventDefault();
               toggleFolder(id);
             }
@@ -166,7 +166,7 @@ export function SQLLabSidebar() {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
+                    if (e.key === "Enter") {
                       e.preventDefault();
                       lab.setSelectedTable(item);
                     }

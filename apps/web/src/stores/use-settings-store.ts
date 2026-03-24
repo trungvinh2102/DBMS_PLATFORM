@@ -18,6 +18,7 @@ export interface SettingsState {
   editorLineNumbers: "on" | "off" | "relative" | "interval";
   editorFormatOnPaste: boolean;
   editorFormatOnSave: boolean;
+  editorLigatures: boolean;
 
   // Data
   defaultQueryLimit: number;
@@ -26,6 +27,7 @@ export interface SettingsState {
   showNullAs: string;
   dateTimeFormat: string;
   csvDelimiter: "," | ";";
+  resultEncoding: string;
 
   // Actions
   setTheme: (theme: "light" | "dark" | "system") => void;
@@ -51,6 +53,7 @@ const defaultSettings = {
   editorLineNumbers: "on" as const,
   editorFormatOnPaste: true,
   editorFormatOnSave: false,
+  editorLigatures: true,
 
   // Data
   defaultQueryLimit: 1000,
@@ -59,6 +62,7 @@ const defaultSettings = {
   showNullAs: "(null)",
   dateTimeFormat: "YYYY-MM-DD HH:mm:ss",
   csvDelimiter: "," as const,
+  resultEncoding: "UTF-8",
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -78,3 +82,4 @@ export const useSettingsStore = create<SettingsState>()(
     },
   ),
 );
+

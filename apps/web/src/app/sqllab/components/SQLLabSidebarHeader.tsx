@@ -29,7 +29,7 @@ export function SQLLabSidebarHeader({
   getDBIcon: (type: string) => React.ReactNode;
 }) {
   const lab = useSQLLabContext();
-  const selectedDSData = lab.dataSources?.find((ds) => ds.id === lab.selectedDS);
+  const selectedDSData = lab.dataSources?.find((ds: DataSource) => ds.id === lab.selectedDS);
   return (
     <div className="p-3 pb-4 flex flex-col gap-3 border-b border-border/40">
       <DropdownMenu>

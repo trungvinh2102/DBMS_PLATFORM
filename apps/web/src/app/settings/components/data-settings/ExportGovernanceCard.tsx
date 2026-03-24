@@ -74,19 +74,26 @@ export function ExportGovernanceCard({ settings, updateData }: ExportGovernanceC
               <Globe className="h-4 w-4 text-emerald-500/70" />
               Result Encoding
             </Label>
-            <Select defaultValue="UTF-8">
-              <SelectTrigger className="bg-muted/20 border-border/40 focus:bg-background h-10 opacity-70">
-                <SelectValue placeholder="UTF-8" />
+            <Select 
+              value={settings.resultEncoding}
+              onValueChange={(val) => val && updateData({ resultEncoding: val })}
+            >
+              <SelectTrigger className="bg-muted/20 border-border/40 focus:bg-background h-10 transition-all focus:ring-1 focus:ring-emerald-500/50">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="UTF-8">UTF-8 (International / Recommended)</SelectItem>
                 <SelectItem value="UTF-16">UTF-16 LE (Windows)</SelectItem>
                 <SelectItem value="ASCII">US-ASCII</SelectItem>
-                <SelectItem value="ISO">ISO-8859-1</SelectItem>
+                <SelectItem value="ISO-8859-1">ISO-8859-1</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2 pt-1">
-              <Switch checked={true} disabled className="scale-75 origin-left" />
+              <Switch 
+                checked={settings.includeBOM || false} 
+                onCheckedChange={(c) => updateData({ includeBOM: !!c })}
+                className="scale-75 origin-left" 
+              />
               <span className="text-[10px] text-muted-foreground">Include Byte Order Mark (BOM)</span>
             </div>
           </div>

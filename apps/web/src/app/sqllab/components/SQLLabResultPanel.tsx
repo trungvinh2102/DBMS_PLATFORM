@@ -97,7 +97,7 @@ export function SQLLabResultPanel({
         </div>
 
         {lab.results.length > 0 && effectiveTab === "results" && (
-          <ExportDropdown results={lab.results} columns={lab.columns} />
+          <ExportDropdown results={lab.results} columns={lab.columns} encoding={lab.resultEncoding} />
         )}
       </div>
 
@@ -128,6 +128,7 @@ export function SQLLabResultPanel({
         errorCount={errorCount}
         warningCount={warningCount}
         setActiveTab={lab.setActiveResultTab}
+        encoding={lab.resultEncoding}
       />
     </div>
   );
@@ -292,7 +293,7 @@ function EmptyState({ icon, title, desc }: any) {
   );
 }
 
-function ExportDropdown({ results, columns }: any) {
+function ExportDropdown({ results, columns, encoding }: any) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -305,14 +306,14 @@ function ExportDropdown({ results, columns }: any) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => exportData(results, columns, "csv", "query_results")}
+          onClick={() => exportData(results, columns, "csv", "query_results", encoding)}
           className="cursor-pointer"
         >
           <FileText className="mr-2 h-4 w-4" />
           <span>Export as CSV</span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => exportData(results, columns, "xlsx", "query_results")}
+          onClick={() => exportData(results, columns, "xlsx", "query_results", encoding)}
           className="cursor-pointer"
         >
           <FileSpreadsheet className="mr-2 h-4 w-4" />
@@ -329,12 +330,13 @@ function Footer({
   errorCount,
   warningCount,
   setActiveTab,
+  encoding = "UTF-8",
 }: any) {
   return (
     <footer className="h-10 border-t bg-background flex items-center justify-between px-5 text-[10px] font-black text-muted-foreground/60 overflow-hidden shrink-0 uppercase tracking-widest divide-x divide-border/40">
       <div className="flex items-center gap-8 h-full">
         <span className="flex items-center gap-2.5 hover:bg-muted px-4 cursor-pointer transition-colors h-full">
-          <Database className="h-4 w-4 text-primary/60" /> UTF-8
+          <Database className="h-4 w-4 text-primary/60" /> {encoding}
         </span>
         <span className="hover:bg-muted px-4 cursor-pointer transition-colors h-full flex items-center">
           LN {cursorPos.lineNumber}, COL {cursorPos.column}

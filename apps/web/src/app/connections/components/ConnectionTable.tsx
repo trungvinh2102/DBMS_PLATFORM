@@ -14,6 +14,7 @@ interface ConnectionTableProps {
   onEdit: (conn: any) => void;
   onDelete: (id: string) => void;
   onUpdate: (conn: any) => void;
+  onRowSelectionChange?: (selectedIds: string[]) => void;
 }
 
 export function ConnectionTable({
@@ -21,12 +22,19 @@ export function ConnectionTable({
   onEdit,
   onDelete,
   onUpdate,
+  onRowSelectionChange,
 }: ConnectionTableProps) {
   const { columns } = useConnectionColumns({ onEdit, onDelete, onUpdate });
 
   return (
-    <div className="w-full">
-      <DataTable columns={columns} data={connections || []} />
+    <div className="w-full h-full overflow-auto">
+      <DataTable 
+        columns={columns} 
+        data={connections || []} 
+        onSelectionChange={(rows) => {
+          onRowSelectionChange?.(rows.map((row: any) => row.id));
+        }}
+      />
     </div>
   );
 }

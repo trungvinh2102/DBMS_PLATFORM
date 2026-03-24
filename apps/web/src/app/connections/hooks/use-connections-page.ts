@@ -204,6 +204,15 @@ export function useConnectionsPage() {
       handleOpenUpdate,
       handleDelete,
       confirmDelete,
+      handleBulkDelete: async (ids: string[]) => {
+        try {
+          await Promise.all(ids.map(id => deleteMutation.mutateAsync({ id })));
+          toast.success(`${ids.length} connections deleted`);
+          refetch();
+        } catch (error: any) {
+          toast.error("Failed to delete some connections");
+        }
+      },
       handleEdit,
       handleBack,
       refetch,

@@ -168,7 +168,28 @@ def init_engine():
         masked_url = '***' + url[url.find('@'):]
     print(f"Backend: Target: {masked_url}")
     
-    return create_engine(url), url
+    engine = create_engine(url)
+    
+    # Test connection. If failure happens, fallback if frozen.
+    try:
+        with engine.connect() as conn:
+            pass
+    except Exception as e:
+        print(f"WARNING: Database connection to {masked_url} failed: {e}")
+        if getattr(sys, 'frozen', False) and not url.startswith("sqlite"):
+            print("Backend: Falling back to local SQLite database for Desktop...")
+            app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
+            data_dir = os.path.join(app_data, 'DBMSPlatform')
+            
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir, exist_ok=True)
+            
+            db_path = os.path.join(data_dir, 'dbms_platform.db').replace('\\', '/')
+            url = f"sqlite:///{db_path}"
+            engine = create_engine(url)
+            print(f"Backend: Fallback Target established: local sqlite")
+            
+    return engine, url
 
 # Initialize engine immediately at module level
 try:

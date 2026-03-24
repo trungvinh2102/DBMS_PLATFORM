@@ -5,6 +5,7 @@
 
 import { Database, Hash, Info, Zap, Clock, CheckCircle2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -57,17 +58,32 @@ export function QueryPerformanceCard({ settings, updateData }: QueryPerformanceC
                 Maximum number of rows to fetch in the SQL Lab by default.
               </p>
             </div>
-            <Badge variant="secondary" className="px-3 py-1 font-mono text-blue-500 bg-blue-500/5 border-blue-500/10 shadow-inner">
-              <Zap className="h-3 w-3 mr-1.5 inline animate-pulse" />
-              {settings.defaultQueryLimit} rows
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={settings.defaultQueryLimit}
+                onChange={(e) => updateData({ defaultQueryLimit: parseInt(e.target.value) || 10 })}
+                className="w-20 h-8 text-[11px] font-bold text-center bg-blue-500/5 border-blue-500/10 focus:ring-1 focus:ring-blue-500/30 px-1"
+                min={10}
+                max={5000}
+                step={10}
+              />
+              <Badge variant="secondary" className="px-3 py-1 font-mono text-blue-500 bg-blue-500/5 border-blue-500/10 shadow-inner">
+                <Zap className="h-3 w-3 mr-1.5 inline animate-pulse" />
+                {settings.defaultQueryLimit} rows
+              </Badge>
+            </div>
           </div>
           <Slider
             value={[settings.defaultQueryLimit]}
             min={10}
             max={5000}
             step={10}
-            onValueChange={(val: any) => updateData({ defaultQueryLimit: Array.isArray(val) ? val[0] : val })}
+            onValueChange={(val) => {
+              if (Array.isArray(val) && typeof val[0] === 'number') {
+                updateData({ defaultQueryLimit: val[0] });
+              }
+            }}
             className="py-4"
           />
           <div className="flex justify-between text-[10px] text-muted-foreground font-medium uppercase tracking-wider px-1">

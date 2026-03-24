@@ -53,16 +53,30 @@ export function EditorAppearanceCard({ settings, updateEditor }: EditorAppearanc
                 <TextCursorInput className="h-4 w-4 text-orange-500/70" />
                 Font Size
               </Label>
-              <Badge variant="secondary" className="px-3 bg-orange-500/5 text-orange-600 border-orange-500/10 font-mono">
-                {settings.editorFontSize}px
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={settings.editorFontSize}
+                  onChange={(e) => updateEditor({ editorFontSize: parseInt(e.target.value) || 10 })}
+                  className="w-16 h-7 text-[11px] font-bold text-center bg-orange-500/5 border-orange-500/10 focus:ring-1 focus:ring-orange-500/30 px-1"
+                  min={10}
+                  max={24}
+                />
+                <Badge variant="secondary" className="px-3 bg-orange-500/5 text-orange-600 border-orange-500/10 font-mono">
+                  {settings.editorFontSize}px
+                </Badge>
+              </div>
             </div>
             <Slider
               value={[settings.editorFontSize]}
               min={10}
               max={24}
               step={1}
-              onValueChange={(val: any) => updateEditor({ editorFontSize: Array.isArray(val) ? val[0] : val })}
+              onValueChange={(val) => {
+                if (Array.isArray(val) && typeof val[0] === 'number') {
+                  updateEditor({ editorFontSize: val[0] });
+                }
+              }}
               className="py-2"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">
@@ -127,14 +141,17 @@ export function EditorAppearanceCard({ settings, updateEditor }: EditorAppearanc
             />
           </div>
 
-          <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between group/item hover:bg-orange-500/5 transition-all opacity-50 select-none">
+          <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between group/item hover:bg-orange-500/5 transition-all">
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs font-bold font-mono">
                 {"=>"} Ligatures
               </div>
-              <p className="text-[10px] text-muted-foreground">Coming soon.</p>
+              <p className="text-[10px] text-muted-foreground">Enable modern programming font ligatures.</p>
             </div>
-            <Switch checked={false} disabled />
+            <Switch 
+              checked={settings.editorLigatures} 
+              onCheckedChange={(c) => updateEditor({ editorLigatures: !!c })} 
+            />
           </div>
         </div>
       </CardContent>

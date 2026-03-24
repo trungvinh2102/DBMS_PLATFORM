@@ -22,10 +22,47 @@ class AuthService:
         self.algorithm = "HS256"
 
     def verify_password(self, plain_password, hashed_password):
-        return pwd_context.verify(plain_password, hashed_password)
+        # bcrypt has a 72-byte limit. We truncate to ensure compliance.
+        try:
+            if not plain_password:
+                return False
+            
+            # Ensure we have bytes for measurement
+            if isinstance(plain_password, str):
+                p_bytes = plain_password.encode('utf-8')
+            else:
+                p_bytes = plain_password
+            
+            # Truncate to exactly 72 bytes
+            truncated_bytes = p_bytes[:72]
+            safe_str = truncated_bytes.decode('utf-8', errors='ignore')
+            
+            # Diagnostic for debugging in desktop app
+            print(f"Auth Service: Verifying password (input_len={len(p_bytes)}, truncated_len={len(truncated_bytes)}, is_str={isinstance(safe_str, str)})")
+            
+            # Call passlib/bcrypt. It should be happy with a string of up to 72 bytes
+            return pwd_context.verify(safe_str, hashed_password)
+        except Exception as e:
+            # Diagnostic: include lengths in error to see if truncation actually happened
+            p_len = len(plain_password) if plain_password else 0
+            # If the user sees this prefix, they ARE running this updated code.
+            raise Exception(f"Auth verification error [len={p_len}]: {str(e)}")
 
     def get_password_hash(self, password):
-        return pwd_context.hash(password)
+        # bcrypt has a 72-byte limit.
+        if not password:
+             return pwd_context.hash("")
+        
+        # Ensure bytes and truncate
+        if isinstance(password, str):
+            p_bytes = password.encode('utf-8')
+        else:
+            p_bytes = password
+            
+        truncated_bytes = p_bytes[:72]
+        safe_str = truncated_bytes.decode('utf-8', errors='ignore')
+        print(f"Auth Service: Hashing password (input_len={len(p_bytes)}, truncated_len={len(truncated_bytes)}, is_str={isinstance(safe_str, str)})")
+        return pwd_context.hash(safe_str)
 
     def create_access_token(self, data: dict):
         to_encode = data.copy()
@@ -35,13 +72,20 @@ class AuthService:
         return encoded_jwt
 
     def login(self, identifier, password):
+        print(f"Backend: Login attempt for '{identifier}', type(password)={type(password)}, len={len(password) if hasattr(password, '__len__') else 'N/A'}")
         session = SessionLocal()
         try:
             # Try username first, then email
             user = session.query(User).filter(
                 (User.username == identifier) | (User.email == identifier)
             ).first()
-            if not user or not self.verify_password(password, user.password):
+            if not user:
+                print(f"Backend: User '{identifier}' not found.")
+                return None
+            
+            # Verify password
+            if not self.verify_password(password, user.password):
+                print(f"Backend: Password verify failed for '{identifier}'.")
                 return None
             
             # Fetch role name (lazy load or join)

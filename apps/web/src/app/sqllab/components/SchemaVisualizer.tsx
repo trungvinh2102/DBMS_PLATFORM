@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import dagre from "dagre";
 import type {
   NodeProps,
   Edge,
@@ -7,6 +8,7 @@ import type {
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   Handle,
   Position,
@@ -64,6 +66,43 @@ const nodeTypes = {
   table: TableNode,
 };
 
+const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = "LR") => {
+  const isHorizontal = direction === "LR";
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+  
+  const nodeWidth = 320;
+  const nodeHeight = 350;
+  
+  dagreGraph.setGraph({ rankdir: direction, nodesep: 70, ranksep: 100 });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    return {
+      ...node,
+      targetPosition: isHorizontal ? Position.Left : Position.Top,
+      sourcePosition: isHorizontal ? Position.Right : Position.Bottom,
+      // We are shifting the dagre node position (which is center-based) to top-left-based for React Flow
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges };
+};
+
 interface SchemaVisualizerProps {
   tables: string[];
   columns: Record<string, any[]>;
@@ -78,17 +117,17 @@ export function SchemaVisualizer({ tables, columns, foreignKeys, databaseName }:
   const currentTheme = (resolvedTheme || theme || "light") as "light" | "dark";
 
   const { nodes, edges } = useMemo(() => {
-    const nodes: Node[] = tables.map((tableName, index) => ({
+    const rawNodes: Node[] = tables.map((tableName) => ({
       id: tableName,
       type: "table",
-      position: { x: (index % 4) * 350, y: Math.floor(index / 4) * 450 },
+      position: { x: 0, y: 0 },
       data: {
         label: tableName,
         columns: columns[tableName] || [],
       },
     }));
 
-    const edges: Edge[] = foreignKeys.map((fk, index) => ({
+    const rawEdges: Edge[] = foreignKeys.map((fk, index) => ({
       id: `e-${index}`,
       source: fk.table,
       target: fk.foreignTable,
@@ -106,7 +145,8 @@ export function SchemaVisualizer({ tables, columns, foreignKeys, databaseName }:
       },
     }));
 
-    return { nodes, edges };
+    // Apply Dagre Layout
+    return getLayoutedElements(rawNodes, rawEdges);
   }, [tables, columns, foreignKeys, currentTheme]);
 
   if (!tables.length) {
@@ -148,8 +188,17 @@ export function SchemaVisualizer({ tables, columns, foreignKeys, databaseName }:
           fitView
           colorMode={currentTheme}
           proOptions={{ hideAttribution: true }}
+          panActivationKeyCode={null}
+          selectionKeyCode={null}
+          multiSelectionKeyCode={null}
+          deleteKeyCode={null}
         >
-          <Background gap={24} size={1} color="currentColor" className="opacity-[0.03] dark:opacity-[0.07]" />
+          <Background 
+            variant={BackgroundVariant.Dots} 
+            gap={20} 
+            size={1.5} 
+            color={currentTheme === 'dark' ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.2)"} 
+          />
           <Controls className="bg-background border border-border shadow-xl fill-foreground!" />
         </ReactFlow>
       </div>
@@ -220,8 +269,17 @@ function SchemaDetailsDialog({
             fitView
             colorMode={theme}
             proOptions={{ hideAttribution: true }}
+            panActivationKeyCode={null}
+            selectionKeyCode={null}
+            multiSelectionKeyCode={null}
+            deleteKeyCode={null}
           >
-            <Background gap={24} size={1} color="currentColor" className="opacity-[0.03] dark:opacity-[0.07]" />
+            <Background 
+              variant={BackgroundVariant.Dots} 
+              gap={20} 
+              size={1.5} 
+              color={theme === 'dark' ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.2)"} 
+            />
             <Controls className="bg-background border border-border shadow-xl fill-foreground!" />
           </ReactFlow>
         </div>

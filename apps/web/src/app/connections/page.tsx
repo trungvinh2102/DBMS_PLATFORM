@@ -5,10 +5,12 @@
 
 "use client";
 
-import { Suspense, lazy } from "react";
+import { useState, Suspense, lazy } from "react";
 import { ConnectionTable } from "./components/ConnectionTable";
 import { ConnectionsHeader } from "./components/ConnectionsHeader";
 import { useConnectionsPage } from "./hooks/use-connections-page";
+import { Button } from "@/components/ui/button";
+import { Trash } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -38,6 +40,7 @@ export default function ConnectionsPage() {
 
 function ConnectionsContent() {
   const { state, data, handlers } = useConnectionsPage();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const {
     activeConn,
@@ -68,6 +71,7 @@ function ConnectionsContent() {
     handleOpenUpdate,
     handleBack,
     confirmDelete,
+    handleBulkDelete,
   } = handlers;
 
   return (
@@ -104,9 +108,11 @@ function ConnectionsContent() {
         ) : (
           <div className="h-full flex flex-col">
             <div className="flex-1 flex flex-col p-8 space-y-6">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                DB Connections
-              </h1>
+              <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  DB Connections
+                </h1>
+              </div>
 
               <ConnectionsHeader
                 searchQuery={searchQuery}
@@ -124,12 +130,33 @@ function ConnectionsContent() {
                 setEditingId={setEditingId}
               />
 
-              <div className="flex-1 min-h-0 border border-slate-200 dark:border-border rounded-lg overflow-hidden bg-white dark:bg-background">
+              <div className="flex-1 min-h-0 border border-slate-200 dark:border-border rounded-lg overflow-hidden bg-white dark:bg-background flex flex-col">
+                {selectedIds.length > 0 && (
+                  <div className="px-4 py-2 border-b border-slate-100 dark:border-border bg-slate-50/50 dark:bg-accent/20 flex items-center justify-between animate-in slide-in-from-top-1 duration-200">
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                      {selectedIds.length} connection{selectedIds.length > 1 ? 's' : ''} selected
+                    </span>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 gap-2 shadow-sm font-bold"
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to delete ${selectedIds.length} connections?`)) {
+                          handleBulkDelete(selectedIds).then(() => setSelectedIds([]));
+                        }
+                      }}
+                    >
+                      <Trash className="h-4 w-4" />
+                      Delete Selected
+                    </Button>
+                  </div>
+                )}
                 <ConnectionTable
                   connections={filteredConnections as unknown as any[]}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onUpdate={handleOpenUpdate}
+                  onRowSelectionChange={setSelectedIds}
                 />
               </div>
 

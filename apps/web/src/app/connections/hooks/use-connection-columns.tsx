@@ -98,20 +98,30 @@ export function useConnectionColumns({
     {
       id: "select",
       header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-          className="translate-y-0.5 border-slate-300 dark:border-slate-600"
-        />
+        <div className="flex items-center justify-center p-2 cursor-pointer" onClick={(e) => {
+          e.stopPropagation();
+          table.toggleAllPageRowsSelected(!table.getIsAllPageRowsSelected());
+        }}>
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            className="border-slate-300 dark:border-slate-600 pointer-events-none"
+          />
+        </div>
       ),
       cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-          className="translate-y-0.5 border-slate-300 dark:border-slate-600"
-        />
+        <div className="flex items-center justify-center p-2 cursor-pointer" onClick={(e) => {
+          e.stopPropagation();
+          row.toggleSelected(!row.getIsSelected());
+        }}>
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+            className="border-slate-300 dark:border-slate-600 pointer-events-none"
+          />
+        </div>
       ),
       enableSorting: false,
       enableHiding: false,
@@ -242,7 +252,7 @@ export function useConnectionColumns({
             onClick={(e) => e.stopPropagation()}
           >
             <TestConnectionButton conn={conn} />
-            <Link href={`/sqllab?ds=${conn.id}` as any}>
+            <Link to={`/sqllab?ds=${conn.id}`}>
               <Button
                 variant="ghost"
                 size="icon"

@@ -1,16 +1,26 @@
 import { Info, Database, Loader2, Search, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SQLLabDataTable } from "./SQLLabDataTable";
+import { cn } from "@/lib/utils";
 import React, { lazy, Suspense } from "react";
 const Editor = lazy(() => import("@monaco-editor/react"));
 
 export function EmptyObjectSelection() {
   return (
-    <div className="flex flex-col items-center justify-center h-full p-16 text-center gap-6 text-muted-foreground/10">
-      <Info className="h-16 w-16" />
-      <p className="text-xs font-black uppercase tracking-[0.3em]">
-        Pick an Object
-      </p>
+    <div className="flex flex-col items-center justify-center h-full p-12 text-center">
+      <div className="flex flex-col items-center justify-center p-16 gap-6 rounded-3xl border-2 border-dashed border-border/40 bg-muted/5 max-w-sm mx-auto transition-all hover:bg-muted/10 group">
+        <div className="h-20 w-20 rounded-full bg-muted/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+          <Info className="h-10 w-10 text-muted-foreground/40" />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground/60">
+            Select an Object
+          </p>
+          <p className="text-[10px] text-muted-foreground/40 font-medium px-4">
+            Pick a table or view from the sidebar to explore its structure and data.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -129,23 +139,24 @@ export function IndexTabView({ indexes }: any) {
       <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
         Indexes
       </h4>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {indexes && indexes.length > 0 ? (
           indexes.map((idx: any) => (
             <div
               key={idx.indexname}
-              className="p-3 bg-muted/20 border border-border/30 rounded-lg text-xs"
+              className="p-4 bg-muted/20 border border-border/50 rounded-lg shadow-sm dark:shadow-none hover:bg-muted/30 transition-all group"
             >
-              <div className="font-bold text-foreground/90 mb-1">
+              <div className="font-bold text-foreground/90 mb-1.5 flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-blue-500/50" />
                 {idx.indexname}
               </div>
-              <div className="font-mono text-muted-foreground text-[10px] break-all">
+              <div className="font-mono text-muted-foreground text-[10px] break-all bg-muted/30 p-2 rounded border border-border/20">
                 {idx.indexdef}
               </div>
             </div>
           ))
         ) : (
-          <div className="text-muted-foreground/40 text-xs italic">
+          <div className="text-muted-foreground/40 text-xs italic p-10 text-center border border-dashed border-border/40 rounded-lg bg-muted/5">
             No indexes found
           </div>
         )}
@@ -160,27 +171,30 @@ export function RelationTabView({ foreignKeys }: any) {
       <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
         Foreign Keys
       </h4>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {foreignKeys && foreignKeys.length > 0 ? (
           foreignKeys.map((fk: any) => (
             <div
               key={fk.constraint}
-              className="p-3 bg-muted/20 border border-border/30 rounded-lg text-xs"
+              className="p-4 bg-muted/20 border border-border/50 rounded-lg shadow-sm dark:shadow-none hover:bg-muted/30 transition-all group"
             >
-              <div className="font-bold text-foreground/90 mb-1">
+              <div className="font-bold text-foreground/90 mb-2 flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-purple-500/50" />
                 {fk.constraint}
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <span className="font-mono text-[11px]">{fk.column}</span>
-                <ChevronRight className="h-3 w-3" />
-                <span className="font-mono">
+              <div className="flex items-center gap-2.5 text-muted-foreground bg-muted/30 p-2 rounded border border-border/20">
+                <span className="font-mono text-[11px] font-bold text-foreground/70">
+                  {fk.column}
+                </span>
+                <ChevronRight className="h-3 w-3 opacity-40" />
+                <span className="font-mono text-[11px]">
                   {fk.foreignTable}.{fk.foreignColumn}
                 </span>
               </div>
             </div>
           ))
         ) : (
-          <div className="text-muted-foreground/40 text-xs italic">
+          <div className="text-muted-foreground/40 text-xs italic p-10 text-center border border-dashed border-border/40 rounded-lg bg-muted/5">
             No foreign keys found
           </div>
         )}
@@ -195,15 +209,21 @@ export function TriggerTabView({ triggers }: any) {
       <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
         Triggers
       </h4>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {triggers && triggers.length > 0 ? (
           triggers.map((trg: any) => (
-            <div key={trg} className="p-3 bg-muted/20 rounded-lg text-xs">
-              <div className="font-bold">{trg}</div>
+            <div
+              key={trg}
+              className="p-4 bg-muted/20 border border-border/50 rounded-lg shadow-sm dark:shadow-none hover:bg-muted/30 transition-all flex items-center gap-3"
+            >
+              <div className="h-1.5 w-1.5 rounded-full bg-green-500/50" />
+              <div className="font-bold text-[11px] tracking-tight text-foreground/90">
+                {trg}
+              </div>
             </div>
           ))
         ) : (
-          <div className="text-muted-foreground/40 text-xs italic">
+          <div className="text-muted-foreground/40 text-xs italic p-10 text-center border border-dashed border-border/40 rounded-lg bg-muted/5">
             No triggers found
           </div>
         )}
@@ -214,47 +234,36 @@ export function TriggerTabView({ triggers }: any) {
 
 export function InfoTabView({ tableInfo }: any) {
   return (
-    <div className="p-5">
-      <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em] mb-4">
-        Table Statistics
-      </h4>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h4 className="text-[10px] font-black text-muted-foreground/70 uppercase tracking-[0.2em]">
+          Table Statistics
+        </h4>
+        <div className="h-px flex-1 bg-border/40 ml-4" />
+      </div>
       {tableInfo ? (
         <div className="grid grid-cols-2 gap-4">
-          <div className="p-3 bg-muted/20 rounded-lg">
-            <div className="text-[10px] opacity-50 uppercase font-black">
-              Row Count
+          {[
+            { label: "Row Count", value: tableInfo.row_count, color: "text-blue-500" },
+            { label: "Total Size", value: tableInfo.total_size, color: "text-purple-500" },
+            { label: "Data Size", value: tableInfo.data_size, color: "text-emerald-500" },
+            { label: "Index Size", value: tableInfo.index_size, color: "text-orange-500" },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="p-4 bg-muted/20 border border-border/50 rounded-lg shadow-sm dark:shadow-none hover:bg-muted/30 transition-all group"
+            >
+              <div className="text-[10px] opacity-60 uppercase font-black tracking-wider mb-1 group-hover:opacity-100 transition-opacity">
+                {item.label}
+              </div>
+              <div className={cn("text-lg font-mono font-bold mt-1 tracking-tight", item.color)}>
+                {item.value}
+              </div>
             </div>
-            <div className="text-lg font-mono font-bold mt-1">
-              {tableInfo.row_count}
-            </div>
-          </div>
-          <div className="p-3 bg-muted/20 rounded-lg">
-            <div className="text-[10px] opacity-50 uppercase font-black">
-              Total Size
-            </div>
-            <div className="text-lg font-mono font-bold mt-1">
-              {tableInfo.total_size}
-            </div>
-          </div>
-          <div className="p-3 bg-muted/20 rounded-lg">
-            <div className="text-[10px] opacity-50 uppercase font-black">
-              Data Size
-            </div>
-            <div className="text-lg font-mono font-bold mt-1">
-              {tableInfo.data_size}
-            </div>
-          </div>
-          <div className="p-3 bg-muted/20 rounded-lg">
-            <div className="text-[10px] opacity-50 uppercase font-black">
-              Index Size
-            </div>
-            <div className="text-lg font-mono font-bold mt-1">
-              {tableInfo.index_size}
-            </div>
-          </div>
+          ))}
         </div>
       ) : (
-        <div className="text-muted-foreground/40 text-xs italic">
+        <div className="text-muted-foreground/40 text-xs italic p-10 text-center border border-dashed border-border/40 rounded-lg bg-muted/5">
           No info available
         </div>
       )}

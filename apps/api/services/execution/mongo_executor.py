@@ -113,11 +113,27 @@ class MongoExecutor:
             result = method(*args)
             return self._format_result(self._build_info(result, orig_name))
 
+    def _sanitize_bson(self, val: Any) -> Any:
+        """Recursively sanitizes BSON types to be JSON serializable."""
+        if isinstance(val, (str, int, float, bool, type(None))):
+            return val
+        elif isinstance(val, dict):
+            return {k: self._sanitize_bson(v) for k, v in val.items()}
+        elif isinstance(val, list):
+            return [self._sanitize_bson(v) for v in val]
+        else:
+            return str(val)
+
     def _process_documents(self, docs: List[Dict]) -> Tuple[List[Dict], List[str]]:
         """Serializes BSON documents to standard JSON-compatible formats."""
         processed, columns = [], set()
         for doc in docs:
-            p_doc = {k: (str(v) if k == '_id' or not isinstance(v, (str, int, float, bool, list, dict, type(None))) else v) for k, v in doc.items()}
+            p_doc = {}
+            for k, v in doc.items():
+                if k == '_id':
+                    p_doc[k] = str(v)
+                else:
+                    p_doc[k] = self._sanitize_bson(v)
             processed.append(p_doc)
             columns.update(p_doc.keys())
         return processed, sorted(list(columns))

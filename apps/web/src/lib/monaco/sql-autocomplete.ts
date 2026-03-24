@@ -271,39 +271,30 @@ export const registerSqlAutocomplete = (
           kind: monaco.languages.CompletionItemKind.Keyword,
           insertText: keyword,
           range: range,
-          sortText: "1", // Highest priority
+          sortText: "1",
         })),
         ...tablesRef.current.map((table) => ({
           label: table,
-          kind: monaco.languages.CompletionItemKind.Class, // or Class/Table
+          kind: monaco.languages.CompletionItemKind.Class,
           documentation: `Table: ${table}`,
           insertText: shouldQuote(table) ? `"${table}"` : table,
           range: range,
-          sortText: "2", // Second priority
+          sortText: "2",
         })),
         ...columnsRef.current.map((col) => {
           const quotedName = shouldQuote(col.name) ? `"${col.name}"` : col.name;
-          const quotedTable = shouldQuote(col.table)
-            ? `"${col.table}"`
-            : col.table;
           return {
             label: `${col.table}.${col.name}`,
             kind: monaco.languages.CompletionItemKind.Field,
             detail: `${col.table} (${col.type})`,
-            documentation: `Column: ${col.name} in table ${col.table}`,
+            documentation: `Column: ${col.name} in ${col.table}`,
             insertText: quotedName,
             range: range,
-            sortText: "3", // Third priority
+            sortText: "3",
+            // Also allow matching just by name
+            filterText: `${col.name} ${col.table}.${col.name}`,
           };
         }),
-        ...columnsRef.current.map((col) => ({
-          label: col.name,
-          kind: monaco.languages.CompletionItemKind.Field,
-          detail: `${col.table} (${col.type})`,
-          insertText: shouldQuote(col.name) ? `"${col.name}"` : col.name,
-          range: range,
-          sortText: "4", // Lowest priority
-        })),
       ];
 
       return { suggestions };
