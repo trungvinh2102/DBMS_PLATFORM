@@ -94,13 +94,34 @@ class MetadataService(BaseDatabaseService):
             session.close()
 
     def get_all_columns(self, database_id: str, schema: str) -> Dict[str, List[Dict[str, Any]]]:
-        """Retrieves columns for all tables in a schema, useful for client-side search/analysis."""
-        # Simple implementation: fetch tables then fetch columns for each
-        tables = self.get_tables(database_id, schema)
-        result = {}
-        for table in tables:
-            result[table] = self.get_columns(database_id, schema, table)
-        return result
+        """Retrieves columns for all tables and views in a schema, optimized for performance."""
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type == 'mongodb':
+                tables = self.mongo_provider.get_tables(database_id, schema, session)
+                views = self.mongo_provider.get_views(database_id, schema, session)
+                result = {}
+                for obj in (tables + views):
+                    result[obj] = self.mongo_provider.get_columns(database_id, schema, obj, session)
+                return result
+            if db_type == 'redis':
+                return {}
+            
+            # Optimized for SQL databases
+            return self.sql_provider.get_all_columns(database_id, schema)
+        except Exception as e:
+            logger.error(f"Error fetching all columns for {database_id}: {e}")
+            # Fallback to individual fetches if optimized one fails
+            logger.info("Falling back to separate column fetches...")
+            tables = self.get_tables(database_id, schema)
+            views = self.get_views(database_id, schema)
+            result = {}
+            for obj in (tables + views):
+                result[obj] = self.get_columns(database_id, schema, obj)
+            return result
+        finally:
+            session.close()
 
     def get_indexes(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
         """Lists all defined indices for the specified table or collection."""

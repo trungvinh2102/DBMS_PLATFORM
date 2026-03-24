@@ -10,11 +10,13 @@ import { useSQLLabMetadata } from "./use-sqllab-metadata";
 import { useSQLLabQuery } from "./use-sqllab-query";
 import { useSQLLabUI } from "./use-sqllab-ui";
 import { useSQLLabActions } from "./use-sqllab-actions";
+import { useSettingsStore } from "@/stores/use-settings-store";
 
 export function useSQLLab() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const settings = useSettingsStore();
 
   // 1. Compose Sub-hooks
   const {
@@ -38,6 +40,13 @@ export function useSQLLab() {
   const selectedDSType = selectedDSData?.type || "";
   const isRelational = !["mongodb", "redis"].includes(selectedDSType);
 
+  useEffect(() => {
+    if (ui.rightPanelMode === "schema" && (!isRelational || selectedDSType === "clickhouse")) {
+      ui.setShowRightPanel(false);
+      ui.setRightPanelMode("object");
+    }
+  }, [isRelational, selectedDSType, ui.rightPanelMode, ui]);
+
   const {
     handleRun, handleFormat, handleStop, executing, runSQLMutation, saveQueryMutation,
     savedQueries, refetchSavedQueries,
@@ -45,7 +54,7 @@ export function useSQLLab() {
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
     autoCommit: ui.activeResultTab === "results", // Generic, specific ones can override
-    limit: 1000,
+    limit: settings.defaultQueryLimit,
     onSuccess: (res: any) => {
       updateActiveTab({ results: res.data || [], columns: res.columns || [], error: null });
       ui.setActiveResultTab("results");
@@ -99,13 +108,29 @@ export function useSQLLab() {
     return "table";
   }, [ui.selectedTable, metadata]);
 
+  const lastExecutedSql = (tableDataMutation.variables as any)?.sql;
+
   useEffect(() => {
     const type = getSelectedObjectType();
-    if (ui.selectedTable && activeTab.selectedDS && ui.activeRightTab === "data" && (type === "table" || type === "view")) {
-      const sql = selectedDSType === "redis" ? `GET "${ui.selectedTable}"` : `SELECT * FROM "${ui.selectedTable}" LIMIT 100`;
-      tableDataMutation.mutate({ databaseId: activeTab.selectedDS, sql });
+    if (
+      ui.selectedTable && 
+      activeTab.selectedDS && 
+      ui.activeRightTab === "data" && 
+      (type === "table" || type === "view")
+    ) {
+      let sql = `SELECT * FROM "${ui.selectedTable}" LIMIT 100`;
+      if (selectedDSType === "redis") sql = `GET "${ui.selectedTable}"`;
+      else if (selectedDSType === "mongodb") {
+        const dbPrefix = (activeTab.selectedSchema && activeTab.selectedSchema !== "public") ? activeTab.selectedSchema : "db";
+        sql = `${dbPrefix}.${ui.selectedTable}.find()`;
+      }
+      
+      // Only mutate if SQL changed and not already fetching
+      if (sql !== lastExecutedSql && !tableDataMutation.isPending) {
+        tableDataMutation.mutate({ databaseId: activeTab.selectedDS, sql });
+      }
     }
-  }, [ui.selectedTable, activeTab.selectedDS, ui.activeRightTab, getSelectedObjectType, selectedDSType]);
+  }, [ui.selectedTable, activeTab.selectedDS, ui.activeRightTab, getSelectedObjectType, selectedDSType, activeTab.selectedSchema, lastExecutedSql]);
 
   const [selectedText, setSelectedText] = [ui.cursorPos, ui.setCursorPos]; // Mocked locally for now, to be integrated better.
 
@@ -121,6 +146,7 @@ export function useSQLLab() {
     setSelectedDS: (ds: string) => updateActiveTab({ selectedDS: ds }),
     selectedSchema: activeTab.selectedSchema,
     setSelectedSchema: (sc: string) => updateActiveTab({ selectedSchema: sc }),
+    resultEncoding: settings.resultEncoding,
     
     // Data & Results
     dataSources, schemas, isLoadingSchemas, tables, ...metadata,
@@ -146,7 +172,20 @@ export function useSQLLab() {
     handleExport: () => actions.handleExport(activeTab.sql, activeTab.selectedDS),
     handleRollback: () => { handleRun("ROLLBACK;"); toast.info("Rollback command sent"); },
     handleSaveConfirmed: async (name: string, desc?: string) => {
-      await saveQueryMutation.mutateAsync({ name, description: desc, sql: activeTab.sql, databaseId: activeTab.selectedDS });
+      let finalSql = activeTab.sql;
+      if (settings.editorFormatOnSave) {
+        // We reuse handleFormat logic but synchronously if possible or just call it
+        // Since sql-formatter is used in useSQLLabQuery, we can manually call it if we want,
+        // but it's better to stay consistent.
+        try {
+          const { format } = await import("sql-formatter");
+          finalSql = format(activeTab.sql, { language: "postgresql" });
+          updateActiveTab({ sql: finalSql });
+        } catch (e) {
+          console.warn("Format on save failed:", e);
+        }
+      }
+      await saveQueryMutation.mutateAsync({ name, description: desc, sql: finalSql, databaseId: activeTab.selectedDS });
       toast.success(`Query "${name}" saved`);
       ui.setIsSaveDialogOpen(false);
       refetchSavedQueries();

@@ -14,6 +14,7 @@ export const exportData = (
   columns: string[],
   format: ExportFormat,
   filename: string,
+  encoding: string = "UTF-8",
 ) => {
   if (!data || data.length === 0) {
     console.warn("No data to export");

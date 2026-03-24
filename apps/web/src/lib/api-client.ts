@@ -15,20 +15,28 @@ const getBaseURL = () => {
 
     // Priority 2: Standard standalone/desktop local development
     if (typeof window !== "undefined") {
-        // If we're running in Electron/Tauri via app:// or localized localhost
-        const isStandalone = window.location.protocol === 'app:' || window.location.origin.includes('localhost:3001');
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        
+        // If we're running in Electron/Tauri via app://, tauri://, tauri.localhost, or localized localhost
+        const isStandalone = 
+            protocol === 'app:' || 
+            protocol === 'tauri:' ||
+            hostname === 'tauri.localhost' ||
+            hostname === 'localhost' ||
+            hostname === '127.0.0.1';
+            
         if (isStandalone) {
-            return "http://localhost:5000/api/";
+            // Using 127.0.0.1 is often more reliable than 'localhost' in some webview environments
+            return "http://127.0.0.1:5000/api/";
         }
         
-        // If we're in the browser on a web domain, use same host with different port/prefix
+        // If we're in the browser on a web domain, use relative path (proxied)
         return "/api/"; 
     }
 
     // Default fallback
-    const finalUrl = "http://localhost:5000/api/";
-    console.log("API Base URL Selected:", finalUrl);
-    return finalUrl;
+    return "http://127.0.0.1:5000/api/";
 };
 
 const api = axios.create({
@@ -41,19 +49,30 @@ api.interceptors.response.use(
   (error: any) => {
     // Check for 401 Unauthorized
     if (error.response?.status === 401) {
-      // Clear auth state and redirect to login
-      console.warn("API 401: Unauthorized. Logging out.");
-      useAuth.getState().logout();
-      if (typeof window !== "undefined") {
-        window.location.href = "/auth/login";
+      const isLoginRequest = error.config.url?.includes("auth/login");
+      const isAlreadyOnLoginPage = typeof window !== "undefined" && window.location.pathname.includes("/auth/login");
+
+      if (!isLoginRequest && !isAlreadyOnLoginPage) {
+        // Clear auth state and redirect to login
+        console.warn("API 401: Unauthorized. Logging out.");
+        useAuth.getState().logout();
+        if (typeof window !== "undefined") {
+          window.location.href = "/auth/login";
+        }
       }
     }
 
     // Standardize error format
     const message =
+      error.response?.data?.message ||
       error.response?.data?.error ||
       error.message ||
       "An unknown error occurred";
+      
+    if (error.message === "Network Error") {
+      console.error("API Network Error: Check if backend is running at", getBaseURL());
+    }
+    
     return Promise.reject(new Error(message));
   },
 );

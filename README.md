@@ -96,6 +96,17 @@ bun run dev
 bun run backend:dev
 ```
 
+### 5. Desktop Sidebar Sync (Crucial)
+
+If you modify the Python code in `apps/api/` and want those changes to reflect in the **Desktop version**, you **must rebuild the sidecar**:
+
+```powershell
+# Run from the root directory
+powershell -ExecutionPolicy Bypass -File build-backend.ps1
+```
+
+Failing to do this will cause the Desktop app to continue running the old `api.exe` binary.
+
 ---
 
 ## 🌐 Environment Configuration

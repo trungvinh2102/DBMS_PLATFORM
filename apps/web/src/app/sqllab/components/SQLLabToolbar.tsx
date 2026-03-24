@@ -93,7 +93,7 @@ export function SQLLabToolbar() {
             aria-checked={lab.activeResultTab === "results"}
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (e.key === "Enter") {
                 e.preventDefault();
                 lab.setActiveResultTab(lab.activeResultTab === "results" ? "messages" : "results");
               }

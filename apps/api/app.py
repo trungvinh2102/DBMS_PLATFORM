@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 import os
 import logging
 import sys
+import threading
+import time
+import psutil
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,26 +27,19 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Try loading from executable dir FIRST (for production)
-env_path = os.path.join(base_path, '.env')
-api_env_path = os.path.join(base_path, 'api.env')
-# Also check resources folder (Tauri standard)
-res_env_path = os.path.join(base_path, 'resources', '.env')
-res_api_env_path = os.path.join(base_path, 'resources', 'api.env')
-
-if os.path.exists(env_path):
-    print(f"Backend: Detected .env at {env_path}")
-    load_dotenv(dotenv_path=env_path)
-elif os.path.exists(api_env_path):
-    print(f"Backend: Detected api.env at {api_env_path}")
-    load_dotenv(dotenv_path=api_env_path)
-elif os.path.exists(res_env_path):
-    print(f"Backend: Detected .env in resources at {res_env_path}")
-    load_dotenv(dotenv_path=res_env_path)
-elif os.path.exists(res_api_env_path):
-    print(f"Backend: Detected api.env in resources at {res_api_env_path}")
-    load_dotenv(dotenv_path=res_api_env_path)
+env_paths = [
+    os.path.join(base_path, '.env'),
+    os.path.join(base_path, 'api.env'),
+    os.path.join(base_path, 'resources', '.env'),
+    os.path.join(base_path, 'resources', 'api.env'),
+    os.path.join(base_path, '_up_', '_up_', 'api', '.env') # Tauri v2 preserves hierarchy for resources
+]
+for p in env_paths:
+    if os.path.exists(p):
+        print(f"Backend: Detected .env at {p}")
+        load_dotenv(dotenv_path=p)
+        break
 else:
-    # Try current working directory as fallback
     load_dotenv()
 
 from routes.connection_routes import connection_bp
@@ -59,6 +55,7 @@ import services.auth_service
 import passlib.handlers.bcrypt
 from models.metadata import User
 from services.auth_service import auth_service
+import uuid
 
 def create_app():
     """Application factory for Flask."""
@@ -82,10 +79,8 @@ def create_app():
 
     @app.before_request
     def log_request_info():
-        # app.logger.debug('Headers: %s', request.headers)
-        # app.logger.debug('Body: %s', request.get_data())
-        if request.method != 'OPTIONS':
-            print(f"API Request: {request.method} {request.path}")
+        # Log all requests including OPTIONS to debug CORS/Network issues
+        print(f"API Request: {request.method} {request.path} (Origin: {request.headers.get('Origin')})")
 
     @app.route('/api/health')
     @app.route('/health')
@@ -105,26 +100,78 @@ def create_app():
 
     return app
 
+def monitor_parent():
+    """
+    Monitors the parent process (Tauri).
+    If the parent process is no longer running, exit this process.
+    """
+    try:
+        parent_id = os.getppid()
+        # On some systems, ppid 1 means adopted by init (orphan)
+        if parent_id <= 1:
+            logging.info("Backend: Started as orphan or adopted by init. Not monitoring.")
+            return
+
+        parent = psutil.Process(parent_id)
+        logging.info(f"Backend: Monitoring parent process: {parent.name()} (PID: {parent_id})")
+
+        while True:
+            # Check if parent is still alive
+            if not parent.is_running():
+                logging.warning("Backend: Parent process (Tauri) has exited. Shutting down...")
+                os._exit(0)
+            time.sleep(2)
+    except Exception as e:
+        logging.error(f"Backend: Error in parent monitor: {e}")
+
 if __name__ == '__main__':
+    # Start parent monitor in a background thread
+    monitor_thread = threading.Thread(target=monitor_parent, daemon=True)
+    monitor_thread.start()
+
     # Ensure database tables are created and seeded
     from models.metadata import Base, engine, Role, User, SessionLocal
     if engine:
         logger.info("Backend: Creating database tables if they don't exist...")
         Base.metadata.create_all(engine)
         
+        # SIMPLE MIGRATION: Check for missing columns in existing tables (SQLAlchemy create_all doesn't add columns)
+        from sqlalchemy import text
+        try:
+            with engine.connect() as conn:
+                # Check for users.avatarUrl and users.bio
+                result = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+                columns = [r[1] for r in result]
+                
+                if "avatarUrl" not in columns:
+                    logger.info("Backend: Migrating database - adding 'avatarUrl' to 'users' table...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN avatarUrl TEXT"))
+                    conn.commit()
+                
+                if "bio" not in columns:
+                    logger.info("Backend: Migrating database - adding 'bio' to 'users' table...")
+                    conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
+                    conn.commit()
+                    
+                logger.info("Backend: Schema check complete.")
+        except Exception as e:
+            logger.warning(f"Backend: Auto-migration check skipped or failed: {e}")
+        
         # Seed initial roles if missing
         session = SessionLocal()
         try:
-            if not session.query(Role).filter(Role.name == "Default").first():
-                logger.info("Backend: Seeding initial 'Default' role...")
-                session.add(Role(id="default", name="Default"))
-                session.commit()
-                logger.info("Backend: 'Default' role seeded successfully.")
-            else:
-                logger.info("Backend: 'Default' role already exists.")
+            for role_name in ["Default", "Admin"]:
+                r = session.query(Role).filter(Role.name == role_name).first()
+                if not r:
+                    logger.info(f"Backend: Seeding '{role_name}' role...")
+                    # Using hardcoded IDs or uuids. Hardcode default for backward compat
+                    rid = "default" if role_name == "Default" else str(uuid.uuid4())
+                    session.add(Role(id=rid, name=role_name))
+            session.commit()
+            logger.info("Backend: Roles seeded successfully.")
         except Exception as e:
             logger.error(f"Backend: Failed to seed roles: {e}", exc_info=True)
-            session.rollback() # Rollback in case of error
+            session.rollback()
         finally:
             session.close()
         
@@ -133,21 +180,29 @@ if __name__ == '__main__':
         try:
             if session.query(User).count() == 0:
                 logger.info("Backend: Seeding default admin user (admin / admin123)...")
-                from services.auth_service import auth_service
-                auth_service.register({
-                    "username": "admin",
-                    "email": "admin@example.com",
-                    "password": "admin123",
-                    "name": "System Admin"
-                })
+                admin_role = session.query(Role).filter(Role.name == "Admin").first()
+                if admin_role:
+                    from services.auth_service import auth_service
+                    hashed_pw = auth_service.get_password_hash("admin123")
+                    admin_user = User(
+                        id=str(uuid.uuid4()),
+                        email="admin@dbms.local",
+                        username="admin",
+                        password=hashed_pw,
+                        name="System Admin",
+                        roleId=admin_role.id
+                    )
+                    session.add(admin_user)
+                    session.commit()
         except Exception as e:
             logger.error(f"Backend: Failed to seed admin user: {e}")
         finally:
             session.close()
         
     app = create_app()
-    debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    # Bind to 0.0.0.0 to ensure accessibility from within desktop apps (Electron/Tauri)
-    # This helps avoid localhost/127.0.0.1/::1 resolution issues
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    # Get port and host
+    port = int(os.environ.get('PORT', 5000))
+    host = os.environ.get('HOST', '127.0.0.1')
+    debug = str(os.environ.get('DEBUG', 'False')).lower() == 'true'
+    
+    app.run(host=host, port=port, debug=debug)

@@ -219,10 +219,17 @@ export function SQLEditor({
             padding: { top: 12, bottom: 12 },
             lineNumbers: settings.editorLineNumbers,
             renderLineHighlight: "all",
-            fontLigatures: true,
+            fontLigatures: settings.editorLigatures,
             formatOnPaste: settings.editorFormatOnPaste,
             glyphMargin: enableValidation && language === "sql",
             renderValidationDecorations: "on",
+            acceptSuggestionOnCommitCharacter: false,
+            suggestOnTriggerCharacters: true,
+            quickSuggestions: {
+              other: true,
+              comments: false,
+              strings: false
+            },
           }}
         />
       </div>

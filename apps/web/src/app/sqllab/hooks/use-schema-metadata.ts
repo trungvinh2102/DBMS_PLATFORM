@@ -25,11 +25,20 @@ export function useSchemaMetadata({ databaseId, schema }: SchemaMetadataProps) {
     enabled: !!databaseId && !!schema,
   });
 
-  const isLoading = tablesQuery.isLoading || columnsQuery.isLoading || foreignKeysQuery.isLoading;
-  const isError = tablesQuery.isError || columnsQuery.isError || foreignKeysQuery.isError;
+  const isLoading = 
+    tablesQuery.isLoading || 
+    columnsQuery.isLoading || 
+    foreignKeysQuery.isLoading;
+    
+  const isError = 
+    tablesQuery.isError ||  
+    columnsQuery.isError || 
+    foreignKeysQuery.isError;
+
+  const tables = (tablesQuery.data as string[]) || [];
 
   return {
-    tables: (tablesQuery.data as string[]) || [],
+    tables: tables,
     columns: (columnsQuery.data as Record<string, any[]>) || {},
     foreignKeys: (foreignKeysQuery.data as any[]) || [],
     isLoading,

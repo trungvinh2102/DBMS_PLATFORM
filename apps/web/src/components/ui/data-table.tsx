@@ -29,6 +29,7 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   searchKey?: string;
   onRowClick?: (data: TData) => void;
+  onSelectionChange?: (selectedRows: TData[]) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -36,26 +37,48 @@ export function DataTable<TData, TValue>({
   data,
   searchKey,
   onRowClick,
+  onSelectionChange,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );
+  const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({
     data,
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: setSorting,
-    getSortedRowModel: getSortedRowModel(),
-    onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
     state: {
       sorting,
       columnFilters,
+      rowSelection,
     },
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
   });
+
+  const lastSelectedRowsRef = React.useRef<TData[]>([]);
+
+  React.useEffect(() => {
+    if (!onSelectionChange) return;
+
+    const selectedRows = table.getSelectedRowModel().rows.map((row) => row.original);
+    
+    // Check if selection actually changed to avoid infinite loop
+    const hasChanged = selectedRows.length !== lastSelectedRowsRef.current.length ||
+      selectedRows.some((row, i) => (row as any)?.id !== (lastSelectedRowsRef.current[i] as any)?.id);
+
+    if (hasChanged) {
+      lastSelectedRowsRef.current = selectedRows;
+      onSelectionChange(selectedRows);
+    }
+  }, [rowSelection, onSelectionChange, table]);
 
   return (
     <div className="space-y-4">

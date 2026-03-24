@@ -229,7 +229,7 @@ export function SQLLabObjectPanel() {
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="tracking-tighter">
-              1-{currentTData.length} OF {currentTData.length}
+              1-{lab.currentTData.length} OF {lab.currentTData.length}
             </span>
             <button className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center">
               <ChevronRight className="h-4 w-4" />
@@ -237,7 +237,7 @@ export function SQLLabObjectPanel() {
           </div>
           <div className="flex items-center gap-2.5">
             <Clock className="h-4 w-4 opacity-40" />
-            <span>{executionTime || 0}MS</span>
+            <span>{lab.executionTime || 0}MS</span>
           </div>
         </div>
       )}

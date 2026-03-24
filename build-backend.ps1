@@ -1,27 +1,57 @@
+# Build script for packaging the Python Flask backend as a sidecar executable.
+# Supports both x86_64-pc-windows-gnu and x86_64-pc-windows-msvc targets.
+#
+# Usage:
+#   ./build-backend.ps1                    # Builds for gnu target (default)
+#   ./build-backend.ps1 -Target msvc       # Builds for msvc target
+
+param(
+    [ValidateSet("gnu", "msvc")]
+    [string]$Target = "gnu"
+)
+
 $ErrorActionPreference = "Stop"
 
-$TARGET_TRIPLE = "x86_64-pc-windows-gnu"
-Write-Host "Building Python Backend Sidecar for $TARGET_TRIPLE..."
+$TARGET_TRIPLE = if ($Target -eq "msvc") {
+    "x86_64-pc-windows-msvc"
+} else {
+    "x86_64-pc-windows-gnu"
+}
+
+Write-Host "=== Building Python Backend Sidecar for $TARGET_TRIPLE ===" -ForegroundColor Cyan
 
 $API_DIR = "apps/api"
 $DEST_DIR = "apps/desktop/src-tauri/bin"
 
 # Install dependencies
+Write-Host "[1/4] Installing Python dependencies..." -ForegroundColor Yellow
 Set-Location $API_DIR
-& pip install -r requirements.txt
-& pip install pyinstaller
+& pip install -r requirements.txt --quiet
+& pip install pyinstaller --quiet
 
-# Build with PyInstaller using the existing SPEC file
-Write-Host "Running PyInstaller with spec file..."
-& pyinstaller "api-$TARGET_TRIPLE.spec" --noconfirm
+# Build with PyInstaller
+Write-Host "[2/4] Running PyInstaller..." -ForegroundColor Yellow
+$SPEC_FILE = "api-$TARGET_TRIPLE.spec"
 
-# Create destination directory if it doesn't exist
-if (-not (Test-Path $DEST_DIR)) {
-    New-Item -ItemType Directory -Path $DEST_DIR -Force
+if (Test-Path $SPEC_FILE) {
+    Write-Host "Using existing spec file: $SPEC_FILE"
+    & pyinstaller $SPEC_FILE --noconfirm
+} else {
+    Write-Host "No spec file found, building with default options..."
+    & pyinstaller --onefile --name "api-$TARGET_TRIPLE" app.py --noconfirm
 }
 
-# Move to Tauri bin directory
-Write-Host "Copying binary to $DEST_DIR..."
+# Create destination directory
+Write-Host "[3/4] Copying binary..." -ForegroundColor Yellow
+if (-not (Test-Path "../../$DEST_DIR")) {
+    New-Item -ItemType Directory -Path "../../$DEST_DIR" -Force | Out-Null
+}
+
+# Copy the built executable
 Copy-Item "dist/api-$TARGET_TRIPLE.exe" "../../$DEST_DIR/api-$TARGET_TRIPLE.exe" -Force
 
-Write-Host "Backend sidecar built successfully!"
+Write-Host "[4/4] Done!" -ForegroundColor Green
+Write-Host "Output: $DEST_DIR/api-$TARGET_TRIPLE.exe" -ForegroundColor Green
+
+# Return to original directory
+Set-Location ../..
