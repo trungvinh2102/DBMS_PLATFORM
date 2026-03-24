@@ -1,3 +1,8 @@
+/**
+ * @file SchemaContent.tsx
+ * @description Wrapper component for the SchemaVisualizer that handles fetching metadata and displaying loading/error states.
+ */
+
 "use client";
 
 import React from "react";

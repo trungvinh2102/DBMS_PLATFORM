@@ -1,3 +1,8 @@
+/**
+ * @file use-sqllab-query.ts
+ * @description Hook to manage SQL query execution, formatting, and saved query operations.
+ */
+
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";

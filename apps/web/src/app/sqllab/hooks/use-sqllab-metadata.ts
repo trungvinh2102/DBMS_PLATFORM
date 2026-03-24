@@ -1,3 +1,8 @@
+/**
+ * @file use-sqllab-metadata.ts
+ * @description Hook to fetch and manage database metadata such as schemas, tables, views, functions, and specific table details.
+ */
+
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";

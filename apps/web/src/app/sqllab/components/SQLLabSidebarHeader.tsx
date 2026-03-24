@@ -1,3 +1,8 @@
+/**
+ * @file SQLLabSidebarHeader.tsx
+ * @description Header component for the SQL Lab sidebar, providing database selection, schema switching, and object searching.
+ */
+
 import React from "react";
 import { Search, Database, ChevronsUpDown, Layers } from "lucide-react";
 import { Input } from "@/components/ui/input";
