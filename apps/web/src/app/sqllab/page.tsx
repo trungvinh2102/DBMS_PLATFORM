@@ -1,3 +1,8 @@
+/**
+ * @file page.tsx
+ * @description Main entry point for the SQL Lab page, orchestrating the sidebar, toolbar, editor, and results panels.
+ */
+
 "use client";
 
 import { useState, Suspense, lazy } from "react";

@@ -1,3 +1,8 @@
+/**
+ * @file ChartViewer.tsx
+ * @description Main component for rendering and managing interactive data visualizations for SQL query results.
+ */
+
 import React, { useState, useMemo, useRef, useCallback } from "react";
 import * as Recharts from "recharts";
 import { toPng } from "html-to-image";

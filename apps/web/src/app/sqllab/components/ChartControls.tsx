@@ -1,3 +1,8 @@
+/**
+ * @file ChartControls.tsx
+ * @description UI controls for selecting chart types and configuring X/Y axes in the SQL Lab visualization panel.
+ */
+
 import React from "react";
 import {
   Select,

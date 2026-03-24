@@ -1,3 +1,8 @@
+/**
+ * @file SaveQueryDialog.tsx
+ * @description Dialog component for naming and saving SQL queries to the database.
+ */
+
 import React, { useState } from "react";
 import {
   Dialog,

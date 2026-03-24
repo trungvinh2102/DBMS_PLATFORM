@@ -1,3 +1,8 @@
+/**
+ * @file use-schema-metadata.ts
+ * @description Hook to fetch and manage full schema metadata (tables, columns, foreign keys) for visualization.
+ */
+
 import { useQuery } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
 

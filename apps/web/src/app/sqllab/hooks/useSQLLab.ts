@@ -1,3 +1,8 @@
+/**
+ * @file useSQLLab.ts
+ * @description Master composition hook for SQL Lab, integrating state management, query execution, and metadata retrieval.
+ */
+
 import { useEffect, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";

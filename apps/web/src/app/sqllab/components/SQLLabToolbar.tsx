@@ -1,3 +1,8 @@
+/**
+ * @file SQLLabToolbar.tsx
+ * @description Main toolbar for the SQL Lab, providing query execution, file operations, formatting, and side panel toggles.
+ */
+
 import {
   Database,
   FolderTree,

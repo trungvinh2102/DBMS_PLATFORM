@@ -1,3 +1,8 @@
+/**
+ * @file OpenQueryDialog.tsx
+ * @description Dialog for browsing and selecting saved SQL queries to load into the editor.
+ */
+
 import React from "react";
 import {
   Dialog,
