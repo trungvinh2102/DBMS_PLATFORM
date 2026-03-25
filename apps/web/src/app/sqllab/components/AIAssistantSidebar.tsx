@@ -89,11 +89,21 @@ export function AIAssistantSidebar() {
     if (lab.fixSQLError) {
       const errorMsg = lab.fixSQLError;
       const currentSql = lab.sql;
+      // Clear the trigger immediately
       lab.setFixSQLError(null);
+      
       const prompt = `I'm getting this SQL error: "${errorMsg}".\n\nHere is my current SQL:\n\`\`\`sql\n${currentSql}\n\`\`\`\n\nPlease analyze and fix this query.`;
-      _handleSend(prompt);
+      
+      // Always start a new chat for "Fix with AI" to keep it clean
+      startNewChat();
+      setShowHistory(false);
+      
+      // Small timeout to ensure state is cleared before sending
+      setTimeout(() => {
+        _handleSend(prompt);
+      }, 0);
     }
-  }, [lab.fixSQLError, lab.sql, _handleSend, lab]);
+  }, [lab.fixSQLError, lab.sql, _handleSend, lab.setFixSQLError, startNewChat]);
 
   const handleSendRequest = async () => {
     if (!input.trim()) return;
@@ -192,9 +202,22 @@ export function AIAssistantSidebar() {
                 >
                   <div className="pb-6">
                     {isLastTyping ? (
-                      <div className="flex items-center gap-3 text-muted-foreground text-[10px] font-black uppercase tracking-[0.2em] ml-2 animate-pulse bg-muted/20 p-4 rounded-2xl border border-dashed border-border/50">
-                        <Sparkles className="h-4 w-4 text-primary animate-spin-slow" />
-                        <span>Synthesizing intelligence...</span>
+                      <div className="relative overflow-hidden bg-muted/20 p-6 rounded-3xl border border-dashed border-primary/20 flex flex-col items-center gap-4 transition-all duration-1000">
+                        <div className="absolute inset-0 glass-orb" />
+                        <div className="relative z-10 flex items-center justify-center">
+                          <BrainCircuit className="h-8 w-8 text-primary animate-pulse" />
+                          <Sparkles className="h-4 w-4 text-primary absolute -top-1 -right-1 animate-bounce" />
+                        </div>
+                        <div className="relative z-10 flex flex-col items-center gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/80 animate-pulse">
+                            Synthesizing Intelligence
+                          </span>
+                          <div className="flex gap-1">
+                            {[0, 1, 2].map((i) => (
+                              <div key={i} className="w-1 h-1 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: `${i * 0.2}s` }} />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ) : m ? (
                       <AIMessage

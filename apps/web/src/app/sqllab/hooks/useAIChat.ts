@@ -130,7 +130,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     setMessages([]);
   }, []);
 
-  const handleSend = async (input: string) => {
+  const handleSend = useCallback(async (input: string) => {
     if (!input.trim() || isTyping || !databaseId) {
       if (!databaseId) toast.error("Connect a database first.");
       return;
@@ -190,7 +190,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [databaseId, schema, selectedModel, conversationId, isTyping, parseStreamedContent, loadConversations]);
 
   return { 
     messages, 

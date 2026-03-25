@@ -19,6 +19,7 @@ except ImportError:
     HAS_GENAI = False
 
 from services.metadata import metadata_service
+from services.base_service import BaseDatabaseService
 from models.metadata import AIChatMessage, AIGeneratedQuery, UserAIConfig, SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -244,113 +245,161 @@ class AIService:
         return text.strip()
 
     def _format_schema_context(self, db_id: str, schema: str) -> str:
-        """Constructs a text-based representation of the schema for the AI's context."""
+        """Constructs a rich, dialect-aware schema context for the AI."""
+        # Get dialect info
+        db_type = "SQL"
+        session = SessionLocal()
+        try:
+            base_service = BaseDatabaseService()
+            db_type, _ = base_service.get_db_config(db_id, session)
+        except Exception: 
+            pass
+        finally: 
+            session.close()
+
         all_cols = metadata_service.get_all_columns(db_id, schema)
         if not all_cols:
-            return "No schema metadata available."
+            return f"DATABASE TYPE: {db_type}\nNo schema metadata available."
             
-        context = []
+        # Get Foreign Keys for relationship mapping
+        all_fks = metadata_service.get_all_foreign_keys(db_id, schema)
+        fks_by_table = {}
+        for fk in all_fks:
+            t = fk['table']
+            if t not in fks_by_table: fks_by_table[t] = []
+            fks_by_table[t].append(f"FOREIGN KEY ({fk['column']}) REFERENCES {fk['foreignTable']}({fk['foreignColumn']})")
+
+        context = [f"DATABASE DIALECT: {db_type.upper()}", "SCHEMA STRUCTURE:"]
         count = 0
         for t, cols in all_cols.items():
-            if count >= 30: break
-            col_strs = [f"{c['name']} ({c['type']})" for c in cols]
-            context.append(f'Table "{t}" {{\n  ' + ",\n  ".join(col_strs) + '\n}')
+            if count >= 60: break # Increased limit
+            col_strs = [f"{c['name']} {c['type']}" + (" NOT NULL" if not c.get('nullable') else "") for c in cols]
+            table_def = [f'CREATE TABLE "{t}" (']
+            table_def.extend([f"  {s}" for s in col_strs])
+            
+            # Add FKs if any
+            if t in fks_by_table:
+                table_def.extend([f"  {fk}" for fk in fks_by_table[t]])
+            
+            table_def.append(");")
+            context.append("\n".join(table_def))
             count += 1
+            
         return "\n\n".join(context)
 
     # --- Prompt Templates ---
     def _get_sql_generation_prompt(self, schema_context: str) -> str:
-        return f"""You are the 'Supreme SQL Architect'. Bridge the gap between natural language and optimized SQL.
+        return f"""You are the 'Supreme SQL Architect' - an AI expert in SQL engineering, database performance, and data modeling.
+Your goal is to translate natural language into high-performance, secure, and idiomatic SQL.
 
-        SCHEMA CONTEXT:
-        {schema_context}
+### DATABASE ENVIRONMENT:
+{schema_context}
 
-        INSTRUCTIONS:
-        1. Start with a <thinking> section analyzing the user's request and the necessary tables/joins.
-        2. Provide the generated SQL in a clean markdown code block using ```sql.
-        3. End with an 'ANALYSIS' section explaining the logic, indexes used (if applicable), and performance considerations.
+### CORE INSTRUCTIONS:
+1. **Dialect Awareness**: Strictly follow the syntax rules of the detected DATABASE DIALECT.
+2. **Readability**: Use Common Table Expressions (CTEs) for multi-step logic. Prefer explicit JOIN syntax.
+3. **Performance**: Avoid `SELECT *`. Select only required columns. Use indexes effectively in WHERE clauses.
+4. **Safety**: Never generate destructive queries (DROP, DELETE without WHERE, etc.).
+5. **Language**: If the user asks in VIETNAMESE, you MUST respond in VIETNAMESE for all text (Thinking/Analysis), but keep SQL as standard code.
 
-        FORMAT:
-        <thinking>
-        [Your thought process here]
-        </thinking>
+### RESPONSE STRUCTURE:
+1. **<thinking>**: Start by analyzing the intent, identifying entities, planning the JOIN paths, and considering edge cases (nulls, duplicates).
+2. **<confidence>**: Provide a score from 1 to 5 (1=Unsure, 5=Absolute Certainty) based on your understanding of the schema and the complexity of the request.
+3. **SQL Block**: Provide exactly one clean markdown block using ```sql.
+4. **### ANALYSIS**: Provide a detailed breakdown including:
+    - **Logic**: How the data is filtered and aggregated.
+    - **Performance**: Why this query is efficient.
+    - **Note**: Any assumptions made.
 
-        ```sql
-        [SQL Query]
-        ```
+### FORMAT:
+<thinking>
+[Step-by-step strategy]
+</thinking>
 
-        ### ANALYSIS:
-        [Your detailed breakdown here]
-        """
+<confidence>[Score 1-5]</confidence>
+
+```sql
+[SQL Query]
+```
+
+### ANALYSIS:
+[Your detailed breakdown]
+"""
 
     def _get_sql_explanation_prompt(self) -> str:
-        return """You are the 'Supreme SQL Architect'. Explain the provided SQL in depth.
-        
-        INSTRUCTIONS:
-        1. Start with a <thinking> section analyzing the query's objective and complexity.
-        2. Provide the SQL itself in a clean markdown code block using ```sql.
-        3. End with an 'ANALYSIS' section giving a line-by-line explanation of the logic and performance implications.
+        return """You are the 'Supreme SQL Architect'. Provide a crystal-clear, deep explanation of the provided SQL.
 
-        FORMAT:
-        <thinking>
-        [Your thought process]
-        </thinking>
+### INSTRUCTIONS:
+1. **Persona**: Senior Database Architect & Mentor.
+2. **Analysis**: Explain *why* certain keywords/clauses are used, not just *what* they do.
+3. **Logic Path**: Trace the data flow from source tables to the final result set.
+4. **Language**: If the user asks in VIETNAMESE, respond fully in VIETNAMESE for all text.
 
-        ```sql
-        [The SQL being explained]
-        ```
+### FORMAT:
+<thinking>
+[Brief reasoning on query complexity]
+</thinking>
 
-        ### ANALYSIS:
-        [Your detailed explanation here]
-        """
+```sql
+[The SQL being explained]
+```
+
+### ANALYSIS:
+[Your line-by-line, deep breakdown]
+"""
 
     def _get_sql_optimization_prompt(self, schema_context: str) -> str:
-        return f"""You are the 'Supreme SQL Architect'. Refactor the provided SQL for maximum performance.
-        
-        SCHEMA CONTEXT:
-        {schema_context}
+        return f"""You are the 'Supreme SQL Architect' - an expert in high-performance database tuning.
+Your mission is to refactor the provided SQL to minimize execution time and resource consumption.
 
-        INSTRUCTIONS:
-        1. Start with a <thinking> section identifying bottlenecks and optimization strategies.
-        2. Provide the OPTIMIZED SQL in a clean markdown code block using ```sql.
-        3. End with an 'ANALYSIS' section explaining why these changes improve performance.
+### DATABASE ENVIRONMENT:
+{schema_context}
 
-        FORMAT:
-        <thinking>
-        [Reasoning for optimization]
-        </thinking>
+### OPTIMIZATION STRATEGIES:
+1. **Simplify**: Remove redundant joins and subqueries. Use CTEs if they help the optimizer.
+2. **Index Alignment**: Ensure WHERE clauses align with the primary/foreign keys provided.
+3. **Data Volume**: Add LIMIT where appropriate and avoid expensive sorting if not needed.
+4. **Dialect Specifics**: Use performance-heavy primitives specific to the DATABASE DIALECT.
 
-        ```sql
-        [Optimized SQL]
-        ```
+### FORMAT:
+<thinking>
+[Analysis of bottlenecks and proposed refactoring strategy]
+</thinking>
 
-        ### ANALYSIS:
-        [Explanation of improvements]
-        """
+```sql
+[Optimized SQL]
+```
+
+### ANALYSIS:
+[Detailed comparison of improvements and performance impact]
+"""
 
     def _get_sql_fix_prompt(self, error: str, schema_context: str) -> str:
-        return f"""You are the 'Supreme SQL Architect'. Debug and fix the provided SQL based on the error message.
-        
-        ERROR: {error}
-        SCHEMA CONTEXT:
-        {schema_context}
+        return f"""You are the 'Supreme SQL Architect' - a master debugger.
+Fix the broken SQL query based on the provided error message and schema context.
 
-        INSTRUCTIONS:
-        1. Start with a <thinking> section analyzing the cause of the error.
-        2. Provide the FIXED SQL in a clean markdown code block using ```sql.
-        3. End with an 'ANALYSIS' section explaining the fix.
+### ERROR MESSAGE:
+{error}
 
-        FORMAT:
-        <thinking>
-        [Debugging analysis]
-        </thinking>
+### DATABASE ENVIRONMENT:
+{schema_context}
 
-        ```sql
-        [Fixed SQL]
-        ```
+### DEBUGGING PROTOCOL:
+1. **Root Cause**: Identify if it's a syntax error, a missing column, or an invalid join.
+2. **Schema Alignment**: Verify all identifiers against the SCHEMA STRUCTURE.
+3. **Fix Strategy**: Apply the minimal necessary changes to make the query valid and performant.
 
-        ### ANALYSIS:
-        [Explanation of the fix]
-        """
+### FORMAT:
+<thinking>
+[Detailed debugging trace and fix plan]
+</thinking>
+
+```sql
+[Corrected SQL]
+```
+
+### ANALYSIS:
+[Explanation of why the error occurred and how it was fixed]
+"""
 
 ai_service = AIService()
