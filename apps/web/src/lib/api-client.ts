@@ -169,10 +169,51 @@ export const userApi = {
 };
 
 export const aiApi = {
+  getModels: () => req(api.get("ai/models")),
+  addModel: (data: any) => req(api.post("ai/models", data)),
+  getAIConfig: (reveal: boolean = false) => req(api.get("ai-config/get", { params: { reveal } })),
+  saveAIConfig: (data: any) => req(api.post("ai-config/save", data)),
   generateSQL: (data: any) => req(api.post("ai/generate-sql", data)),
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
   fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
+  deleteModel: (id: string) => req(api.delete(`ai/models/${id}`)),
+  getHistory: (databaseId?: string) => req(api.get("ai/history", { params: { databaseId } })),
+  getConversations: (databaseId?: string) => req(api.get("ai/conversations", { params: { databaseId } })),
+  getConversationMessages: (id: string) => req(api.get(`ai/conversations/${id}`)),
+  updateConversation: (id: string, data: any) => req(api.put(`ai/conversations/${id}`, data)),
+  deleteConversation: (id: string) => req(api.delete(`ai/conversations/${id}`)),
+  streamChat: async (data: any, onChunk: (chunk: string) => void, onHeaders?: (headers: Headers) => void) => {
+    const token = useAuth.getState().token;
+    const response = await fetch(`${getBaseURL()}ai/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (onHeaders) {
+        onHeaders(response.headers);
+    }
+
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: "Streaming failed" }));
+        throw new Error(err.error || "Streaming failed");
+    }
+
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    if (!reader) return;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      onChunk(chunk);
+    }
+  }
 };
 
 export const resolveUrl = (path: string | null | undefined) => {

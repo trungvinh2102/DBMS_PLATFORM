@@ -48,6 +48,7 @@ from routes.execution_routes import execution_bp
 from routes.auth import auth_bp
 from routes.user import user_bp
 from routes.ai import ai_bp
+from routes.ai_config import ai_config_bp
 
 # Explicit imports to help PyInstaller find them
 import models.metadata
@@ -61,9 +62,25 @@ def create_app():
     """Application factory for Flask."""
     app = Flask(__name__)
     
-    # Configure CORS - Allow Tauri origins explicitly when supporting credentials
+    # Configure CORS - Allow common development and Tauri origins
     CORS(app, resources={r"/api/*": {
-        "origins": ["tauri://localhost", "http://tauri.localhost", "http://localhost:3001", "http://127.0.0.1:3001", "http://localhost:3002", "http://127.0.0.1:3002"]
+        "origins": [
+            "tauri://localhost", 
+            "http://tauri.localhost", 
+            "http://localhost:3000", 
+            "http://127.0.0.1:3000",
+            "http://localhost:3001", 
+            "http://127.0.0.1:3001", 
+            "http://localhost:3002", 
+            "http://127.0.0.1:3002",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:1420", # Common Tauri/Vite dev port
+            "http://127.0.0.1:1420"
+        ],
+        "expose_headers": ["Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     }}, supports_credentials=True)
     # No manual headers needed, flask-cors will handle it.
 
@@ -76,6 +93,7 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
+    app.register_blueprint(ai_config_bp, url_prefix='/api/ai-config')
 
     @app.before_request
     def log_request_info():
@@ -130,32 +148,56 @@ if __name__ == '__main__':
     monitor_thread.start()
 
     # Ensure database tables are created and seeded
-    from models.metadata import Base, engine, Role, User, SessionLocal
+    from models.metadata import Base, engine, Role, User, SessionLocal, Db, SavedQuery, QueryHistory, UserSetting, AIModel, AIConversation, AIChatMessage
+    debug_msg = f"Backend: AIModel class has 'description': {hasattr(AIModel, 'description')}"
+    logger.info(debug_msg)
+    print(debug_msg) # Direct print to console
     if engine:
         logger.info("Backend: Creating database tables if they don't exist...")
         Base.metadata.create_all(engine)
         
         # SIMPLE MIGRATION: Check for missing columns in existing tables (SQLAlchemy create_all doesn't add columns)
-        from sqlalchemy import text
+        from sqlalchemy import text, inspect
         try:
-            with engine.connect() as conn:
-                # Check for users.avatarUrl and users.bio
-                result = conn.execute(text("PRAGMA table_info(users)")).fetchall()
-                columns = [r[1] for r in result]
-                
-                if "avatarUrl" not in columns:
-                    logger.info("Backend: Migrating database - adding 'avatarUrl' to 'users' table...")
-                    conn.execute(text("ALTER TABLE users ADD COLUMN avatarUrl TEXT"))
-                    conn.commit()
-                
-                if "bio" not in columns:
-                    logger.info("Backend: Migrating database - adding 'bio' to 'users' table...")
-                    conn.execute(text("ALTER TABLE users ADD COLUMN bio TEXT"))
-                    conn.commit()
-                    
-                logger.info("Backend: Schema check complete.")
+            inspector = inspect(engine)
+            
+            # Helper to add column if missing
+            def add_column_if_missing(table_name, column_name, column_type):
+                columns = [c['name'] for c in inspector.get_columns(table_name)]
+                if column_name not in columns:
+                    logger.info(f"Backend: Migrating database - adding '{column_name}' to '{table_name}' table...")
+                    with engine.connect() as conn:
+                        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN \"{column_name}\" {column_type}"))
+                        conn.commit()
+
+            # Check users table
+            add_column_if_missing("users", "avatarUrl", "TEXT")
+            add_column_if_missing("users", "bio", "TEXT")
+            add_column_if_missing("users", "created_on", "TIMESTAMP")
+            add_column_if_missing("users", "changed_on", "TIMESTAMP")
+
+            # Check ai_models table
+            add_column_if_missing("ai_models", "description", "TEXT")
+            add_column_if_missing("ai_models", "isDefault", "BOOLEAN DEFAULT FALSE")
+            add_column_if_missing("ai_models", "isActive", "BOOLEAN DEFAULT TRUE")
+            add_column_if_missing("ai_models", "provider", "TEXT DEFAULT 'Google'")
+            add_column_if_missing("ai_models", "created_on", "TIMESTAMP")
+
+            # AI and Settings tables
+            add_column_if_missing("user_settings", "created_on", "TIMESTAMP")
+            add_column_if_missing("user_settings", "changed_on", "TIMESTAMP")
+            add_column_if_missing("user_ai_configs", "created_on", "TIMESTAMP")
+            add_column_if_missing("user_ai_configs", "changed_on", "TIMESTAMP")
+            add_column_if_missing("ai_chat_messages", "created_on", "TIMESTAMP")
+            add_column_if_missing("ai_chat_messages", "conversationId", "TEXT")
+            add_column_if_missing("ai_generated_queries", "created_on", "TIMESTAMP")
+
+            logger.info("Backend: Schema check complete.")
         except Exception as e:
             logger.warning(f"Backend: Auto-migration check skipped or failed: {e}")
+            # If it failed due to some Postgres specific issue, we might want to log more info
+            import traceback
+            logger.debug(traceback.format_exc())
         
         # Seed initial roles if missing
         session = SessionLocal()
@@ -196,9 +238,10 @@ if __name__ == '__main__':
                     session.commit()
         except Exception as e:
             logger.error(f"Backend: Failed to seed admin user: {e}")
+            session.rollback()
         finally:
             session.close()
-        
+            
     app = create_app()
     # Get port and host
     port = int(os.environ.get('PORT', 5000))

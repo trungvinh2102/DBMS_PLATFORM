@@ -2,11 +2,12 @@
 ai_service.py
 
 Service using Google Gemini for SQL generation, explanation, and optimization.
-Provides a unified interface for AI-assisted database operations.
+Supports both global and user-specific API keys.
 """
 
 import os
 import re
+import uuid
 import logging
 from typing import Dict, Any, Optional
 
@@ -18,6 +19,7 @@ except ImportError:
     HAS_GENAI = False
 
 from services.metadata import metadata_service
+from models.metadata import AIChatMessage, AIGeneratedQuery, UserAIConfig, SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -30,85 +32,206 @@ class AIService:
     def __init__(self):
         """Initializes the Gemini model with the GOOGLE_API_KEY environment variable."""
         api_key = os.getenv("GOOGLE_API_KEY")
-        self.model_name = 'gemini-2.0-flash'
+        self.model_name = 'gemini-2.5-flash' # Default model
         self.model: Optional[Any] = None
 
         if HAS_GENAI and api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-            logger.info(f"AIService initialized with model: {self.model_name}")
-        else:
-            self._log_init_error(api_key)
+            try:
+                genai.configure(api_key=api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                logger.info(f"AIService initialized with global model: {self.model_name}")
+            except Exception as e:
+                logger.error(f"Failed to configure global Gemini: {e}")
 
-    def generate_sql(self, prompt: str, db_id: str, schema: str = "public") -> Dict[str, Any]:
+    def generate_sql(self, prompt: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Generates a SQL query based on natural language intent and schema context."""
+        self._save_chat("user", prompt, user_id, db_id)
+
         context = self._format_schema_context(db_id, schema)
         system_prompt = self._get_sql_generation_prompt(context)
         
-        response_text = self._generate_response(f"{system_prompt}\n\nUser Intent: {prompt}")
-        if not response_text:
-            return {"error": "AI response was empty or failed"}
+        response_text = self._generate_response(f"{system_prompt}\n\nUser Intent: {prompt}", model_id=model_id, user_id=user_id)
+        if not response_text or response_text.startswith("AI Error:"):
+            error_msg = response_text if response_text else "AI response was empty or failed"
+            self._save_chat("assistant", error_msg, user_id, db_id)
+            return {"error": error_msg}
             
-        return {"sql": self._extract_sql(response_text)}
+        sql = self._extract_sql(str(response_text))
+        self._save_chat("assistant", f"Generated SQL: {sql}", user_id, db_id)
+        self._save_generated_query(sql, prompt, "AI Generated Query", user_id, db_id)
+        
+        return {"sql": sql}
 
-    def explain_sql(self, sql: str) -> Dict[str, Any]:
+    def explain_sql(self, sql: str, user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Provides a natural language explanation of the logic within a SQL query."""
+        self._save_chat("user", f"Explain this SQL: {sql}", user_id)
         system_prompt = self._get_sql_explanation_prompt()
         
-        response_text = self._generate_response(f"{system_prompt}\n\nSQL EXECUTABLE:\n{sql}")
-        if not response_text:
-            return {"error": "AI response was empty or failed"}
+        response_text = self._generate_response(f"{system_prompt}\n\nSQL EXECUTABLE:\n{sql}", model_id=model_id, user_id=user_id)
+        if not response_text or response_text.startswith("AI Error:"):
+            error_msg = response_text if response_text else "AI response was empty or failed"
+            self._save_chat("assistant", error_msg, user_id)
+            return {"error": error_msg}
             
+        self._save_chat("assistant", str(response_text), user_id)
         return {"explanation": response_text}
 
-    def optimize_sql(self, sql: str, db_id: str, schema: str = "public") -> Dict[str, Any]:
+    def optimize_sql(self, sql: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Refactors SQL for better performance based on schema context."""
+        self._save_chat("user", f"Optimize this SQL: {sql}", user_id, db_id)
         context = self._format_schema_context(db_id, schema)
         system_prompt = self._get_sql_optimization_prompt(context)
         
-        response_text = self._generate_response(f"{system_prompt}\n\nCURRENT SQL:\n{sql}")
-        if not response_text:
-            return {"error": "AI response was empty or failed"}
+        response_text = self._generate_response(f"{system_prompt}\n\nCURRENT SQL:\n{sql}", model_id=model_id, user_id=user_id)
+        if not response_text or response_text.startswith("AI Error:"):
+            error_msg = response_text if response_text else "AI response was empty or failed"
+            self._save_chat("assistant", error_msg, user_id, db_id)
+            return {"error": error_msg}
             
-        return {
-            "result": response_text, 
-            "sql": self._extract_sql(response_text)
-        }
+        optimized_sql = self._extract_sql(str(response_text))
+        self._save_chat("assistant", f"Optimized SQL: {optimized_sql}", user_id, db_id)
+        self._save_generated_query(optimized_sql, f"Optimize: {sql}", str(response_text), user_id, db_id)
 
-    def fix_sql(self, sql: str, error: str, db_id: str, schema: str = "public") -> Dict[str, Any]:
+        return {"result": str(response_text), "sql": optimized_sql}
+
+    def fix_sql(self, sql: str, error: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Analyzes a SQL error and provides a corrected version of the query."""
+        self._save_chat("user", f"Fix this SQL error: {error}\nSQL: {sql}", user_id, db_id)
         context = self._format_schema_context(db_id, schema)
         system_prompt = self._get_sql_fix_prompt(error, context)
         
-        response_text = self._generate_response(f"{system_prompt}\n\nFAILED SQL:\n{sql}")
-        if not response_text:
-            return {"error": "AI response was empty or failed"}
+        response_text = self._generate_response(f"{system_prompt}\n\nFAILED SQL:\n{sql}", model_id=model_id, user_id=user_id)
+        if not response_text or response_text.startswith("AI Error:"):
+            error_msg = response_text if response_text else "AI response was empty or failed"
+            self._save_chat("assistant", error_msg, user_id, db_id)
+            return {"error": error_msg}
             
-        return {
-            "result": response_text, 
-            "sql": self._extract_sql(response_text)
-        }
+        fixed_sql = self._extract_sql(str(response_text))
+        self._save_chat("assistant", f"Fixed SQL: {fixed_sql}", user_id, db_id)
+        self._save_generated_query(fixed_sql, f"Fix Error: {error}", str(response_text), user_id, db_id)
+
+        return {"result": str(response_text), "sql": fixed_sql}
 
     # --- Private Helper Methods ---
 
-    def _log_init_error(self, api_key: Optional[str]):
-        """Logs appropriate warning messages when AI features are disabled."""
+    def _generate_response(self, combined_prompt: str, model_id: Optional[str] = None, user_id: Optional[str] = None) -> str:
+        """Internal helper to communicate with the Gemini API, using user-specific keys if available."""
         if not HAS_GENAI:
-            logger.warning("google-generativeai package not installed. AI features disabled.")
-        elif not api_key:
-            logger.warning("GOOGLE_API_KEY not set in environment. AI features disabled.")
+            return "AI Error: google-generativeai package is not installed"
+            
+        # Try to use user-specific API Key
+        if user_id:
+            try:
+                from routes.ai_config import decrypt_key
+                session = SessionLocal()
+                config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
+                if config and config.apiKey:
+                    key = decrypt_key(config.apiKey)
+                    if key:
+                        genai.configure(api_key=key)
+                session.close()
+            except Exception as e:
+                logger.error(f"Failed to use user AI key: {e}")
 
-    def _generate_response(self, full_prompt: str) -> Optional[str]:
-        """Internal helper to call the Gemini model safely."""
-        if not self.model:
-            logger.error("AI model not configured. Call ignored.")
-            return None
+        target_model = model_id or self.model_name
         try:
-            response = self.model.generate_content(full_prompt)
-            return response.text
+            model = genai.GenerativeModel(target_model)
+            response = model.generate_content(combined_prompt)
+            return response.text if response and response.text else ""
         except Exception as e:
-            logger.error(f"Gemini API call failed: {e}", exc_info=True)
-            return None
+            # Fallback to global config if user config failed (or if no user config)
+            if user_id:
+                api_key = os.getenv("GOOGLE_API_KEY")
+                if api_key:
+                    try:
+                        genai.configure(api_key=api_key)
+                        model = genai.GenerativeModel(target_model)
+                        response = model.generate_content(combined_prompt)
+                        return response.text if response and response.text else ""
+                    except:
+                        pass
+            
+            logger.error(f"Gemini API call failed with model {target_model}: {e}", exc_info=True)
+            return f"AI Error: {str(e)}"
+
+    def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None):
+        """Streams responses from Gemini, incorporating schema context and past conversation history."""
+        if not HAS_GENAI:
+            yield "AI Error: google-generativeai package is not installed"
+            return
+            
+        system_prompt = "You are the Supreme SQL Architect."
+        if db_id:
+            context = self._format_schema_context(db_id, schema)
+            system_prompt = self._get_sql_generation_prompt(context)
+
+        # Prepare messages for Gemini
+        messages = []
+        if history:
+            for msg in history:
+                # Map 'assistant' to 'model' for Gemini
+                role = "model" if msg['role'] == "assistant" else "user"
+                messages.append({'role': role, 'parts': [msg['content']]})
+        
+        # Add the current prompt
+        messages.append({'role': 'user', 'parts': [prompt]})
+
+        target_model = model_id or self.model_name
+        try:
+            # Construct model with system instructions if supported by the SDK version
+            # Fallback to appending system prompt to the first message if needed
+            model = genai.GenerativeModel(
+                model_name=target_model,
+                system_instruction=system_prompt
+            )
+            
+            response = model.generate_content(messages, stream=True)
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as e:
+            logger.error(f"Gemini Streaming API call failed with model {target_model}: {e}", exc_info=True)
+            yield f"AI Error: {str(e)}"
+
+    def _save_chat(self, role: str, content: str, user_id: Optional[str] = None, db_id: Optional[str] = None, conv_id: Optional[str] = None):
+        """Persists AI chat messages to the database."""
+        session = SessionLocal()
+        try:
+            msg = AIChatMessage(
+                id=str(uuid.uuid4()),
+                role=role,
+                content=str(content)[:5000], 
+                userId=user_id,
+                databaseId=db_id,
+                conversationId=conv_id
+            )
+            session.add(msg)
+            session.commit()
+        except Exception as e:
+            logger.error(f"Failed to save AI chat message: {e}")
+            session.rollback()
+        finally:
+            session.close()
+
+    def _save_generated_query(self, sql: str, prompt: Optional[str], explanation: Optional[str], user_id: Optional[str] = None, db_id: Optional[str] = None):
+        """Persists AI generated SQL queries to the database."""
+        session = SessionLocal()
+        try:
+            query = AIGeneratedQuery(
+                id=str(uuid.uuid4()),
+                prompt=str(prompt)[:2000] if prompt else None,
+                sql=str(sql),
+                explanation=str(explanation)[:5000] if explanation else None,
+                userId=user_id,
+                databaseId=db_id
+            )
+            session.add(query)
+            session.commit()
+        except Exception as e:
+            logger.error(f"Failed to save AI generated query: {e}")
+            session.rollback()
+        finally:
+            session.close()
 
     def _extract_sql(self, text: str) -> str:
         """Parses the SQL code block out of the AI's markdown response."""
@@ -127,73 +250,107 @@ class AIService:
             return "No schema metadata available."
             
         context = []
-        # Limit tables to prevent context window overflow (top 30 tables)
-        for t, cols in list(all_cols.items())[:30]:
+        count = 0
+        for t, cols in all_cols.items():
+            if count >= 30: break
             col_strs = [f"{c['name']} ({c['type']})" for c in cols]
             context.append(f'Table "{t}" {{\n  ' + ",\n  ".join(col_strs) + '\n}')
-            
+            count += 1
         return "\n\n".join(context)
 
     # --- Prompt Templates ---
-
     def _get_sql_generation_prompt(self, schema_context: str) -> str:
-        return f"""
-        You are an Elite AI SQL Architect (2026 Edition). Your goal is to synthesize high-performance, precision SQL queries.
-        
-        DATABASE KNOWLEDGE GRAPH:
+        return f"""You are the 'Supreme SQL Architect'. Bridge the gap between natural language and optimized SQL.
+
+        SCHEMA CONTEXT:
         {schema_context}
-        
-        DIRECTIVES:
-        - Output ONLY the optimized SQL query within a ```sql ... ``` block.
-        - Ensure 100% compliance with requested business logic.
-        - Use modern SQL features (CTEs, Window Functions) for better readability and performance.
-        - Strictly enforce data security; only SELECT operations are permitted.
+
+        INSTRUCTIONS:
+        1. Start with a <thinking> section analyzing the user's request and the necessary tables/joins.
+        2. Provide the generated SQL in a clean markdown code block using ```sql.
+        3. End with an 'ANALYSIS' section explaining the logic, indexes used (if applicable), and performance considerations.
+
+        FORMAT:
+        <thinking>
+        [Your thought process here]
+        </thinking>
+
+        ```sql
+        [SQL Query]
+        ```
+
+        ### ANALYSIS:
+        [Your detailed breakdown here]
         """
 
     def _get_sql_explanation_prompt(self) -> str:
-        return """
-        You are a Database Logic Translator. Deconstruct the provided SQL query into a clear, high-level narrative for architects and developers.
+        return """You are the 'Supreme SQL Architect'. Explain the provided SQL in depth.
         
-        STRUCTURE:
-        1. Purpose: What does this query achieve?
-        2. Mechanisms: Break down JOINs, filters, and aggregations.
-        3. Data Flow: Describe the transformation path from source to result.
-        
-        Use concise, premium professional language.
+        INSTRUCTIONS:
+        1. Start with a <thinking> section analyzing the query's objective and complexity.
+        2. Provide the SQL itself in a clean markdown code block using ```sql.
+        3. End with an 'ANALYSIS' section giving a line-by-line explanation of the logic and performance implications.
+
+        FORMAT:
+        <thinking>
+        [Your thought process]
+        </thinking>
+
+        ```sql
+        [The SQL being explained]
+        ```
+
+        ### ANALYSIS:
+        [Your detailed explanation here]
         """
 
     def _get_sql_optimization_prompt(self, schema_context: str) -> str:
-        return f"""
-        You are a Query Performance Guru. Refactor the provided SQL for maximum efficiency and execution speed.
+        return f"""You are the 'Supreme SQL Architect'. Refactor the provided SQL for maximum performance.
         
         SCHEMA CONTEXT:
         {schema_context}
-        
-        OPTIMIZATION STRATEGIES:
-        - Eliminate redundant scans and Cartesian products.
-        - Optimize WHERE clause for SARGability.
-        - Recommend CTEs over nested subqueries for clarity.
-        - Ensure optimal indexing alignment.
-        
-        OUTPUT:
-        - Provide the ```sql [Optimized Query] ``` first.
-        - Follow with a bulleted "Performance Delta" explanation.
+
+        INSTRUCTIONS:
+        1. Start with a <thinking> section identifying bottlenecks and optimization strategies.
+        2. Provide the OPTIMIZED SQL in a clean markdown code block using ```sql.
+        3. End with an 'ANALYSIS' section explaining why these changes improve performance.
+
+        FORMAT:
+        <thinking>
+        [Reasoning for optimization]
+        </thinking>
+
+        ```sql
+        [Optimized SQL]
+        ```
+
+        ### ANALYSIS:
+        [Explanation of improvements]
         """
 
     def _get_sql_fix_prompt(self, error: str, schema_context: str) -> str:
-        return f"""
-        You are a SQL Debugging Specialist. Analyzing a failed query and providing a correction.
+        return f"""You are the 'Supreme SQL Architect'. Debug and fix the provided SQL based on the error message.
         
-        DATABASE ERROR:
-        {error}
-        
+        ERROR: {error}
         SCHEMA CONTEXT:
         {schema_context}
-        
-        TASK:
-        1. Identify the root cause (syntax, column mismatch, etc.).
-        2. Provide the corrected SQL in a markdown block.
-        3. Briefly explain the correction.
+
+        INSTRUCTIONS:
+        1. Start with a <thinking> section analyzing the cause of the error.
+        2. Provide the FIXED SQL in a clean markdown code block using ```sql.
+        3. End with an 'ANALYSIS' section explaining the fix.
+
+        FORMAT:
+        <thinking>
+        [Debugging analysis]
+        </thinking>
+
+        ```sql
+        [Fixed SQL]
+        ```
+
+        ### ANALYSIS:
+        [Explanation of the fix]
         """
 
 ai_service = AIService()

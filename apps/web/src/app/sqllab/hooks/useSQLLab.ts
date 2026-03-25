@@ -61,12 +61,23 @@ export function useSQLLab() {
     autoCommit: ui.activeResultTab === "results", // Generic, specific ones can override
     limit: settings.defaultQueryLimit,
     onSuccess: (res: any) => {
-      updateActiveTab({ results: res.data || [], columns: res.columns || [], error: null });
-      ui.setActiveResultTab("results");
+      updateActiveTab({
+        results: res.data || [],
+        columns: res.columns || [],
+        error: res.error || null,
+      });
+      if (res.error) {
+        ui.setActiveResultTab("messages");
+        toast.error("Execution failed. Check messages for details.");
+      } else {
+        ui.setActiveResultTab("results");
+        toast.success("Query executed successfully");
+      }
     },
     onError: (err) => {
       updateActiveTab({ error: err });
       ui.setActiveResultTab("messages");
+      toast.error("Network or execution error. Check details.");
     },
   });
 
@@ -169,7 +180,8 @@ export function useSQLLab() {
     // Actions
     handleRun: (sqlOverride?: string | React.SyntheticEvent) => {
       const actualSql = typeof sqlOverride === "string" ? sqlOverride : undefined;
-      return handleRun(actualSql || undefined); // selection logic simplified temporarily
+      updateActiveTab({ error: null });
+      return handleRun(actualSql || undefined);
     },
     handleFormat: () => handleFormat(activeTab.sql, (s: string) => updateActiveTab({ sql: s })),
     handleStop,
@@ -201,8 +213,14 @@ export function useSQLLab() {
       ui.setIsOpenDialogOpen(false);
     },
     setSelectedText: (txt: string) => { /* localized in ui trigger if needed */ },
-    fixSQLError: ui.showAISidebar ? "error" : null, // Mocked for placeholder
-    setFixSQLError: (v: string) => {},
+    fixSQLError: ui.fixSQLError,
+    setFixSQLError: (v: string | null) => {
+      ui.setFixSQLError(v);
+      if (v) {
+        ui.setShowAISidebar(true);
+        ui.setShowRightPanel(false);
+      }
+    },
     handleSave: () => ui.setIsSaveDialogOpen(true),
     handleOpen: () => ui.setIsOpenDialogOpen(true),
     handleUndo: ui.triggerUndo,

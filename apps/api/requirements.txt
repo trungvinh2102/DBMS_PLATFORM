@@ -24,3 +24,4 @@ clickhouse-connect
 # Utils
 redis
 cloudinary
+psutil

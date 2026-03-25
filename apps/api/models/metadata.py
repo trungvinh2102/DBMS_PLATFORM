@@ -112,6 +112,83 @@ class UserSetting(Base):
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+class AIConversation(Base):
+    __tablename__ = 'ai_conversations'
+    
+    id = Column(String, primary_key=True)
+    title = Column(String, nullable=False)
+    userId = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    databaseId = Column(String, ForeignKey('databases.id'), nullable=True)
+    isPinned = Column(Boolean, default=False)
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+    changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    messages = relationship("AIChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+class AIChatMessage(Base):
+    __tablename__ = 'ai_chat_messages'
+    
+    id = Column(String, primary_key=True)
+    role = Column(String, nullable=False) # 'user' or 'assistant'
+    content = Column(Text, nullable=False)
+    userId = Column(String, ForeignKey('users.id'), nullable=True)
+    databaseId = Column(String, ForeignKey('databases.id'), nullable=True)
+    conversationId = Column(String, ForeignKey('ai_conversations.id', ondelete='CASCADE'), nullable=True)
+    
+    conversation = relationship("AIConversation", back_populates="messages")
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+
+class AIGeneratedQuery(Base):
+    __tablename__ = 'ai_generated_queries'
+    
+    id = Column(String, primary_key=True)
+    prompt = Column(Text, nullable=True)
+    sql = Column(Text, nullable=False)
+    explanation = Column(Text, nullable=True)
+    userId = Column(String, ForeignKey('users.id'), nullable=True)
+    databaseId = Column(String, ForeignKey('databases.id'), nullable=True)
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class AIModel(Base):
+    __tablename__ = 'ai_models'
+    
+    id = Column(String, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    modelId = Column(String, unique=True, nullable=False) # e.g. 'gemini-1.5-flash'
+    provider = Column(String, default="Google")
+    description = Column(Text, nullable=True)
+    isActive = Column(Boolean, default=True)
+    isDefault = Column(Boolean, default=False)
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+
+    def to_dict(self):
+        """Robust serialization to dictionary, handling missing columns gracefully."""
+        return {
+            'id': self.id,
+            'name': getattr(self, 'name', "Unnamed"),
+            'modelId': getattr(self, 'modelId', "dynamic-model"),
+            'provider': getattr(self, 'provider', "Google"),
+            'description': getattr(self, 'description', "No description available."),
+            'status': 'Synchronized' if getattr(self, 'isActive', True) else 'Offline',
+            'isActive': getattr(self, 'isActive', True),
+            'isDefault': getattr(self, 'isDefault', False)
+        }
+
+class UserAIConfig(Base):
+    __tablename__ = 'user_ai_configs'
+    
+    id = Column(String, primary_key=True)
+    userId = Column(String, ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
+    apiKey = Column(String, nullable=False) # Should be encrypted
+    provider = Column(String, default="Google")
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+    changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
 # Database connection
 import sys
 from dotenv import load_dotenv
@@ -170,24 +247,12 @@ def init_engine():
     
     engine = create_engine(url)
     
-    # Test connection. If failure happens, fallback if frozen.
+    # Test connection
     try:
         with engine.connect() as conn:
             pass
     except Exception as e:
-        print(f"WARNING: Database connection to {masked_url} failed: {e}")
-        if getattr(sys, 'frozen', False) and not url.startswith("sqlite"):
-            print("Backend: Falling back to local SQLite database for Desktop...")
-            app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
-            data_dir = os.path.join(app_data, 'DBMSPlatform')
-            
-            if not os.path.exists(data_dir):
-                os.makedirs(data_dir, exist_ok=True)
-            
-            db_path = os.path.join(data_dir, 'dbms_platform.db').replace('\\', '/')
-            url = f"sqlite:///{db_path}"
-            engine = create_engine(url)
-            print(f"Backend: Fallback Target established: local sqlite")
+        print(f"WARNING: Database connection failed: {e}")
             
     return engine, url
 
@@ -200,21 +265,7 @@ except Exception as e:
     DATABASE_URL = None
 
 def SessionLocal():
-    """Returns a new session. Always ensures binding to avoid 'Could not locate a bind' error."""
-    global engine
     if engine is None:
-        engine, DATABASE_URL = init_engine()
-    
-    if engine is None:
-        raise Exception("SQLAlchemy Error: DATABASE_URL not found. Engine is not bound.")
-        
-    # Create a fresh session maker bound to the engine
-    factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return factory()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+        return None
+    Session = sessionmaker(bind=engine)
+    return Session()

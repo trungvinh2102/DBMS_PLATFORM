@@ -20,7 +20,7 @@ if %errorlevel% neq 0 (
 )
 
 echo Starting Backend API...
-start "Backend API" cmd /c "bun run backend:dev"
+start "Backend API" cmd /c "bun run dev:backend"
 
 echo Waiting for backend to initialize...
 timeout /t 5 /nobreak >nul

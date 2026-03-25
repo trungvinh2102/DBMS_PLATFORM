@@ -26,8 +26,8 @@ $DEST_DIR = "apps/desktop/src-tauri/bin"
 # Install dependencies
 Write-Host "[1/4] Installing Python dependencies..." -ForegroundColor Yellow
 Set-Location $API_DIR
-& pip install -r requirements.txt --quiet
-& pip install pyinstaller --quiet
+& ./venv/Scripts/python -m pip install -r requirements.txt --quiet
+& ./venv/Scripts/python -m pip install pyinstaller --quiet
 
 # Build with PyInstaller
 Write-Host "[2/4] Running PyInstaller..." -ForegroundColor Yellow
@@ -35,10 +35,10 @@ $SPEC_FILE = "api-$TARGET_TRIPLE.spec"
 
 if (Test-Path $SPEC_FILE) {
     Write-Host "Using existing spec file: $SPEC_FILE"
-    & pyinstaller $SPEC_FILE --noconfirm
+    & ./venv/Scripts/python -m PyInstaller $SPEC_FILE --noconfirm
 } else {
     Write-Host "No spec file found, building with default options..."
-    & pyinstaller --onefile --name "api-$TARGET_TRIPLE" app.py --noconfirm
+    & ./venv/Scripts/python -m PyInstaller --onefile --name "api-$TARGET_TRIPLE" app.py --noconfirm
 }
 
 # Create destination directory
