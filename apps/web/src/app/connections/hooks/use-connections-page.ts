@@ -143,13 +143,26 @@ export function useConnectionsPage() {
 
   // Sync activeConn from URL param when connections are loaded
   useEffect(() => {
-    if (connIdFromUrl && connections && !activeConn) {
+    if (!connections) return;
+
+    if (connIdFromUrl) {
+      // Find the connection matching the ID in the URL
       const found = (connections as any[]).find(
         (c: any) => c.id === connIdFromUrl,
       );
+      
       if (found) {
-        setActiveConn(found);
+        // Update activeConn if it's different (or null)
+        if (!activeConn || activeConn.id !== found.id) {
+          setActiveConn(found);
+        }
+      } else if (activeConn) {
+        // ID in URL is invalid/not found, clear activeConn
+        setActiveConn(null);
       }
+    } else if (activeConn) {
+      // No ID in URL, clear activeConn
+      setActiveConn(null);
     }
   }, [connIdFromUrl, connections, activeConn]);
 
@@ -162,7 +175,6 @@ export function useConnectionsPage() {
   );
 
   const handleBack = useCallback(() => {
-    setActiveConn(null);
     navigate("/connections");
   }, [navigate]);
 
