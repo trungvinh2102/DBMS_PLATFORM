@@ -14,7 +14,7 @@ from models.metadata import User, Role, SessionLocal
 logger = logging.getLogger(__name__)
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 class AuthService:
     def __init__(self):
@@ -22,47 +22,41 @@ class AuthService:
         self.algorithm = "HS256"
 
     def verify_password(self, plain_password, hashed_password):
-        # bcrypt has a 72-byte limit. We truncate to ensure compliance.
+        """
+        Verifies the plain password against the hashed password using direct bcrypt call.
+        Bypasses passlib logic to resolve length limitation errors.
+        """
         try:
-            if not plain_password:
+            if not plain_password or not hashed_password:
                 return False
+                
+            # Convert both to bytes for bcrypt.checkpw
+            p_bytes = plain_password.encode('utf-8')
+            if len(p_bytes) > 72:
+                 p_bytes = p_bytes[:72]
             
-            # Ensure we have bytes for measurement
-            if isinstance(plain_password, str):
-                p_bytes = plain_password.encode('utf-8')
-            else:
-                p_bytes = plain_password
+            h_bytes = hashed_password.encode('utf-8') if isinstance(hashed_password, str) else hashed_password
             
-            # Truncate to exactly 72 bytes
-            truncated_bytes = p_bytes[:72]
-            safe_str = truncated_bytes.decode('utf-8', errors='ignore')
-            
-            # Diagnostic for debugging in desktop app
-            print(f"Auth Service: Verifying password (input_len={len(p_bytes)}, truncated_len={len(truncated_bytes)}, is_str={isinstance(safe_str, str)})")
-            
-            # Call passlib/bcrypt. It should be happy with a string of up to 72 bytes
-            return pwd_context.verify(safe_str, hashed_password)
+            # Direct checkpw call. It usually handles everything fine.
+            return bcrypt.checkpw(p_bytes, h_bytes)
         except Exception as e:
-            # Diagnostic: include lengths in error to see if truncation actually happened
-            p_len = len(plain_password) if plain_password else 0
-            # If the user sees this prefix, they ARE running this updated code.
-            raise Exception(f"Auth verification error [len={p_len}]: {str(e)}")
+            logger.error(f"Auth Service ERROR during verification: {e}")
+            # If it's not a bcrypt hash, we should handle it gracefully
+            return False
 
     def get_password_hash(self, password):
-        # bcrypt has a 72-byte limit.
+        """Hashes the password using direct bcrypt call."""
         if not password:
-             return pwd_context.hash("")
+             password = ""
         
-        # Ensure bytes and truncate
-        if isinstance(password, str):
-            p_bytes = password.encode('utf-8')
-        else:
-            p_bytes = password
+        p_bytes = password.encode('utf-8')
+        if len(p_bytes) > 72:
+            p_bytes = p_bytes[:72]
             
-        truncated_bytes = p_bytes[:72]
-        safe_str = truncated_bytes.decode('utf-8', errors='ignore')
-        print(f"Auth Service: Hashing password (input_len={len(p_bytes)}, truncated_len={len(truncated_bytes)}, is_str={isinstance(safe_str, str)})")
-        return pwd_context.hash(safe_str)
+        # Standard bcrypt hashing
+        salt = bcrypt.gensalt(12) # Rounds match the $2b$12$ in your DB
+        hashed = bcrypt.hashpw(p_bytes, salt)
+        return hashed.decode('utf-8')
 
     def create_access_token(self, data: dict):
         to_encode = data.copy()
