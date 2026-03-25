@@ -195,6 +195,9 @@ export function ConnectionConfig({
         {activeConn.type === 'clickhouse' && (
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-orange-600 opacity-50" />
         )}
+        {activeConn.type === 'redis' && (
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-600 opacity-50" />
+        )}
         <div className="flex gap-3">
           <Button
             variant="outline"

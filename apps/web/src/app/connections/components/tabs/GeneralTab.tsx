@@ -14,6 +14,7 @@ interface GeneralTabProps {
 export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
   const isClickhouse = dbType === "clickhouse";
   const isMongodb = dbType === "mongodb";
+  const isRedis = dbType === "redis";
   const useUri = config.useUri || false;
 
   return (
@@ -116,6 +117,54 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
         </div>
       )}
 
+      {dbType === "redis" && (
+        <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-red-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-red-600">Redis Configuration Mode</span>
+            </div>
+            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-lg border border-red-500/20">
+              <Button
+                variant={config.redisMode !== "cluster" && config.redisMode !== "sentinel" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md transition-all"
+                onClick={() => onChange("redisMode", "standalone")}
+              >
+                STANDALONE
+              </Button>
+              <Button
+                variant={config.redisMode === "cluster" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md transition-all"
+                onClick={() => onChange("redisMode", "cluster")}
+              >
+                CLUSTER
+              </Button>
+              <Button
+                variant={config.redisMode === "sentinel" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md transition-all"
+                onClick={() => onChange("redisMode", "sentinel")}
+              >
+                SENTINEL
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between px-1">
+            <div className="space-y-0.5">
+              <Label className="text-[11px] font-bold">Secure Connection (SSL/TLS)</Label>
+              <p className="text-[10px] text-muted-foreground">Encryption for cloud Redis instances</p>
+            </div>
+            <Switch 
+              checked={config.secure || false} 
+              onCheckedChange={(checked: boolean) => onChange("secure", checked)}
+            />
+          </div>
+        </div>
+      )}
+
       {isMongodb && useUri ? (
         <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
            <div className="space-y-2">
@@ -164,18 +213,38 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
             />
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Database className="h-3.5 w-3.5 text-muted-foreground" />
-              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database Name</Label>
+          {!isRedis && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Database className="h-3.5 w-3.5 text-muted-foreground" />
+                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database Name</Label>
+              </div>
+              <Input 
+                value={config.database || ""} 
+                onChange={(e) => onChange("database", e.target.value)} 
+                className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+                placeholder={isMongodb ? "admin" : "default"}
+              />
             </div>
-            <Input 
-              value={config.database || ""} 
-              onChange={(e) => onChange("database", e.target.value)} 
-              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-              placeholder={isMongodb ? "admin" : "default"}
-            />
-          </div>
+          )}
+
+          {isRedis && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-left-2 duration-300">
+              <div className="flex items-center gap-2">
+                <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database Index</Label>
+              </div>
+              <Input 
+                type="number"
+                min={0}
+                max={15}
+                value={config.database || "0"} 
+                onChange={(e) => onChange("database", e.target.value)} 
+                className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+                placeholder="0-15"
+              />
+            </div>
+          )}
 
           {isMongodb && (
             <div className="space-y-2">
@@ -237,6 +306,21 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
                 onChange={(e) => onChange("authSource", e.target.value)} 
                 className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
                 placeholder="e.g. admin"
+              />
+            </div>
+          )}
+
+          {isRedis && config.redisMode === "sentinel" && (
+            <div className="space-y-2 animate-in fade-in slide-in-from-right-2 duration-300">
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Master Name</Label>
+              </div>
+              <Input 
+                value={config.masterName || ""} 
+                onChange={(e) => onChange("masterName", e.target.value)} 
+                className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+                placeholder="e.g. mymaster"
               />
             </div>
           )}
