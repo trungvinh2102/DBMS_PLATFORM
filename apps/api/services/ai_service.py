@@ -57,7 +57,7 @@ class AIService:
             return {"error": error_msg}
             
         sql = self._extract_sql(str(response_text))
-        self._save_chat("assistant", f"Generated SQL: {sql}", user_id, db_id)
+        self._save_chat("assistant", str(response_text), user_id, db_id)
         self._save_generated_query(sql, prompt, "AI Generated Query", user_id, db_id)
         
         return {"sql": sql}
@@ -89,7 +89,7 @@ class AIService:
             return {"error": error_msg}
             
         optimized_sql = self._extract_sql(str(response_text))
-        self._save_chat("assistant", f"Optimized SQL: {optimized_sql}", user_id, db_id)
+        self._save_chat("assistant", str(response_text), user_id, db_id)
         self._save_generated_query(optimized_sql, f"Optimize: {sql}", str(response_text), user_id, db_id)
 
         return {"result": str(response_text), "sql": optimized_sql}
@@ -107,7 +107,7 @@ class AIService:
             return {"error": error_msg}
             
         fixed_sql = self._extract_sql(str(response_text))
-        self._save_chat("assistant", f"Fixed SQL: {fixed_sql}", user_id, db_id)
+        self._save_chat("assistant", str(response_text), user_id, db_id)
         self._save_generated_query(fixed_sql, f"Fix Error: {error}", str(response_text), user_id, db_id)
 
         return {"result": str(response_text), "sql": fixed_sql}

@@ -46,8 +46,8 @@ interface AIMessageProps {
 export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessageProps) {
   const [showThought, setShowThought] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
 
   const handleCopy = () => {
     if (message.sql) {
@@ -139,6 +139,7 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                               margin: "1em 0",
                               borderRadius: "8px",
                               fontSize: "11px",
+                              background: isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
                             }}
                             {...props}
                           >
@@ -185,6 +186,7 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                               margin: "0.5em 0",
                               borderRadius: "6px",
                               fontSize: "10px",
+                              background: isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
                             }}
                             {...props}
                           >
@@ -218,11 +220,11 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
         {message.sql && (
           <div className={cn(
             "w-full rounded-xl border shadow-2xl overflow-hidden group/sql transition-all hover:border-primary/50",
-            isDark ? "bg-[#0a0c10] border-border/40" : "bg-white border-slate-200"
+            isDark ? "bg-[#0a0c10]/90 backdrop-blur-sm border-primary/20" : "bg-white border-slate-200"
           )}>
             <div className={cn(
               "flex items-center justify-between px-3 py-1.5 border-b",
-              isDark ? "bg-slate-900/50 border-white/5" : "bg-slate-100/50 border-slate-200"
+              isDark ? "bg-primary/10 border-white/5" : "bg-slate-50 border-slate-200"
             )}>
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3 w-3 text-primary" />
