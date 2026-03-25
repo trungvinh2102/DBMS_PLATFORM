@@ -1,92 +1,153 @@
-/**
- * @file GeneralTab.tsx
- * @description Core connection settings for relational databases.
- */
-
+import { Database, Server, Hash, User, Lock, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Database, Server, Hash, User, Lock } from "lucide-react";
+import { ChangeEvent } from "react";
 
 interface GeneralTabProps {
+  dbType?: string;
   config: any;
   onChange: (field: string, value: any) => void;
 }
 
-export function GeneralTab({ config, onChange }: GeneralTabProps) {
+export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
+  const isClickhouse = dbType === "clickhouse";
+
   return (
-    <div className="grid grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Server className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Host Address</Label>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {isClickhouse && (
+        <div className="p-4 bg-orange-500/5 border border-orange-500/10 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-orange-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-600">ClickHouse Protocol Settings</span>
+            </div>
+            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-lg border border-orange-500/20">
+              <Button
+                variant={config.protocol !== "native" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md"
+                onClick={() => {
+                  onChange("protocol", "http");
+                  if (!config.port || ["9000", "9440", "8123", "8443"].includes(config.port.toString())) {
+                    onChange("port", config.secure ? "8443" : "8123");
+                  }
+                }}
+              >
+                HTTP
+              </Button>
+              <Button
+                variant={config.protocol === "native" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md"
+                onClick={() => {
+                  onChange("protocol", "native");
+                  if (!config.port || ["9000", "9440", "8123", "8443"].includes(config.port.toString())) {
+                    onChange("port", config.secure ? "9440" : "9000");
+                  }
+                }}
+              >
+                NATIVE
+              </Button>
+            </div>
           </div>
-          <Input 
-            value={config.host || ""} 
-            onChange={(e) => onChange("host", e.target.value)} 
-            className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-            placeholder="e.g. localhost or 1.2.3.4"
-          />
+          
+          <div className="flex items-center justify-between px-1">
+            <div className="space-y-0.5">
+              <Label className="text-[11px] font-bold">Secure Connection (TLS/SSL)</Label>
+              <p className="text-[10px] text-muted-foreground">Encryption for cloud and production servers</p>
+            </div>
+            <Switch 
+              checked={config.secure || false} 
+              onCheckedChange={(checked: boolean) => {
+                onChange("secure", checked);
+                // Update port based on protocol if it's the default
+                if (config.protocol === "native") {
+                  onChange("port", checked ? "9440" : "9000");
+                } else {
+                  onChange("port", checked ? "8443" : "8123");
+                }
+              }}
+            />
+          </div>
         </div>
-        
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Port</Label>
+      )}
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Server className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Host Address</Label>
+            </div>
+            <Input 
+              value={config.host || ""} 
+              onChange={(e) => onChange("host", e.target.value)} 
+              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+              placeholder="e.g. localhost or clickhouse-cloud.com"
+            />
           </div>
-          <Input 
-            type="number" 
-            value={config.port || ""} 
-            onChange={(e) => onChange("port", e.target.value)} 
-            className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-          />
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Port</Label>
+            </div>
+            <Input 
+              type="number" 
+              value={config.port || ""} 
+              onChange={(e) => onChange("port", e.target.value)} 
+              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Database className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database Name</Label>
+            </div>
+            <Input 
+              value={config.database || ""} 
+              onChange={(e) => onChange("database", e.target.value)} 
+              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+              placeholder="default"
+            />
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Database className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database Name</Label>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Username</Label>
+            </div>
+            <Input 
+              value={config.user || ""} 
+              onChange={(e) => onChange("user", e.target.value)} 
+              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+              placeholder="e.g. default"
+            />
           </div>
-          <Input 
-            value={config.database || ""} 
-            onChange={(e) => onChange("database", e.target.value)} 
-            className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-            placeholder="e.g. postgres"
-          />
-        </div>
-      </div>
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <User className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Username</Label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Password</Label>
+            </div>
+            <Input 
+              type="password" 
+              value={config.password || ""} 
+              onChange={(e) => onChange("password", e.target.value)} 
+              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+              placeholder={config.password === '********' ? '********' : '••••••••'}
+            />
+            {config.password === '********' && (
+              <p className="text-[10px] text-muted-foreground/60 italic">
+                Encrypted password. Type to change.
+              </p>
+            )}
           </div>
-          <Input 
-            value={config.user || ""} 
-            onChange={(e) => onChange("user", e.target.value)} 
-            className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-            placeholder="e.g. admin"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Password</Label>
-          </div>
-          <Input 
-            type="password" 
-            value={config.password || ""} 
-            onChange={(e) => onChange("password", e.target.value)} 
-            className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-            placeholder={config.password === '********' ? '********' : '••••••••'}
-          />
-          {config.password === '********' && (
-            <p className="text-[10px] text-muted-foreground/60 italic">
-              Encrypted password. Type to change.
-            </p>
-          )}
         </div>
       </div>
     </div>

@@ -20,6 +20,8 @@ google-generativeai
 
 # ClickHouse
 clickhouse-connect
+clickhouse-sqlalchemy
+clickhouse-driver
 
 # Utils
 redis
