@@ -53,10 +53,49 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
     if (message.sql) {
         navigator.clipboard.writeText(message.sql);
         setCopied(true);
-        toast.success("SQL copied to clipboard");
+        toast.promise(Promise.resolve(), {
+          loading: 'Copying...',
+          success: 'SQL copied to clipboard',
+          error: 'Failed to copy',
+        });
         setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  /**
+   * Logic to extract confidence score and clean content
+   */
+  const extractConfidence = (content: string) => {
+    const match = content.match(/<confidence>([1-5])<\/confidence>/i);
+    const score = match ? parseInt(match[1]) : 4; // Default to 4 if not found
+    const cleaned = content.replace(/<confidence>[1-5]<\/confidence>/gi, "").trim();
+    return { score, cleaned };
+  };
+
+  const { score, cleaned } = extractConfidence(message.content || "");
+
+  /**
+   * Confidence Score Component
+   * Visualizes the AI's certainty based on metadata or heuristic analysis.
+   */
+  const ConfidenceScore = ({ score }: { score: number }) => (
+    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/5 border border-primary/10 mb-2 w-fit">
+      <div className="flex gap-0.5">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div 
+            key={i} 
+            className={cn(
+              "w-1.5 h-1.5 rounded-full transition-all duration-1000",
+              i <= score ? "bg-primary animate-pulse" : "bg-muted"
+            )} 
+          />
+        ))}
+      </div>
+      <span className="text-[10px] font-black uppercase tracking-tight text-primary/70">
+        AI Confidence: {score * 20}%
+      </span>
+    </div>
+  );
 
   return (
     <div className={cn(
@@ -88,25 +127,25 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
           <div className="w-full mb-1">
             <button
               onClick={() => setShowThought(!showThought)}
-              className="flex items-center gap-2 text-primary hover:text-primary/100 transition-all py-1 px-2 rounded-lg hover:bg-primary/5 border border-transparent hover:border-primary/20"
+              className="flex items-center gap-2 text-primary/70 hover:text-primary transition-all py-1 px-2 rounded-lg hover:bg-primary/5 group/thought mb-1"
             >
               <div className={cn(
-                "p-1 rounded-md bg-primary/10 transition-transform duration-300",
-                showThought ? "rotate-90" : "rotate-0"
+                "p-1 rounded-md bg-primary/10 transition-all duration-500",
+                showThought ? "rotate-180 bg-primary/20" : "rotate-0"
               )}>
-                <ArrowRight className="h-3 w-3" />
+                <BrainCircuit className={cn("h-3 w-3", showThought ? "text-primary" : "text-muted-foreground")} />
               </div>
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-                Thinking Process
+                {showThought ? "Hide Intelligence Trace" : "View Intelligence Trace"}
               </span>
             </button>
             
             <div className={cn(
-              "grid transition-all duration-300 ease-in-out",
+              "grid transition-all duration-500 ease-in-out",
               showThought ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
             )}>
               <div className="overflow-hidden">
-                <div className="p-3 rounded-xl bg-muted/30 border border-primary/10 text-[11px] text-muted-foreground leading-relaxed font-mono">
+                <div className="p-4 rounded-2xl bg-muted/20 border border-primary/10 text-[11px] text-muted-foreground leading-relaxed font-mono glass-v2">
                   {message.thought}
                 </div>
               </div>
@@ -114,18 +153,24 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
           </div>
         )}
 
-        {/* Primary Communication Bubble */}
+        {/* Primary Communication Bubble with Glassmorphism 2.0 */}
         <div
           className={cn(
-            "p-3 rounded-xl text-xs leading-relaxed shadow-lg transition-all border w-full",
+            "p-3.5 px-4 rounded-3xl text-[12px] leading-relaxed transition-all relative group/bubble",
             message.role === "user"
-              ? "bg-primary text-primary-foreground rounded-tr-none border-primary/20 shadow-primary/20"
-              : "glass border-border/50 rounded-tl-none backdrop-blur-xl bg-background/50",
+              ? "bg-primary text-primary-foreground rounded-tr-none shadow-lg w-fit max-w-full ml-auto"
+              : "glass-v2 rounded-tl-none w-full border-none shadow-none",
           )}
         >
-          <div className="prose prose-sm dark:prose-invert max-w-none">
+          {message.role === "assistant" && <ConfidenceScore score={score} />}
+          
+          <div className={cn(
+            message.role === "assistant" 
+              ? "prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed" 
+              : "text-[12px] whitespace-pre-wrap"
+          )}>
             {message.content && !message.content.includes("Crafting the SQL") ? (
-               <React.Suspense fallback={<div className="animate-pulse h-4 bg-muted w-3/4 rounded" />}>
+               <React.Suspense fallback={null}>
                   <ReactMarkdown
                     components={{
                       code({ node, className, children, ...props }: any) {
@@ -136,32 +181,33 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                             language={match[1]}
                             PreTag="div"
                             customStyle={{
-                              margin: "1em 0",
-                              borderRadius: "8px",
+                              margin: "0.8em 0",
+                              borderRadius: "10px",
                               fontSize: "11px",
-                              background: isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
+                              background: message.role === "user" 
+                                ? "rgba(0,0,0,0.2)" 
+                                : isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
+                              border: message.role === "user" ? "1px solid rgba(255,255,255,0.1)" : "none",
                             }}
                             {...props}
                           >
                             {String(children).replace(/\n$/, "")}
                           </Prism>
                         ) : (
-                          <code className={className} {...props}>
+                          <code className={cn(
+                            "px-1.5 py-0.5 rounded bg-black/10 font-mono text-[10px]",
+                            className
+                          )} {...props}>
                             {children}
                           </code>
                         );
                       },
                     }}
                   >
-                    {message.content}
+                    {cleaned}
                   </ReactMarkdown>
                </React.Suspense>
-            ) : (
-              <div className="flex items-center gap-2 animate-pulse text-muted-foreground italic text-xs">
-                 <Sparkles className="h-3 w-3" />
-                 Building intelligence...
-              </div>
-            )}
+            ) : null}
           </div>
           
           {/* Post-Generation Analysis */}
@@ -219,12 +265,12 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
         {/* SQL Code Block with Advanced Highlighting */}
         {message.sql && (
           <div className={cn(
-            "w-full rounded-xl border shadow-2xl overflow-hidden group/sql transition-all hover:border-primary/50",
-            isDark ? "bg-[#0a0c10]/90 backdrop-blur-sm border-primary/20" : "bg-white border-slate-200"
+            "w-full rounded-xl border shadow-lg overflow-hidden group/sql transition-all hover:border-primary/30 mt-3",
+            isDark ? "bg-[#0d1117] border-white/10" : "bg-white border-slate-200"
           )}>
             <div className={cn(
-              "flex items-center justify-between px-3 py-1.5 border-b",
-              isDark ? "bg-primary/10 border-white/5" : "bg-slate-50 border-slate-200"
+              "flex items-center justify-between px-3 py-2 border-b",
+              isDark ? "bg-white/5 border-white/5" : "bg-slate-50 border-slate-200"
             )}>
               <div className="flex items-center gap-2">
                 <Sparkles className="h-3 w-3 text-primary" />
@@ -247,8 +293,8 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
             </div>
 
             <div className={cn(
-              "p-3 overflow-x-auto min-h-[2.5rem] border-t",
-              isDark ? "bg-[#050505] border-white/5" : "bg-white border-slate-100"
+              "p-4 overflow-x-auto min-h-[2.5rem] border-t-0",
+              isDark ? "bg-[#0d1117]" : "bg-white"
             )}>
               <React.Suspense fallback={<div className="h-16 animate-pulse bg-muted/20" />}>
                 <Prism 
