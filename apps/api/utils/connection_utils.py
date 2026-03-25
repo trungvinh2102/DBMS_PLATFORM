@@ -67,8 +67,9 @@ class ConnectionStringBuilder:
             return conn_str
 
         # 2. Build URI from components
-        user = config.get('user', '')
-        password = config.get('password', '')
+        from urllib.parse import quote_plus
+        user = quote_plus(str(config.get('user', '')))
+        password = quote_plus(str(config.get('password', '')))
         host = config.get('host', '127.0.0.1')
         port = config.get('port')
         dbname = config.get('database', '')
