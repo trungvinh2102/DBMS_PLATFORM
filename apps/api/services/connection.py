@@ -170,6 +170,7 @@ class ConnectionService(BaseDatabaseService):
         if 'environment' in data: db.environment = data['environment']
         if 'isReadOnly' in data: db.isReadOnly = data['isReadOnly']
         if 'sslMode' in data: db.sslMode = data['sslMode']
+        if 'sshConfig' in data: db.sshConfig = data['sshConfig']
         
         if 'config' in data:
             new_config = data['config'].copy()
@@ -199,6 +200,13 @@ class ConnectionService(BaseDatabaseService):
                 db_type = db_type or exist_type
                 if config:
                     merged = exist_config.copy()
+                    # Handle sensitive data masks
+                    if config.get('password') == "********":
+                        config['password'] = exist_config.get('password')
+                    
+                    if config.get('uri') and '****' in config['uri']:
+                        config['uri'] = exist_config.get('uri')
+                        
                     merged.update(config)
                     config = merged
                 else:
