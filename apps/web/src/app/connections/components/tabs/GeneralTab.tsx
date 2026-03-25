@@ -1,4 +1,4 @@
-import { Database, Server, Hash, User, Lock, Zap } from "lucide-react";
+import { Database, Server, Hash, User, Lock, Zap, Link2, Settings2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,8 @@ interface GeneralTabProps {
 
 export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
   const isClickhouse = dbType === "clickhouse";
+  const isMongodb = dbType === "mongodb";
+  const useUri = config.useUri || false;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -74,7 +76,67 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6">
+      {isMongodb && (
+        <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">MongoDB Connection Mode</span>
+            </div>
+            <div className="flex items-center gap-1 bg-background/50 p-1 rounded-lg border border-emerald-500/20">
+              <Button
+                variant={!useUri ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md"
+                onClick={() => onChange("useUri", false)}
+              >
+                STANDARD
+              </Button>
+              <Button
+                variant={useUri ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 text-[10px] font-bold px-3 rounded-md"
+                onClick={() => onChange("useUri", true)}
+              >
+                CONNECTION STRING
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between px-1">
+            <div className="space-y-0.5">
+              <Label className="text-[11px] font-bold">Direct Connection</Label>
+              <p className="text-[10px] text-muted-foreground">Force direct connection to a single node</p>
+            </div>
+            <Switch 
+              checked={config.directConnection || false} 
+              onCheckedChange={(checked: boolean) => onChange("directConnection", checked)}
+            />
+          </div>
+        </div>
+      )}
+
+      {isMongodb && useUri ? (
+        <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+           <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Connection URI</Label>
+            </div>
+            <textarea
+              value={config.uri || ""}
+              onChange={(e) => onChange("uri", e.target.value)}
+              className="w-full min-h-[100px] p-3 bg-muted/5 border border-border/50 rounded-xl focus:border-primary/50 transition-all font-mono text-xs outline-none"
+              placeholder="mongodb://username:password@host:port/database?authSource=admin"
+            />
+            <div className="flex items-center gap-2 p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg">
+              <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
+              <p className="text-[10px] text-amber-600 font-medium"> Ensure special characters in your password are URL encoded (e.g. @ becomes %40)</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-6">
         <div className="space-y-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -111,9 +173,24 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
               value={config.database || ""} 
               onChange={(e) => onChange("database", e.target.value)} 
               className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-              placeholder="default"
+              placeholder={isMongodb ? "admin" : "default"}
             />
           </div>
+
+          {isMongodb && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Replica Set</Label>
+              </div>
+              <Input 
+                value={config.replicaSet || ""} 
+                onChange={(e) => onChange("replicaSet", e.target.value)} 
+                className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+                placeholder="e.g. rs0"
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -148,8 +225,24 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
               </p>
             )}
           </div>
+
+          {isMongodb && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground" />
+                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Auth Source</Label>
+              </div>
+              <Input 
+                value={config.authSource || ""} 
+                onChange={(e) => onChange("authSource", e.target.value)} 
+                className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
+                placeholder="e.g. admin"
+              />
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }
