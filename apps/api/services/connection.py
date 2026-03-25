@@ -249,6 +249,8 @@ class ConnectionService(BaseDatabaseService):
                 username=config.get('user'),
                 password=config.get('password'),
                 authSource=config.get('authSource', 'admin'),
+                replicaSet=config.get('replicaSet'),
+                directConnection=config.get('directConnection', False),
                 serverSelectionTimeoutMS=5000
             )
         client.admin.command('ping')
