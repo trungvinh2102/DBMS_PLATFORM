@@ -9,21 +9,35 @@ import { Slider } from "@/components/ui/slider";
 import { Database, Zap, Clock, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+
 interface PerformanceTabProps {
+  dbType?: string;
   pooling: {
     pool_size: number;
     max_overflow: number;
     pool_timeout: number;
     pool_recycle: number;
+    compression?: string;
+    read_timeout?: number;
+    write_timeout?: number;
   };
-  onChange: (field: string, value: number) => void;
+  onChange: (field: string, value: any) => void;
 }
 
-export function PerformanceTab({ pooling, onChange }: PerformanceTabProps) {
+export function PerformanceTab({ dbType, pooling, onChange }: PerformanceTabProps) {
+  const isClickhouse = dbType === "clickhouse";
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="grid grid-cols-2 gap-8">
-        {/* Core Pooling */}
+        {/* Core Pooling / General Timing */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 bg-blue-500/10 rounded-xl flex items-center justify-center border border-blue-500/20 shadow-sm">
@@ -44,14 +58,14 @@ export function PerformanceTab({ pooling, onChange }: PerformanceTabProps) {
                 </div>
               </div>
               <Slider 
-                value={pooling.pool_size} 
+                value={[pooling.pool_size]} 
                 min={1} 
                 max={50} 
                 step={1} 
                 onValueChange={(val) => onChange("pool_size", val[0])}
               />
               <p className="text-[9px] text-muted-foreground leading-relaxed">
-                Number of connections to keep open. Default is 5. High values increase memory usage on the DB server.
+                Number of connections to keep open. Default is 5.
               </p>
             </div>
 
@@ -63,7 +77,7 @@ export function PerformanceTab({ pooling, onChange }: PerformanceTabProps) {
                 </div>
               </div>
               <Slider 
-                value={pooling.max_overflow} 
+                value={[pooling.max_overflow]} 
                 min={0} 
                 max={50} 
                 step={1} 
@@ -94,11 +108,10 @@ export function PerformanceTab({ pooling, onChange }: PerformanceTabProps) {
               </div>
               <Input 
                 type="number" 
-                value={pooling.pool_timeout} 
+                value={pooling.pool_timeout || 30} 
                 onChange={(e) => onChange("pool_timeout", parseInt(e.target.value) || 0)} 
                 className="h-9 bg-background border-border/50 text-xs font-bold"
               />
-              <p className="text-[9px] text-muted-foreground">Wait time before throwing a NoAvailableConnection error.</p>
             </div>
 
             <div className="space-y-2">
@@ -108,27 +121,72 @@ export function PerformanceTab({ pooling, onChange }: PerformanceTabProps) {
               </div>
               <Input 
                 type="number" 
-                value={pooling.pool_recycle} 
+                value={pooling.pool_recycle || 1800} 
                 onChange={(e) => onChange("pool_recycle", parseInt(e.target.value) || 0)} 
                 className="h-9 bg-background border-border/50 text-xs font-bold"
               />
-              <p className="text-[9px] text-muted-foreground">Force re-connection after this period (useful for preventing idle kill).</p>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ClickHouse Specific Tuning */}
+      {isClickhouse && (
+        <div className="space-y-4 p-6 bg-orange-500/5 border border-orange-500/10 rounded-2xl">
+          <div className="flex items-center gap-3">
+             <Activity className="h-5 w-5 text-orange-600" />
+             <h3 className="text-sm font-bold tracking-tight text-orange-950 dark:text-orange-200">ClickHouse Analytical Optimization</h3>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-6">
+             <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Compression</Label>
+                <Select value={pooling.compression || "lz4"} onValueChange={(val) => onChange("compression", val)}>
+                   <SelectTrigger className="h-9 bg-background text-xs">
+                      <SelectValue />
+                   </SelectTrigger>
+                   <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="lz4">LZ4 (Fast)</SelectItem>
+                      <SelectItem value="zstd">ZSTD (High Compression)</SelectItem>
+                   </SelectContent>
+                </Select>
+             </div>
+             
+             <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Read Timeout (s)</Label>
+                <Input 
+                   type="number" 
+                   value={pooling.read_timeout || 30} 
+                   onChange={(e) => onChange("read_timeout", parseInt(e.target.value))}
+                   className="h-9 bg-background text-xs font-bold"
+                />
+             </div>
+
+             <div className="space-y-2">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground">Write Timeout (s)</Label>
+                <Input 
+                   type="number" 
+                   value={pooling.write_timeout || 30} 
+                   onChange={(e) => onChange("write_timeout", parseInt(e.target.value))}
+                   className="h-9 bg-background text-xs font-bold"
+                />
+             </div>
+          </div>
+        </div>
+      )}
 
       {/* Advanced Performance Options */}
       <div className="p-6 bg-gradient-to-r from-muted/5 via-muted/10 to-muted/5 border border-border/40 rounded-xl shadow-xs">
           <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[9px] bg-background">BETA</Badge>
-                  <h4 className="text-xs font-bold font-mono">Statement Level Caching (SQL Alchemy)</h4>
+                  <h4 className="text-xs font-bold font-mono">Statement Level Caching</h4>
               </div>
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-              When enabled, compiled SQL statements will be cached to reduce overhead. This significantly improves performance for repetitive queries in high-load scenarios.
+              When enabled, compiled SQL statements will be cached to reduce overhead. This significantly improves performance for repetitive queries.
           </p>
       </div>
     </div>

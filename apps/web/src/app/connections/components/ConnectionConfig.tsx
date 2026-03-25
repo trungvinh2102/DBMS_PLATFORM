@@ -6,15 +6,15 @@
 
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { 
-  ArrowLeft, 
-  Database, 
-  Save, 
-  Loader2, 
-  Play, 
-  ShieldCheck, 
-  Settings2, 
-  Key, 
+import {
+  ArrowLeft,
+  Database,
+  Save,
+  Loader2,
+  Play,
+  ShieldCheck,
+  Settings2,
+  Key,
   BarChart3,
   Clock,
   CheckCircle2,
@@ -64,7 +64,7 @@ export function ConnectionConfig({
     database: activeConn.config?.database || activeConn.databaseName || "",
     ...activeConn.config
   });
-  
+
   const [sshConfig, setSshConfig] = useState(activeConn.sshConfig || { enabled: false });
   const [accessConfig, setAccessConfig] = useState(activeConn.config?.accessConfig || {
     start_time: "00:00",
@@ -80,7 +80,7 @@ export function ConnectionConfig({
   const [testMessage, setTestMessage] = useState("");
 
   // Find the database type info
-  const dbType = useMemo(() => 
+  const dbType = useMemo(() =>
     DB_TYPES.find((t) => t.id === activeConn.type) || DB_TYPES.find((t) => t.id === "postgres"),
     [activeConn.type]
   );
@@ -123,43 +123,43 @@ export function ConnectionConfig({
     setTestStatus('TESTING');
     setTestProgress(10);
     setTestMessage("Resolving host...");
-    
+
     // Simulate real steps for "WOW" factor
     setTimeout(() => {
-        setTestProgress(40);
-        setTestMessage("Establishing TCP/IP handshake...");
+      setTestProgress(40);
+      setTestMessage("Establishing TCP/IP handshake...");
     }, 800);
 
     setTimeout(async () => {
-        try {
-            setTestProgress(70);
-            setTestMessage("Authenticating with credentials...");
-            
-            const result = await databaseApi.test({
-                id: activeConn.id,
-                type: activeConn.type,
-                config: {
-                    ...config,
-                    sslMode,
-                    sshConfig
-                }
-            });
+      try {
+        setTestProgress(70);
+        setTestMessage("Authenticating with credentials...");
 
-            if (result.success) {
-                setTestStatus('SUCCESS');
-                setTestProgress(100);
-                setTestMessage("Connection established successfully!");
-                toast.success("Connection test passed");
-            } else {
-                setTestStatus('ERROR');
-                setTestMessage(result.message || "Auth failed: Access Denied");
-                toast.error("Test failed: " + result.message);
-            }
-        } catch (err: any) {
-            setTestStatus('ERROR');
-            setTestMessage(err.message || "Network unreachable");
-            toast.error("Test failed: " + err.message);
+        const result = await databaseApi.test({
+          id: activeConn.id,
+          type: activeConn.type,
+          config: {
+            ...config,
+            sslMode,
+            sshConfig
+          }
+        });
+
+        if (result.success) {
+          setTestStatus('SUCCESS');
+          setTestProgress(100);
+          setTestMessage("Connection established successfully!");
+          toast.success("Connection test passed");
+        } else {
+          setTestStatus('ERROR');
+          setTestMessage(result.message || "Auth failed: Access Denied");
+          toast.error("Test failed: " + result.message);
         }
+      } catch (err: any) {
+        setTestStatus('ERROR');
+        setTestMessage(err.message || "Network unreachable");
+        toast.error("Test failed: " + err.message);
+      }
     }, 1500);
   };
 
@@ -168,30 +168,33 @@ export function ConnectionConfig({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/50 pb-6">
         <div className="flex items-center gap-4">
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="rounded-full hover:bg-muted"
-                onClick={onBack}
-            >
-                <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-bold tracking-tight">{activeConn.databaseName}</h1>
-                    <Badge className={`${envColor === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/30' : envColor === 'amber' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'} border uppercase text-[10px] font-bold px-2 py-0 h-5`}>
-                        {environment}
-                    </Badge>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-                    <span className="flex items-center gap-1">
-                        {dbType?.icon} {dbType?.name}
-                    </span>
-                    <span>•</span>
-                    <span className="font-mono text-[10px]">{config.host}:{config.port}</span>
-                </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full hover:bg-muted"
+            onClick={onBack}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold tracking-tight">{activeConn.databaseName}</h1>
+              <Badge className={`${envColor === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/30' : envColor === 'amber' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'} border uppercase text-[10px] font-bold px-2 py-0 h-5`}>
+                {environment}
+              </Badge>
             </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+              <span className="flex items-center gap-1">
+                {dbType?.icon} {dbType?.name}
+              </span>
+              <span>•</span>
+              <span className="font-mono text-[10px]">{config.host}:{config.port}</span>
+            </div>
+          </div>
         </div>
+        {activeConn.type === 'clickhouse' && (
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-500 to-orange-600 opacity-50" />
+        )}
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -219,135 +222,143 @@ export function ConnectionConfig({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Sidebar Diagnostics */}
         <div className="lg:col-span-1 space-y-6">
-            {/* Connection Tester Card */}
-            <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/20 to-muted/5 border border-border/50 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold uppercase tracking-tight flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-primary" />
-                        Diagnostics
-                    </h3>
-                    {testStatus === 'SUCCESS' && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-                    {testStatus === 'ERROR' && <AlertCircle className="h-4 w-4 text-red-500" />}
-                </div>
-                
-                <div className="space-y-2">
-                    {testStatus === 'TESTING' || testStatus === 'SUCCESS' || testStatus === 'ERROR' ? (
-                        <div className="space-y-3 pt-2">
-                            <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
-                                <span>{testMessage}</span>
-                                <span>{testProgress}%</span>
-                            </div>
-                            <Progress value={testProgress} className={`h-1.5 ${testStatus === 'ERROR' ? 'bg-red-500/10' : ''}`} />
-                            {testStatus === 'ERROR' && (
-                                <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-lg flex gap-2">
-                                    <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5" />
-                                    <p className="text-[10px] text-red-600 font-medium leading-relaxed">{testMessage}</p>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            Run a manual heartbeat test to verify path connectivity and authentication.
-                        </p>
-                    )}
-                </div>
-
-                <Button 
-                    variant="secondary" 
-                    className="w-full h-9 rounded-xl font-bold uppercase text-[10px] tracking-widest gap-2 bg-background border border-border shadow-xs hover:bg-muted"
-                    onClick={handleTestConnection}
-                    disabled={testStatus === 'TESTING'}
-                >
-                    {testStatus === 'TESTING' ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                        <Play className="h-3 w-3" />
-                    )}
-                    Run Connection Test
-                </Button>
+          {/* Connection Tester Card */}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-muted/20 to-muted/5 border border-border/50 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold uppercase tracking-tight flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Diagnostics
+              </h3>
+              {testStatus === 'SUCCESS' && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+              {testStatus === 'ERROR' && <AlertCircle className="h-4 w-4 text-red-500" />}
             </div>
 
-            {/* Quick Stats */}
-            <div className="p-6 rounded-2xl border border-border/40 bg-muted/5 text-[11px] space-y-3">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">SSL Security</span>
-                    <span className="font-bold flex items-center gap-1">
-                        {sslMode !== 'DISABLE' ? <ShieldCheck className="h-3 w-3 text-emerald-500" /> : 'UNSECURED'}
-                    </span>
+            <div className="space-y-2">
+              {testStatus === 'TESTING' || testStatus === 'SUCCESS' || testStatus === 'ERROR' ? (
+                <div className="space-y-3 pt-2">
+                  <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground">
+                    <span>{testMessage}</span>
+                    <span>{testProgress}%</span>
+                  </div>
+                  <Progress value={testProgress} className={`h-1.5 ${testStatus === 'ERROR' ? 'bg-red-500/10' : ''}`} />
+                  {testStatus === 'ERROR' && (
+                    <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-lg flex gap-2">
+                      <XCircle className="h-3.5 w-3.5 text-red-500 mt-0.5" />
+                      <p className="text-[10px] text-red-600 font-medium leading-relaxed">{testMessage}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">SSH Tunnel</span>
-                    <span className="font-bold">{sshConfig.enabled ? 'ACTIVE' : 'NONE'}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Pool Capacity</span>
-                    <span className="font-bold">{config.pool_size || 5} / {config.max_overflow || 10}</span>
-                </div>
-                <div className="pt-2 border-t border-border/40 flex justify-between">
-                    <span className="text-muted-foreground">Compliance</span>
-                    <span className="font-bold text-blue-500">{accessConfig.audit_enabled ? 'SOX/SOC2' : 'BASIC'}</span>
-                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Run a manual heartbeat test to verify path connectivity and authentication.
+                </p>
+              )}
             </div>
+
+            <Button
+              variant="secondary"
+              className="w-full h-9 rounded-xl font-bold uppercase text-[10px] tracking-widest gap-2 bg-background border border-border shadow-xs hover:bg-muted"
+              onClick={handleTestConnection}
+              disabled={testStatus === 'TESTING'}
+            >
+              {testStatus === 'TESTING' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
+              Run Connection Test
+            </Button>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="p-6 rounded-2xl border border-border/40 bg-muted/5 text-[11px] space-y-3">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">SSL Security</span>
+              <span className="font-bold flex items-center gap-1">
+                {sslMode !== 'DISABLE' ? <ShieldCheck className="h-3 w-3 text-emerald-500" /> : 'UNSECURED'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">SSH Tunnel</span>
+              <span className="font-bold">{sshConfig.enabled ? 'ACTIVE' : 'NONE'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Pool Capacity</span>
+              <span className="font-bold">{config.pool_size || 5} / {config.max_overflow || 10}</span>
+            </div>
+            <div className="pt-2 border-t border-border/40 flex justify-between">
+              <span className="text-muted-foreground">Compliance</span>
+              <span className="font-bold text-blue-500">{accessConfig.audit_enabled ? 'SOX/SOC2' : 'BASIC'}</span>
+            </div>
+          </div>
         </div>
 
         {/* Tabbed Content */}
         <div className="lg:col-span-2">
-            <Tabs defaultValue="general" className="w-full">
-                <TabsList className="bg-muted/10 p-1 border border-border/50 rounded-xl mb-6 grid grid-cols-4 h-11">
-                    <TabsTrigger value="general" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                        <Database className="h-3.5 w-3.5" />
-                        Credentials
-                    </TabsTrigger>
-                    <TabsTrigger value="security" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                        <Key className="h-3.5 w-3.5" />
-                        Security
-                    </TabsTrigger>
-                    <TabsTrigger value="access" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                        <Clock className="h-3.5 w-3.5" />
-                        Access
-                    </TabsTrigger>
-                    <TabsTrigger value="performance" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        Performance
-                    </TabsTrigger>
-                </TabsList>
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="bg-muted/10 p-1 border border-border/50 rounded-xl mb-6 grid grid-cols-4 h-11">
+              <TabsTrigger value="general" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
+                <Database className="h-3.5 w-3.5" />
+                Credentials
+              </TabsTrigger>
+              <TabsTrigger value="security" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
+                <Key className="h-3.5 w-3.5" />
+                Security
+              </TabsTrigger>
+              <TabsTrigger value="access" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
+                <Clock className="h-3.5 w-3.5" />
+                Access
+              </TabsTrigger>
+              <TabsTrigger value="performance" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Performance
+              </TabsTrigger>
+            </TabsList>
 
-                <TabsContent value="general" className="mt-0 ring-offset-background focus-visible:outline-none">
-                    <GeneralTab config={config} onChange={(f, v) => setConfig((prev: any) => ({ ...prev, [f]: v }))} />
-                </TabsContent>
+            <TabsContent value="general" className="mt-0 ring-offset-background focus-visible:outline-none">
+              <GeneralTab
+                dbType={dbType?.id}
+                config={config}
+                onChange={(f, v) => setConfig((prev: any) => ({ ...prev, [f]: v }))}
+              />
+            </TabsContent>
 
-                <TabsContent value="security" className="mt-0 ring-offset-background focus-visible:outline-none">
-                    <SecurityTab 
-                        sslMode={sslMode} 
-                        onSslModeChange={setSslMode} 
-                        sshConfig={sshConfig} 
-                        onSshConfigChange={setSshConfig} 
-                    />
-                </TabsContent>
+            <TabsContent value="security" className="mt-0 ring-offset-background focus-visible:outline-none">
+              <SecurityTab
+                sslMode={sslMode}
+                onSslModeChange={setSslMode}
+                sshConfig={sshConfig}
+                onSshConfigChange={setSshConfig}
+              />
+            </TabsContent>
 
-                <TabsContent value="access" className="mt-0 ring-offset-background focus-visible:outline-none">
-                    <AccessTab 
-                        environment={environment} 
-                        onEnvironmentChange={setEnvironment} 
-                        isReadOnly={isReadOnly} 
-                        onReadOnlyChange={setIsReadOnly}
-                        accessConfig={accessConfig}
-                        onAccessConfigChange={setAccessConfig}
-                    />
-                </TabsContent>
+            <TabsContent value="access" className="mt-0 ring-offset-background focus-visible:outline-none">
+              <AccessTab
+                environment={environment}
+                onEnvironmentChange={setEnvironment}
+                isReadOnly={isReadOnly}
+                onReadOnlyChange={setIsReadOnly}
+                accessConfig={accessConfig}
+                onAccessConfigChange={setAccessConfig}
+              />
+            </TabsContent>
 
-                <TabsContent value="performance" className="mt-0 ring-offset-background focus-visible:outline-none">
-                    <PerformanceTab 
-                        pooling={{
-                            pool_size: config.pool_size || 5,
-                            max_overflow: config.max_overflow || 10,
-                            pool_timeout: config.pool_timeout || 30,
-                            pool_recycle: config.pool_recycle || 1800
-                        }} 
-                        onChange={(f, v) => setConfig((prev: any) => ({ ...prev, [f]: v }))} 
-                    />
-                </TabsContent>
-            </Tabs>
+            <TabsContent value="performance" className="mt-0 ring-offset-background focus-visible:outline-none">
+              <PerformanceTab
+                dbType={dbType?.id}
+                pooling={{
+                  pool_size: config.pool_size || 5,
+                  max_overflow: config.max_overflow || 10,
+                  pool_timeout: config.pool_timeout || 30,
+                  pool_recycle: config.pool_recycle || 1800,
+                  compression: config.compression,
+                  read_timeout: config.read_timeout,
+                  write_timeout: config.write_timeout
+                }}
+                onChange={(f, v) => setConfig((prev: any) => ({ ...prev, [f]: v }))}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

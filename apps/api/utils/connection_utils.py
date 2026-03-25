@@ -63,6 +63,9 @@ class ConnectionStringBuilder:
                     driver = (ConnectionStringBuilder.get_mssql_driver() or "ODBC Driver 17 for SQL Server").replace(" ", "+")
                     separator = "&" if "?" in conn_str else "?"
                     conn_str += f"{separator}driver={driver}&TrustServerCertificate=yes"
+            elif conn_str.startswith('clickhouse://'):
+                # Normalize legacy clickhouse scheme to clickhousedb for clickhouse-connect
+                conn_str = conn_str.replace('clickhouse://', 'clickhousedb://')
             
             return conn_str
 
@@ -94,7 +97,23 @@ class ConnectionStringBuilder:
             return f"sqlite:///{dbname}"
 
         elif db_type == 'clickhouse':
-            port = port or 8123
-            return f"clickhousedb://{user}:{password}@{host}:{port}/{dbname}"
+            protocol = config.get('protocol', 'http').lower()
+            secure = config.get('secure', False)
+            
+            if protocol == 'native':
+                # Use clickhouse-driver (Native protocol)
+                default_port = 9440 if secure else 9000
+                port = port or default_port
+                scheme = "clickhouse+native"
+                query_params = f"?secure=True" if secure else ""
+                return f"{scheme}://{user}:{password}@{host}:{port}/{dbname}{query_params}"
+            else:
+                # Default to HTTP (clickhouse-connect)
+                # 'clickhousedb' is the dialect name for the clickhouse-connect library
+                default_port = 8443 if secure else 8123
+                port = port or default_port
+                scheme = "clickhousedb"
+                query_params = f"?secure=True" if secure else ""
+                return f"{scheme}://{user}:{password}@{host}:{port}/{dbname}{query_params}"
 
         return ""
