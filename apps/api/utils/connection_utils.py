@@ -116,4 +116,13 @@ class ConnectionStringBuilder:
                 query_params = f"?secure=True" if secure else ""
                 return f"{scheme}://{user}:{password}@{host}:{port}/{dbname}{query_params}"
 
+        elif db_type == 'redis':
+            secure = config.get('secure', False)
+            scheme = "rediss" if secure else "redis"
+            db_index = config.get('database', '0')
+            
+            # Use username only if provided (Redis 6+ ACL)
+            auth = f"{user}:{password}@" if user and password else f":{password}@" if password else ""
+            return f"{scheme}://{auth}{host}:{port}/{db_index}"
+
         return ""
