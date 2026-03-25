@@ -3,11 +3,12 @@
  * @description Root AI settings component that orchestrates sub-components for provider and model management.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { aiApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSettingsActions } from "../context/SettingsActionsContext";
 
 // Sub-components
 import { ProviderConfig } from "./ai-settings/ProviderConfig";
@@ -22,6 +23,7 @@ import { AIModel, NewAIModel } from "./ai-settings/types";
  */
 export function AISettings() {
   const queryClient = useQueryClient();
+  const { registerActions } = useSettingsActions();
   
   // State for Provider Config
   const [apiKey, setApiKey] = useState("");
@@ -63,6 +65,28 @@ export function AISettings() {
     onError: (err: any) => toast.error(`Sync failed: ${err.message}`),
   });
 
+  const handleSaveConfig = useCallback(async () => {
+    if (!apiKey) return; // Don't save if empty (or show error if triggered manually)
+    await saveConfigMutation.mutateAsync({ apiKey, provider });
+  }, [apiKey, provider, saveConfigMutation]);
+
+  const handleReset = useCallback(() => {
+    // Reset local state to what's currently in the backend
+    if (configQuery.data) {
+      setApiKey(configQuery.data.apiKey || "");
+      setProvider(configQuery.data.provider || "Google");
+    }
+    toast.info("AI settings restored to last sync");
+  }, [configQuery.data]);
+
+  // Register actions for global buttons
+  useEffect(() => {
+    registerActions("ai", { 
+      onSave: handleSaveConfig,
+      onReset: handleReset
+    });
+  }, [registerActions, handleSaveConfig, handleReset]);
+
   // Mutation: Add New Model
   const addModelMutation = useMutation({
     mutationFn: (data: any) => aiApi.addModel(data),
@@ -98,14 +122,6 @@ export function AISettings() {
     },
     onError: (err: any) => toast.error(`Verification failed: ${err.message}`),
   });
-
-  const handleSaveConfig = () => {
-    if (!apiKey) {
-      toast.error("Valid authentication key required.");
-      return;
-    }
-    saveConfigMutation.mutate({ apiKey, provider });
-  };
 
   const handleAddModel = () => {
     if (!newModel.name || !newModel.modelId) {

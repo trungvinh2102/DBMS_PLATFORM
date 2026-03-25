@@ -3,7 +3,7 @@
  * @description Settings page for managing user preferences and account details.
  */
 
-import { useEffect, useState, useRef, lazy, Suspense } from "react";
+import { useEffect, useState, useRef, lazy, Suspense, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
@@ -20,12 +20,13 @@ import {
   useSettingsStore,
   type SettingsState,
 } from "@/stores/use-settings-store";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { SettingsActionsProvider, useSettingsActions } from "./context/SettingsActionsContext";
 
 // Settings card skeleton for loading state
 const SettingsCardSkeleton = () => (
@@ -42,7 +43,7 @@ const DataSettings = lazy(() => import("./components/DataSettings").then((m) => 
 const AccountSettings = lazy(() => import("./components/AccountSettings").then((m) => ({ default: m.AccountSettings })));
 const AISettings = lazy(() => import("./components/AISettings").then((m) => ({ default: m.AISettings })));
 
-export default function SettingsPage() {
+function SettingsContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "general";
   
@@ -50,6 +51,8 @@ export default function SettingsPage() {
   const store = useSettingsStore();
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const { triggerSave, triggerReset, registerActions } = useSettingsActions();
+  const queryClient = useQueryClient();
 
   const settingsQuery = useQuery({
     queryKey: ["settings"],
@@ -62,27 +65,34 @@ export default function SettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: any) => userApi.updateSettings(data),
-    onSuccess: () => toast.success("Settings saved successfully"),
+    onSuccess: (updatedData) => {
+      queryClient.setQueryData(["settings"], updatedData);
+      toast.success("Settings saved successfully");
+    },
     onError: (err: any) => toast.error(`Save failed: ${err.message}`),
   });
 
   const initialized = useRef(false);
 
+  // Sync shop settings to store
+  const syncSettingsToStore = useCallback((data: Partial<SettingsState>) => {
+    const { updateEditor, updateData, updateGeneral } = useSettingsStore.getState();
+    updateEditor(data);
+    updateData(data);
+    updateGeneral(data);
+    if (data.theme) setNextTheme(data.theme);
+  }, [setNextTheme]);
+
   useEffect(() => {
     if (dbSettings && !initialized.current) {
-      const { updateEditor, updateData, updateGeneral } = useSettingsStore.getState();
-      updateEditor(dbSettings);
-      updateData(dbSettings);
-      updateGeneral(dbSettings);
-      if (dbSettings.theme) setNextTheme(dbSettings.theme);
+      syncSettingsToStore(dbSettings);
       initialized.current = true;
     }
-  }, [dbSettings, setNextTheme]);
+  }, [dbSettings, syncSettingsToStore]);
 
   useEffect(() => setMounted(true), []);
 
-  const handleSave = async () => {
-    // Extract only the state values from the store, excluding functions
+  const handleSaveStore = useCallback(async () => {
     const state = useSettingsStore.getState();
     const dataToSave = Object.keys(state).reduce((acc: any, key) => {
       if (typeof (state as any)[key] !== "function") {
@@ -92,7 +102,33 @@ export default function SettingsPage() {
     }, {});
 
     await updateMutation.mutateAsync(dataToSave);
-    refetch();
+  }, [updateMutation]);
+
+  const handleRefreshStore = useCallback(async () => {
+    const { data } = await refetch();
+    if (data) {
+      syncSettingsToStore(data as any);
+      toast.info("Settings refreshed from server");
+    }
+  }, [refetch, syncSettingsToStore]);
+
+  // Register actions for the first 3 tabs (shared store)
+  useEffect(() => {
+    const storeTabs = ["general", "editor", "data"];
+    storeTabs.forEach(tab => {
+        registerActions(tab, {
+            onSave: handleSaveStore,
+            onReset: handleRefreshStore
+        });
+    });
+  }, [registerActions, handleSaveStore, handleRefreshStore]);
+
+  const handleSave = async () => {
+    await triggerSave(activeTab);
+  };
+
+  const handleRefresh = async () => {
+    await triggerReset(activeTab);
   };
 
   const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
@@ -133,13 +169,15 @@ export default function SettingsPage() {
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
-            onClick={() => {
-              store.resetDefaults();
-              setNextTheme("system");
-              toast.info("Reset to defaults");
-            }}
+            onClick={handleRefresh}
+            disabled={settingsQuery.isFetching}
           >
-            <RotateCcw className="mr-2 h-4 w-4" /> Reset
+            {settingsQuery.isFetching ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCcw className="mr-2 h-4 w-4" />
+            )}
+            Refresh
           </Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending}>
             {updateMutation.isPending ? (
@@ -203,5 +241,13 @@ export default function SettingsPage() {
         </div>
       </Tabs>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <SettingsActionsProvider>
+      <SettingsContent />
+    </SettingsActionsProvider>
   );
 }
