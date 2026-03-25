@@ -30,7 +30,7 @@ export function SQLLabResultPanel({
   const errorCount = syntaxErrors.filter((e) => e.severity === 8).length;
   const warningCount = syntaxErrors.filter((e) => e.severity === 4).length;
   const totalProblems = syntaxErrors.length;
-  const effectiveTab = lab.error ? "messages" : lab.activeResultTab;
+  const effectiveTab = lab.activeResultTab;
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden border-r">

@@ -83,7 +83,7 @@ export function PanelContent({
 
   if (tab === "messages") {
     return error ? (
-      <div className="p-8">
+      <div className="p-8 h-full overflow-y-auto scrollbar-thin">
         <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-6 font-mono text-red-700 dark:text-red-400 shadow-xl glass transition-all duration-500 overflow-hidden group">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export function PanelContent({
               <span className="text-[10px] font-black uppercase tracking-widest">Execution Error</span>
             </div>
           </div>
-          <div className="text-xs whitespace-pre-wrap max-h-64 overflow-auto scrollbar-thin pr-4 leading-relaxed opacity-80">
+          <div className="text-xs whitespace-pre-wrap leading-relaxed opacity-80">
             {error}
           </div>
           <div className="mt-6 pt-6 border-t border-red-500/10 flex justify-end">
@@ -114,7 +114,11 @@ export function PanelContent({
     );
   }
 
-  return <ProblemsList errors={syntaxErrors} onItemClick={onErrorClick} />;
+  return (
+    <div className="h-full overflow-y-auto scrollbar-thin">
+      <ProblemsList errors={syntaxErrors} onItemClick={onErrorClick} />
+    </div>
+  );
 }
 
 function EmptyState({ icon, title, desc }: any) {

@@ -21,6 +21,7 @@ export function useSQLLabUI() {
 
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState<boolean>(false);
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState<boolean>(false);
+  const [fixSQLError, setFixSQLError] = useState<string | null>(null);
 
   const toggleRightPanel = useCallback(() => setShowRightPanel(prev => !prev), []);
   const toggleAISidebar = useCallback(() => setShowAISidebar(prev => !prev), []);
@@ -60,5 +61,7 @@ export function useSQLLabUI() {
     setIsSaveDialogOpen,
     isOpenDialogOpen,
     setIsOpenDialogOpen,
+    fixSQLError,
+    setFixSQLError,
   };
 }

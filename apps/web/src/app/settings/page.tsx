@@ -14,6 +14,7 @@ import {
   Save,
   RotateCcw,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import {
   useSettingsStore,
@@ -39,6 +40,7 @@ const GeneralSettings = lazy(() => import("./components/GeneralSettings").then((
 const EditorSettings = lazy(() => import("./components/EditorSettings").then((m) => ({ default: m.EditorSettings })));
 const DataSettings = lazy(() => import("./components/DataSettings").then((m) => ({ default: m.DataSettings })));
 const AccountSettings = lazy(() => import("./components/AccountSettings").then((m) => ({ default: m.AccountSettings })));
+const AISettings = lazy(() => import("./components/AISettings").then((m) => ({ default: m.AISettings })));
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -115,16 +117,17 @@ export default function SettingsPage() {
     { value: "general", label: "General", icon: Palette },
     { value: "editor", label: "Editor", icon: Settings2 },
     { value: "data", label: "Data", icon: Database },
+    { value: "ai", label: "AI Assistant", icon: Sparkles },
     { value: "account", label: "Account", icon: User },
   ];
 
   return (
-    <div className="container mx-auto py-10 px-4 md:px-8 max-w-6xl">
-      <header className="flex items-center justify-between mb-8">
+    <div className="container mx-auto py-4 px-2 md:px-2 max-w-6xl">
+      <header className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
-          <p className="text-muted-foreground">
-            Manage your interface, editor, data, and account.
+          <h2 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">Settings</h2>
+          <p className="text-muted-foreground font-medium mt-1">
+            Tailor your workspace, AI intelligence, and personal profile.
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -152,41 +155,52 @@ export default function SettingsPage() {
       <Tabs 
         value={activeTab} 
         onValueChange={(val) => setSearchParams({ tab: val })}
-        className="space-y-4"
       >
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-100">
-          {TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value}>
-              <tab.icon className="mr-2 h-4 w-4" />
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="flex items-center justify-between border-b border-border/40 pb-4">
+          <TabsList className="flex h-14 items-center bg-card/30 backdrop-blur-md border border-border/40 p-1.5 rounded-[1.2rem] shadow-premium gap-1 w-fit">
+            {TABS.map((tab) => (
+              <TabsTrigger 
+                key={tab.value} 
+                value={tab.value}
+                className="flex items-center py-2.5 px-6 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/20 hover:bg-muted/50 group whitespace-nowrap h-full"
+              >
+                <tab.icon className="mr-2.5 h-4 w-4 transition-transform group-hover:scale-110" />
+                <span className="font-bold tracking-tight text-sm">{tab.label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        
+        </div>
 
-        <Suspense fallback={<SettingsCardSkeleton />}>
-          <TabsContent value="general">
-            <GeneralSettings
-              theme={store.theme}
-              settings={store}
-              updateGeneral={store.updateGeneral}
-              onThemeChange={(t) => {
-                if (t) {
-                  store.setTheme(t as any);
-                  setNextTheme(t);
-                }
-              }}
-            />
-          </TabsContent>
-          <TabsContent value="editor">
-            <EditorSettings settings={store} updateEditor={store.updateEditor} />
-          </TabsContent>
-          <TabsContent value="data">
-            <DataSettings settings={store} updateData={store.updateData} />
-          </TabsContent>
-          <TabsContent value="account">
-            <AccountSettings user={user} />
-          </TabsContent>
-        </Suspense>
+        <div className="w-full animate-in fade-in duration-500">
+          <Suspense fallback={<SettingsCardSkeleton />}>
+            <TabsContent value="general" className="mt-0 focus-visible:outline-none">
+              <GeneralSettings
+                theme={store.theme}
+                settings={store}
+                updateGeneral={store.updateGeneral}
+                onThemeChange={(t) => {
+                  if (t) {
+                    store.setTheme(t as any);
+                    setNextTheme(t);
+                  }
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="editor" className="mt-0 focus-visible:outline-none">
+              <EditorSettings settings={store} updateEditor={store.updateEditor} />
+            </TabsContent>
+            <TabsContent value="data" className="mt-0 focus-visible:outline-none">
+              <DataSettings settings={store} updateData={store.updateData} />
+            </TabsContent>
+            <TabsContent value="ai" className="mt-0 focus-visible:outline-none">
+              <AISettings />
+            </TabsContent>
+            <TabsContent value="account" className="mt-0 focus-visible:outline-none">
+              <AccountSettings user={user} />
+            </TabsContent>
+          </Suspense>
+        </div>
       </Tabs>
     </div>
   );

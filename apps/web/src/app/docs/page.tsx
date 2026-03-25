@@ -122,7 +122,7 @@ export default function DocsPage() {
         className="space-y-6 border-t pt-8 scroll-mt-20"
       >
         <h2 className="text-3xl font-bold tracking-tight">
-          AI Assistant <Badge variant="secondary">Beta</Badge>
+          AI Assistant
         </h2>
         <p className="leading-7">
           Leverage the power of LLMs to write complex SQL queries using natural

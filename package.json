@@ -30,8 +30,8 @@
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
 
-    "dev:backend": "cd apps/api && python app.py",
-    "start:backend": "cd apps/api && gunicorn app:app"
+    "dev:backend": "cd apps/api && venv/Scripts/python app.py",
+    "start:backend": "cd apps/api && venv/Scripts/python -m gunicorn app:app"
   },
 
   "devDependencies": {
