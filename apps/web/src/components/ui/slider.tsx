@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  */
 const Slider = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement> & {
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange"> & {
     onValueChange?: (value: number[]) => void;
     value?: number | number[];
   }

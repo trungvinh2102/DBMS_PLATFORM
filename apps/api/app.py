@@ -32,12 +32,17 @@ env_paths = [
     os.path.join(base_path, 'api.env'),
     os.path.join(base_path, 'resources', '.env'),
     os.path.join(base_path, 'resources', 'api.env'),
-    os.path.join(base_path, '_up_', '_up_', 'api', '.env') # Tauri v2 preserves hierarchy for resources
+    # Tauri v2 preserves hierarchy for resources. The source is ../../api/.env
+    # but in bundle it might be nested.
+    os.path.join(base_path, '_up_', '_up_', 'api', '.env'),
+    # Fallback to current working directory
+    os.path.abspath('.env'),
+    os.path.abspath('api.env')
 ]
 for p in env_paths:
     if os.path.exists(p):
-        print(f"Backend: Detected .env at {p}")
-        load_dotenv(dotenv_path=p)
+        print(f"Backend: Loading configuration from {p}")
+        load_dotenv(dotenv_path=p, override=True)
         break
 else:
     load_dotenv()
@@ -104,16 +109,19 @@ def create_app():
     @app.route('/health')
     def health():
         """Health check endpoint."""
+        logger.info("Health check requested")
         return {'status': 'ok'}
         
     @app.errorhandler(404)
     def handle_404(e):
+        logger.warning(f"404 Not Found: {request.path}")
         return jsonify(error="Not Found", path=request.path), 404
 
     @app.errorhandler(Exception)
     def handle_exception(e):
         """Global exception handler for unhandled server errors."""
-        app.logger.error(f"Unhandled Exception: {e}", exc_info=True)
+        app.logger.error(f"Global Exception: {e}", exc_info=True)
+        print(f"BACKEND ERROR: {str(e)}") # Direct print for sidecar visibility
         return jsonify(error="Internal Server Error", message=str(e)), 500
 
     return app
@@ -225,7 +233,7 @@ if __name__ == '__main__':
                 admin_role = session.query(Role).filter(Role.name == "Admin").first()
                 if admin_role:
                     from services.auth_service import auth_service
-                    hashed_pw = auth_service.get_password_hash("admin123")
+                    hashed_pw = auth_service.get_password_hash("password123")
                     admin_user = User(
                         id=str(uuid.uuid4()),
                         email="admin@dbms.local",
