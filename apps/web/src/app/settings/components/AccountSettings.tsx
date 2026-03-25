@@ -1,13 +1,9 @@
-/**
- * @file AccountSettings.tsx
- * @description Main account settings component that orchestrates profile and security sub-components.
- */
-
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { userApi, databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettingsActions } from "../context/SettingsActionsContext";
 
 import { ProfileCard } from "./account-settings/ProfileCard";
 import { PersonalIdentityForm } from "./account-settings/PersonalIdentityForm";
@@ -16,6 +12,7 @@ import { CriticalActionsCard } from "./account-settings/CriticalActionsCard";
 
 export function AccountSettings({ user }: any) {
   const { setUser } = useAuth();
+  const { registerActions } = useSettingsActions();
   const [name, setName] = useState(user?.name || "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -64,9 +61,30 @@ export function AccountSettings({ user }: any) {
     }
   }, [user]);
 
-  const handleUpdateProfile = () => {
-    profileMutation.mutate({ name, avatarUrl, bio });
-  };
+  const handleUpdateProfile = useCallback(async () => {
+    // Only update if something changed
+    if (name === user?.name && avatarUrl === user?.avatarUrl && bio === user?.bio) {
+        return;
+    }
+    await profileMutation.mutateAsync({ name, avatarUrl, bio });
+  }, [name, avatarUrl, bio, user, profileMutation]);
+
+  const handleReset = useCallback(() => {
+    if (user) {
+      setName(user.name || "");
+      setAvatarUrl(user.avatarUrl || "");
+      setBio(user.bio || "");
+    }
+    toast.info("Account details reverted to original");
+  }, [user]);
+
+  // Register actions for global buttons
+  useEffect(() => {
+    registerActions("account", {
+      onSave: handleUpdateProfile,
+      onReset: handleReset
+    });
+  }, [registerActions, handleUpdateProfile, handleReset]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
