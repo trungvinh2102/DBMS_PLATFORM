@@ -254,7 +254,12 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, conversatio
             "p-3.5 px-4 rounded-3xl text-[12px] leading-relaxed transition-all relative group/bubble",
             message.role === "user"
               ? "bg-primary text-primary-foreground rounded-tr-none shadow-lg w-fit max-w-full ml-auto"
-              : "glass-v2 rounded-tl-none w-full border-none shadow-none",
+              : cn(
+                  "rounded-tl-none w-full shadow-none",
+                  isDark
+                    ? "glass-v2 border-none"
+                    : "bg-muted/10 border border-border/40 text-foreground"
+                ),
           )}
         >
           {message.role === "assistant" && <ConfidenceScore score={score} />}

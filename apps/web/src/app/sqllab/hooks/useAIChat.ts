@@ -199,6 +199,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       setMessages(prev => prev.map(m =>
         m.id === assistantMsgId ? {
           ...m,
+          id: response.messageId || m.id, // Update to persistent DB ID
           content: response.summary || "SQL Generated successfully.",
           thought: response.thinking, // Map thinking to internal thought
           sql: response.sql,
