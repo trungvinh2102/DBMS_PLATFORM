@@ -1,14 +1,10 @@
-/**
- * @file ChartViewer.tsx
- * @description Main component for rendering and managing interactive data visualizations for SQL query results.
- */
-
 import React, { useState, useMemo, useRef, useCallback } from "react";
 import * as Recharts from "recharts";
 import { toPng } from "html-to-image";
 import { toast } from "sonner";
 import { ChartTypeControls, ChartAxisControls } from "./ChartControls";
 import type { ChartType } from "./ChartControls";
+import { suggestChartType } from "../utils/chart-suggestion";
 
 interface ChartViewerProps {
   results: Record<string, unknown>[];
@@ -34,8 +30,21 @@ const GRADIENTS = [
 ];
 
 export function ChartViewer({ results, columns }: ChartViewerProps) {
-  const [chartType, setChartType] = useState<ChartType>("bar");
+  // Auto-suggest chart type based on data shape
+  const suggestion = useMemo(
+    () => suggestChartType(columns, results),
+    [columns, results]
+  );
+
+  const [chartType, setChartType] = useState<ChartType>(suggestion.type);
+  const [isAutoSuggested, setIsAutoSuggested] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  // Handle manual chart type change — dismiss AI badge
+  const handleChartTypeChange = useCallback((type: ChartType) => {
+    setChartType(type);
+    setIsAutoSuggested(type === suggestion.type);
+  }, [suggestion.type]);
 
   // Auto-detect numeric columns for Y axis and categorical for X axis
   const numericColumns = useMemo(() => {
@@ -155,7 +164,20 @@ export function ChartViewer({ results, columns }: ChartViewerProps) {
   return (
     <div className="flex flex-col h-full bg-background/50 overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b bg-muted/5 backdrop-blur-sm shrink-0">
-        <ChartTypeControls chartType={chartType} setChartType={setChartType} />
+        <div className="flex items-center gap-3">
+          <ChartTypeControls chartType={chartType} setChartType={handleChartTypeChange} />
+          {isAutoSuggested && suggestion.confidence !== "low" && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 animate-in fade-in slide-in-from-left-2 duration-500">
+              <span className="text-[9px]">✨</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-primary/80">
+                AI Suggested
+              </span>
+              <span className="text-[8px] text-primary/50 font-medium hidden sm:inline">
+                — {suggestion.reason}
+              </span>
+            </div>
+          )}
+        </div>
         <ChartAxisControls
           columns={columns}
           numericColumns={numericColumns}

@@ -3,7 +3,7 @@
  * @description AI coding assistant for SQL Lab, providing query generation, explanation, optimization, and bug fixing capabilities.
  */
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Zap, Send, Sparkles, X, BrainCircuit, History, Plus, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,8 @@ import { useSQLLabContext } from "../context/SQLLabContext";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAIChat } from "../hooks/useAIChat";
 import { ConversationHistory } from "./ai/ConversationHistory";
+import { SlashCommandMenu } from "./ai/SlashCommandMenu";
+import { parseSlashCommand, filterCommands, type SlashCommand } from "../utils/slash-commands";
 import {
   Select,
   SelectContent,
@@ -29,20 +31,22 @@ export function AIAssistantSidebar() {
   const [availableModels, setAvailableModels] = useState<any[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [showHistory, setShowHistory] = useState(false);
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [commandMenuIndex, setCommandMenuIndex] = useState(0);
   const parentRef = useRef<HTMLDivElement>(null);
-  
-  const { 
-    messages, 
-    isTyping, 
-    handleSend: _handleSend, 
-    loadHistory, 
+
+  const {
+    messages,
+    isTyping,
+    handleSend: _handleSend,
+    loadHistory,
     loadConversations,
     loadConversation,
     startNewChat,
     conversations,
     conversationId,
     addAssistantMessage,
-    setIsTyping 
+    setIsTyping
   } = useAIChat(lab.selectedDS || undefined, lab.selectedSchema, selectedModel);
 
   // Initialize models and load history on mount or database change
@@ -51,9 +55,9 @@ export function AIAssistantSidebar() {
       try {
         const [models] = await Promise.all([
           aiApi.getModels(),
-          loadConversations(lab.selectedDS || undefined)
+          loadConversations() // Unfilter - show all conversations
         ]);
-        
+
         setAvailableModels(models);
         if (models && models.length > 0) {
           // Default to the first model in the list
@@ -77,7 +81,7 @@ export function AIAssistantSidebar() {
   // Auto-scroll logic on new messages or typing state changes
   useEffect(() => {
     if (messages.length > 0) {
-        virtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
+      virtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
     }
   }, [messages.length, isTyping, virtualizer]);
 
@@ -91,13 +95,13 @@ export function AIAssistantSidebar() {
       const currentSql = lab.sql;
       // Clear the trigger immediately
       lab.setFixSQLError(null);
-      
+
       const prompt = `I'm getting this SQL error: "${errorMsg}".\n\nHere is my current SQL:\n\`\`\`sql\n${currentSql}\n\`\`\`\n\nPlease analyze and fix this query.`;
-      
+
       // Always start a new chat for "Fix with AI" to keep it clean
       startNewChat();
       setShowHistory(false);
-      
+
       // Small timeout to ensure state is cleared before sending
       setTimeout(() => {
         _handleSend(prompt);
@@ -105,11 +109,83 @@ export function AIAssistantSidebar() {
     }
   }, [lab.fixSQLError, lab.sql, _handleSend, lab.setFixSQLError, startNewChat]);
 
-  const handleSendRequest = async () => {
+  // ─── Slash Command Detection ─────────────────────────────────
+  const handleSendRequest = useCallback(async () => {
     if (!input.trim()) return;
+    const currentInput = input;
     setInput("");
-    await _handleSend(input);
-  };
+    setShowCommandMenu(false);
+
+    // Check if input is a slash command
+    const parsed = parseSlashCommand(currentInput);
+    if (parsed) {
+      const prompt = parsed.command.buildPrompt({
+        editorSQL: lab.sql || "",
+        args: parsed.args,
+        databaseType: lab.selectedDSType,
+        schema: lab.selectedSchema,
+        lastError: lab.error || undefined,
+      });
+
+      if (!prompt) {
+        // Command requires context that's missing
+        if (parsed.command.requiresEditorSQL && !lab.sql?.trim()) {
+          toast.error(`${parsed.command.command} requires SQL in the editor`);
+        } else if (parsed.command.acceptsArgs && !parsed.args) {
+          toast.error(`Usage: ${parsed.command.command} ${parsed.command.argsHint || '<args>'}`);
+        }
+        return;
+      }
+
+      await _handleSend(prompt);
+      return;
+    }
+
+    // Regular message — send as-is
+    await _handleSend(currentInput);
+  }, [input, lab.sql, lab.selectedDSType, lab.selectedSchema, lab.error, _handleSend]);
+
+  // Handle command selection from dropdown menu
+  const handleCommandSelect = useCallback((cmd: SlashCommand) => {
+    if (cmd.acceptsArgs) {
+      // Set input to command + space, so user can type args
+      setInput(cmd.command + " ");
+      setShowCommandMenu(false);
+    } else {
+      // Execute immediately
+      setInput(cmd.command);
+      setShowCommandMenu(false);
+      // Use setTimeout to let state update, then send
+      setTimeout(async () => {
+        const prompt = cmd.buildPrompt({
+          editorSQL: lab.sql || "",
+          args: "",
+          databaseType: lab.selectedDSType,
+          schema: lab.selectedSchema,
+          lastError: lab.error || undefined,
+        });
+        if (!prompt) {
+          if (cmd.requiresEditorSQL && !lab.sql?.trim()) {
+            toast.error(`${cmd.command} requires SQL in the editor`);
+          }
+          return;
+        }
+        setInput("");
+        await _handleSend(prompt);
+      }, 0);
+    }
+  }, [lab.sql, lab.selectedDSType, lab.selectedSchema, lab.error, _handleSend]);
+
+  // Update command menu visibility based on input
+  useEffect(() => {
+    const trimmed = input.trim();
+    if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
+      setShowCommandMenu(true);
+      setCommandMenuIndex(0);
+    } else {
+      setShowCommandMenu(false);
+    }
+  }, [input]);
 
   const handleApplySQL = (sql: string) => {
     lab.setSql(sql);
@@ -119,16 +195,16 @@ export function AIAssistantSidebar() {
   const handleExplain = async (s: string) => {
     setIsTyping(true);
     try {
-        const res = await aiApi.explainSQL({ sql: s, modelId: selectedModel });
-        addAssistantMessage(res.explanation);
+      const res = await aiApi.explainSQL({ sql: s, modelId: selectedModel });
+      addAssistantMessage(res.explanation);
     } finally { setIsTyping(false); }
   };
 
   const handleOptimize = async (s: string) => {
     setIsTyping(true);
     try {
-        const res = await aiApi.optimizeSQL({ sql: s, databaseId: lab.selectedDS, schema: lab.selectedSchema, modelId: selectedModel });
-        addAssistantMessage("Here is an optimized version:", res.sql || res.result);
+      const res = await aiApi.optimizeSQL({ sql: s, databaseId: lab.selectedDS, schema: lab.selectedSchema, modelId: selectedModel });
+      addAssistantMessage("Here is an optimized version:", res.sql || res.result);
     } finally { setIsTyping(false); }
   };
 
@@ -139,26 +215,26 @@ export function AIAssistantSidebar() {
       <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
 
-            <div className="flex items-center gap-1 font-black uppercase tracking-tighter text-primary">
-              <Zap className="h-4 w-4 fill-primary/20" />
-              <span className="text-sm">AI Assistant</span>
-            </div>
-                        <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setShowHistory(!showHistory)} 
-                className={cn("h-8 w-8 rounded-full", showHistory && "bg-primary/10 text-primary")}
-            >
-              {showHistory ? <MessageSquare className="h-4 w-4" /> : <History className="h-4 w-4" />}
-            </Button>
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => { startNewChat(); setShowHistory(false); }} 
-                className="h-8 w-8 rounded-full text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-1 font-black uppercase tracking-tighter text-primary">
+            <Zap className="h-4 w-4 fill-primary/20" />
+            <span className="text-sm">AI Assistant</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowHistory(!showHistory)}
+            className={cn("h-8 w-8 rounded-full", showHistory && "bg-primary/10 text-primary")}
+          >
+            {showHistory ? <MessageSquare className="h-4 w-4" /> : <History className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => { startNewChat(); setShowHistory(false); }}
+            className="h-8 w-8 rounded-full text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
         <Button variant="ghost" size="icon" onClick={() => lab.setShowAISidebar(false)} className="h-8 w-8 rounded-full">
           <X className="h-4 w-4" />
@@ -170,28 +246,28 @@ export function AIAssistantSidebar() {
           <div className="p-3 bg-muted/20 border-b border-border font-black text-[10px] uppercase tracking-widest text-muted-foreground/60 flex items-center justify-between">
             <span>Recent Conversations</span>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <ConversationHistory 
-              conversations={conversations} 
-              currentId={conversationId} 
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <ConversationHistory
+              conversations={conversations}
+              currentId={conversationId}
               onSelect={(id) => { loadConversation(id); setShowHistory(false); }}
-              onRefresh={() => loadConversations(lab.selectedDS || undefined)}
+              onRefresh={() => loadConversations()}
             />
           </div>
         </div>
       ) : (
-        <div 
-          ref={parentRef} 
+        <div
+          ref={parentRef}
           className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth scrollbar-thin scrollbar-thumb-muted focus:outline-none"
         >
-          <div 
-            className="relative w-full" 
+          <div
+            className="relative w-full"
             style={{ height: `${virtualizer.getTotalSize()}px` }}
           >
             {virtualizer.getVirtualItems().map((vMsg) => {
               const isLastTyping = isTyping && vMsg.index === messages.length;
               const m = messages[vMsg.index];
-              
+
               return (
                 <div
                   key={vMsg.key}
@@ -225,19 +301,24 @@ export function AIAssistantSidebar() {
                         onExplain={handleExplain}
                         onOptimize={handleOptimize}
                         onApply={handleApplySQL}
+                        conversationId={conversationId}
                       />
                     ) : null}
                   </div>
                 </div>
               );
             })}
-            
+
             {messages.length === 0 && !isTyping && (
-                <div className="h-full mt-20 flex flex-col items-center justify-center p-8 text-center opacity-30 select-none">
-                    <Sparkles className="h-12 w-12 text-primary mb-4" />
-                    <h2 className="text-xl font-black uppercase tracking-tighter">New Chat</h2>
-                    <p className="text-xs uppercase tracking-widest font-bold">Describe your data needs to begin</p>
+              <div className="h-full mt-20 flex flex-col items-center justify-center p-8 text-center opacity-30 select-none">
+                <Sparkles className="h-12 w-12 text-primary mb-4" />
+                <h2 className="text-xl font-black uppercase tracking-tighter">New Chat</h2>
+                <p className="text-xs uppercase tracking-widest font-bold">Describe your data needs to begin</p>
+                <div className="mt-4 flex items-center gap-1.5">
+                  <kbd className="px-2 py-0.5 rounded border border-border/50 bg-muted/50 text-[10px] font-mono font-bold">/</kbd>
+                  <span className="text-[10px] uppercase tracking-widest font-bold">for quick commands</span>
                 </div>
+              </div>
             )}
           </div>
         </div>
@@ -246,19 +327,64 @@ export function AIAssistantSidebar() {
       <div className="p-4 border-t border-border bg-muted/10 backdrop-blur-3xl">
         <div className="flex flex-col gap-3">
           <div className="relative group bg-background/50 rounded-2xl border border-border/50 focus-within:border-primary/50 transition-all p-2 shadow-inner">
+            {/* Slash Command Autocomplete Menu */}
+            <SlashCommandMenu
+              inputValue={input}
+              onSelect={handleCommandSelect}
+              visible={showCommandMenu}
+              activeIndex={commandMenuIndex}
+            />
+
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
+                // Handle command menu keyboard navigation
+                if (showCommandMenu) {
+                  const filtered = filterCommands(input);
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setCommandMenuIndex((prev) => (prev + 1) % filtered.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setCommandMenuIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    const selected = filtered[commandMenuIndex];
+                    if (selected) {
+                      handleCommandSelect(selected);
+                    }
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setShowCommandMenu(false);
+                    return;
+                  }
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const selected = filtered[commandMenuIndex];
+                    if (selected) {
+                      handleCommandSelect(selected);
+                    }
+                    return;
+                  }
+                }
+
+                // Normal Enter handling
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleSendRequest();
                 }
               }}
-              placeholder="Ask anything or describe the SQL you need..."
+              placeholder={showCommandMenu ? 'Type a command...' : 'Ask anything or type / for commands...'}
               className="min-h-[80px] w-full border-none bg-transparent focus-visible:ring-0 resize-none text-sm p-2"
             />
-            
+
             <div className="flex items-center justify-between mt-2 px-1 pb-1">
               <div className="flex items-center gap-2">
                 <BrainCircuit className="h-3.5 w-3.5 text-primary/70" />
@@ -293,9 +419,6 @@ export function AIAssistantSidebar() {
                 Send
               </Button>
             </div>
-          </div>
-          <div className="text-[9px] text-center text-muted-foreground/60 uppercase tracking-widest font-medium">
-            Press Enter to send • Shift + Enter for new line
           </div>
         </div>
       </div>

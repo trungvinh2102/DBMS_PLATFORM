@@ -92,6 +92,36 @@ export function useSQLLabQuery({
     ],
   );
 
+  const explainSQLMutation = useMutation({
+    mutationFn: (vars: { databaseId: string; sql: string }) =>
+      databaseApi.getExplainPlan(vars.databaseId, vars.sql),
+  });
+
+  const handleExplain = useCallback(
+    async (sqlOverride?: string) => {
+      if (!selectedDS) {
+        toast.error("Please connect a database first.");
+        return;
+      }
+
+      try {
+        const response: any = await explainSQLMutation.mutateAsync({
+          databaseId: selectedDS,
+          sql: sqlOverride || sql,
+        });
+
+        // We wrap the explain plan response as an execution success with a special flag
+        // or trigger a specific callback, for simplicity we treat it as tab data but
+        // in truth we'll handle parsing up the chain.
+        onSuccess({ ...response, isExplain: true });
+      } catch (error: any) {
+        const msg = error.message || "Failed to generate EXPLAIN plan";
+        onError(msg);
+      }
+    },
+    [selectedDS, sql, explainSQLMutation, onSuccess, onError],
+  );
+
   const handleFormat = useCallback(
     (currentSql: string, setSql: (s: string) => void) => {
       try {
@@ -109,14 +139,20 @@ export function useSQLLabQuery({
       runSQLMutation.reset();
       toast.info("Query execution stopped");
     }
-  }, [runSQLMutation]);
+    if (explainSQLMutation.isPending) {
+      explainSQLMutation.reset();
+      toast.info("Explain plan execution stopped");
+    }
+  }, [runSQLMutation, explainSQLMutation]);
 
   return {
     handleRun,
+    handleExplain,
     handleFormat,
     handleStop,
-    executing: runSQLMutation.isPending,
+    executing: runSQLMutation.isPending || explainSQLMutation.isPending,
     runSQLMutation,
+    explainSQLMutation,
     saveQueryMutation,
     savedQueries: (savedQueries as any[]) || [],
     refetchSavedQueries,

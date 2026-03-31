@@ -36,6 +36,24 @@ def execute_query():
         status = 404 if "not found" in str(e).lower() else 500
         return jsonify({'error': str(e)}), status
 
+@execution_bp.route('/explain', methods=['POST'])
+def explain_query():
+    """Generates an EXPLAIN plan for a given query and returns performance metrics."""
+    data = request.json
+    if not data:
+        return jsonify({'error': 'Missing request body'}), 400
+    db_id = data.get('databaseId')
+    sql = data.get('sql')
+    if not db_id or not sql:
+        return jsonify({'error': 'databaseId and sql are both required'}), 400
+
+    try:
+        result = execution_service.get_explain_plan(db_id, sql)
+        return jsonify(result)
+    except Exception as e:
+        status = 404 if "not found" in str(e).lower() else 500
+        return jsonify({'error': str(e)}), status
+
 @execution_bp.route('/history', methods=['GET'])
 def get_history():
     """Retrieves previous query execution history for the given user/database."""

@@ -146,6 +146,8 @@ export const databaseApi = {
     limit?: number,
   ) =>
     req(api.post("database/execute", { databaseId, sql, autoCommit, limit })),
+  getExplainPlan: (databaseId: string, sql: string) =>
+    req(api.post("database/explain", { databaseId, sql })),
   saveQuery: (data: any) => req(api.post("database/save-query", data)),
   getHistory: (databaseId?: string) =>
     req(api.get("database/history", { params: { databaseId } })),
@@ -177,6 +179,8 @@ export const aiApi = {
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
   fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
+  completeSql: (data: { databaseId: string, schema: string, prefix: string, suffix: string, modelId?: string }) => req(api.post("ai/complete", data)),
+  executeAgent: (data: any) => req(api.post("ai/agent", data)),
   deleteModel: (id: string) => req(api.delete(`ai/models/${id}`)),
   getHistory: (databaseId?: string) => req(api.get("ai/history", { params: { databaseId } })),
   getConversations: (databaseId?: string) => req(api.get("ai/conversations", { params: { databaseId } })),
@@ -213,7 +217,9 @@ export const aiApi = {
       const chunk = decoder.decode(value, { stream: true });
       onChunk(chunk);
     }
-  }
+  },
+  submitFeedback: (data: { messageId: string; rating: 1 | -1; correction?: string; conversationId?: string }) =>
+    req(api.post("ai/feedback", data)),
 };
 
 export const resolveUrl = (path: string | null | undefined) => {

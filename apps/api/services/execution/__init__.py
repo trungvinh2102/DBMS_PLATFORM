@@ -15,6 +15,7 @@ from models.metadata import QueryHistory, SavedQuery, SessionLocal, Db
 from services.execution.sql_executor import SqlExecutor
 from services.execution.mongo_executor import MongoExecutor
 from services.execution.redis_executor import RedisExecutor
+from services.execution.explain_executor import ExplainExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class ExecutionService(BaseDatabaseService):
         self.sql_executor = SqlExecutor(self)
         self.mongo_executor = MongoExecutor(self)
         self.redis_executor = RedisExecutor(self)
+        self.explain_executor = ExplainExecutor(self)
 
     def execute_query(self, database_id: str, sql: str, auto_commit: bool = True, limit: int = 1000) -> Dict[str, Any]:
         """Routes and executes a query, persisting the outcome to history."""
@@ -70,6 +72,23 @@ class ExecutionService(BaseDatabaseService):
             "executionTime": execution_time_ms,
             "error": error_message
         }
+
+    def get_explain_plan(self, database_id: str, sql: str) -> Dict[str, Any]:
+        """Routes an EXPLAIN request to the ExplainExecutor."""
+        if not database_id or not sql:
+            raise ValueError("Database ID and SQL query are required.")
+
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+        finally:
+            session.close()
+
+        # We only support EXPLAIN for SQL relational DBs for now
+        if db_type in ['mongodb', 'redis']:
+             raise ValueError("Performance Insights (EXPLAIN) is currently only supported for SQL databases.")
+
+        return self.explain_executor.execute(database_id, sql)
 
     def _save_history(self, db_id: str, sql: str, status: str, time_ms: int, error: Optional[str]):
         """Persists the outcome of a query execution for later analysis."""

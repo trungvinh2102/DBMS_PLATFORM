@@ -189,6 +189,19 @@ class UserAIConfig(Base):
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
+class AIFeedback(Base):
+    """Stores user feedback (thumbs up/down) on AI-generated responses."""
+    __tablename__ = 'ai_feedback'
+    
+    id = Column(String, primary_key=True)
+    messageId = Column(String, ForeignKey('ai_chat_messages.id', ondelete='CASCADE'), nullable=False)
+    conversationId = Column(String, ForeignKey('ai_conversations.id', ondelete='CASCADE'), nullable=True)
+    userId = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    rating = Column(Integer, nullable=False)  # 1 = positive, -1 = negative
+    correction = Column(Text, nullable=True)  # Optional correction text when rating is negative
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+
 # Database connection
 import sys
 from dotenv import load_dotenv

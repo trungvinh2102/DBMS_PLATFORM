@@ -6,7 +6,8 @@
  */
 
 import React, { useState } from "react";
-import { Copy, FileSearch, Wand2, ArrowRight, Sparkles, MessageSquare, Check, User, Bot, BrainCircuit } from "lucide-react";
+import { Copy, FileSearch, Wand2, ArrowRight, Sparkles, MessageSquare, Check, User, Bot, BrainCircuit, ThumbsUp, ThumbsDown, Send } from "lucide-react";
+import { aiApi } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -28,6 +29,9 @@ export interface Message {
   explanation?: string;
   thought?: string;
   analysis?: string;
+  confidence?: number;
+  columns?: string[];
+  data?: any[];
   isActionable?: boolean;
 }
 
@@ -36,6 +40,7 @@ interface AIMessageProps {
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
   onApply: (sql: string) => void;
+  conversationId?: string | null;
 }
 
 /**
@@ -43,36 +48,119 @@ interface AIMessageProps {
  * @param props - Message data and interactive handlers
  * @returns A structured, styled message bubble suitable for conversational AI
  */
-export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessageProps) {
+export function AIMessage({ message, onExplain, onOptimize, onApply, conversationId }: AIMessageProps) {
   const [showThought, setShowThought] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
+  const [showCorrection, setShowCorrection] = useState(false);
+  const [correctionText, setCorrectionText] = useState("");
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
+  const handleFeedback = async (rating: 1 | -1) => {
+    setFeedbackRating(rating);
+    if (rating === -1) {
+      setShowCorrection(true);
+      return; // Wait for correction text submission
+    }
+    // Positive feedback — submit immediately
+    try {
+      await aiApi.submitFeedback({
+        messageId: message.id,
+        rating,
+        conversationId: conversationId || undefined,
+      });
+      setFeedbackSubmitted(true);
+      toast.success("Thanks for the feedback!");
+    } catch {
+      toast.error("Failed to save feedback");
+    }
+  };
+
+  const handleSubmitCorrection = async () => {
+    try {
+      await aiApi.submitFeedback({
+        messageId: message.id,
+        rating: -1,
+        correction: correctionText,
+        conversationId: conversationId || undefined,
+      });
+      setFeedbackSubmitted(true);
+      setShowCorrection(false);
+      toast.success("Feedback saved — we'll improve!");
+    } catch {
+      toast.error("Failed to save feedback");
+    }
+  };
+
   const handleCopy = () => {
     if (message.sql) {
-        navigator.clipboard.writeText(message.sql);
-        setCopied(true);
-        toast.promise(Promise.resolve(), {
-          loading: 'Copying...',
-          success: 'SQL copied to clipboard',
-          error: 'Failed to copy',
-        });
-        setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard.writeText(message.sql);
+      setCopied(true);
+      toast.promise(Promise.resolve(), {
+        loading: 'Copying...',
+        success: 'SQL copied to clipboard',
+        error: 'Failed to copy',
+      });
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
   /**
    * Logic to extract confidence score and clean content
    */
-  const extractConfidence = (content: string) => {
+  const extractConfidence = (content: string, msgConfidence?: number) => {
+    // If we have a direct confidence score from the Agent, use it
+    if (msgConfidence !== undefined) {
+      return { score: msgConfidence, cleaned: content };
+    }
+
     const match = content.match(/<confidence>([1-5])<\/confidence>/i);
     const score = match ? parseInt(match[1]) : 4; // Default to 4 if not found
     const cleaned = content.replace(/<confidence>[1-5]<\/confidence>/gi, "").trim();
     return { score, cleaned };
   };
 
-  const { score, cleaned } = extractConfidence(message.content || "");
+  const { score, cleaned } = extractConfidence(message.content || "", message.confidence);
+
+  /**
+   * Data Table Preview Component
+   * Renders a truncated grid for the user to verify the SQL result directly.
+   */
+  const DataTablePreview = ({ columns, data }: { columns: string[], data: any[] }) => (
+    <div className="mt-4 p-2.5 rounded-2xl bg-muted/20 border border-primary/10 glass-v2 overflow-hidden">
+      <div className="flex items-center gap-2 mb-2 px-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
+        <Sparkles className="h-3 w-3" />
+        Sample Results Preview (Top 5)
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr>
+              {columns.slice(0, 5).map(col => (
+                <th key={col} className="p-1.5 text-[9px] font-bold text-muted-foreground border-b border-border/50 truncate max-w-[100px]">{col}</th>
+              ))}
+              {columns.length > 5 && <th className="p-1.5 text-[9px] font-bold text-muted-foreground border-b border-border/50 italic opacity-50">+ {columns.length - 5} more</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {data.slice(0, 5).map((row, idx) => (
+              <tr key={idx} className="hover:bg-primary/5 transition-colors">
+                {columns.slice(0, 5).map(col => (
+                  <td key={col} className="p-1.5 text-[10px] text-muted-foreground/80 truncate max-w-[100px] border-b border-border/20">{row[col]}</td>
+                ))}
+                {columns.length > 5 && <td className="p-1.5 border-b border-border/20" />}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 text-[8px] text-muted-foreground/60 italic px-1">
+        Showing top 5 of {data.length} records. Open in SQL Lab for full results.
+      </div>
+    </div>
+  );
 
   /**
    * Confidence Score Component
@@ -82,12 +170,12 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
     <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/5 border border-primary/10 mb-2 w-fit">
       <div className="flex gap-0.5">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className={cn(
               "w-1.5 h-1.5 rounded-full transition-all duration-1000",
               i <= score ? "bg-primary animate-pulse" : "bg-muted"
-            )} 
+            )}
           />
         ))}
       </div>
@@ -105,8 +193,8 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
       {/* Avatar / Icon */}
       <div className={cn(
         "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-all duration-500",
-        message.role === "user" 
-          ? "bg-primary/20 border-primary/30 text-primary" 
+        message.role === "user"
+          ? "bg-primary/20 border-primary/30 text-primary"
           : "bg-muted border-border/50 text-muted-foreground group-hover:bg-primary/10 group-hover:border-primary/20 group-hover:text-primary"
       )}>
         {message.role === "user" ? (
@@ -136,10 +224,17 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                 <BrainCircuit className={cn("h-3 w-3", showThought ? "text-primary" : "text-muted-foreground")} />
               </div>
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-                {showThought ? "Hide Intelligence Trace" : "View Intelligence Trace"}
+                {showThought ? "Collapse Reasoning Trace" : "Trace AI Reasoning"}
               </span>
+              {!message.sql && (
+                <div className="ml-2 flex items-center gap-1">
+                  <div className="w-1 h-1 bg-primary rounded-full animate-bounce delay-0" />
+                  <div className="w-1 h-1 bg-primary rounded-full animate-bounce delay-150" />
+                  <div className="w-1 h-1 bg-primary rounded-full animate-bounce delay-300" />
+                </div>
+              )}
             </button>
-            
+
             <div className={cn(
               "grid transition-all duration-500 ease-in-out",
               showThought ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
@@ -163,53 +258,53 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
           )}
         >
           {message.role === "assistant" && <ConfidenceScore score={score} />}
-          
+
           <div className={cn(
-            message.role === "assistant" 
-              ? "prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed" 
+            message.role === "assistant"
+              ? "prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed"
               : "text-[12px] whitespace-pre-wrap"
           )}>
             {message.content && !message.content.includes("Crafting the SQL") ? (
-               <React.Suspense fallback={null}>
-                  <ReactMarkdown
-                    components={{
-                      code({ node, className, children, ...props }: any) {
-                        const match = /language-(\w+)/.exec(className || "");
-                        return match ? (
-                          <Prism
-                            style={isDark ? vscDarkPlus : oneLight}
-                            language={match[1]}
-                            PreTag="div"
-                            customStyle={{
-                              margin: "0.8em 0",
-                              borderRadius: "10px",
-                              fontSize: "11px",
-                              background: message.role === "user" 
-                                ? "rgba(0,0,0,0.2)" 
-                                : isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
-                              border: message.role === "user" ? "1px solid rgba(255,255,255,0.1)" : "none",
-                            }}
-                            {...props}
-                          >
-                            {String(children).replace(/\n$/, "")}
-                          </Prism>
-                        ) : (
-                          <code className={cn(
-                            "px-1.5 py-0.5 rounded bg-black/10 font-mono text-[10px]",
-                            className
-                          )} {...props}>
-                            {children}
-                          </code>
-                        );
-                      },
-                    }}
-                  >
-                    {cleaned}
-                  </ReactMarkdown>
-               </React.Suspense>
+              <React.Suspense fallback={null}>
+                <ReactMarkdown
+                  components={{
+                    code({ node, className, children, ...props }: any) {
+                      const match = /language-(\w+)/.exec(className || "");
+                      return match ? (
+                        <Prism
+                          style={isDark ? vscDarkPlus : oneLight}
+                          language={match[1]}
+                          PreTag="div"
+                          customStyle={{
+                            margin: "0.8em 0",
+                            borderRadius: "10px",
+                            fontSize: "11px",
+                            background: message.role === "user"
+                              ? "rgba(0,0,0,0.2)"
+                              : isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
+                            border: message.role === "user" ? "1px solid rgba(255,255,255,0.1)" : "none",
+                          }}
+                          {...props}
+                        >
+                          {String(children).replace(/\n$/, "")}
+                        </Prism>
+                      ) : (
+                        <code className={cn(
+                          "px-1.5 py-0.5 rounded bg-black/10 font-mono text-[10px]",
+                          className
+                        )} {...props}>
+                          {children}
+                        </code>
+                      );
+                    },
+                  }}
+                >
+                  {cleaned}
+                </ReactMarkdown>
+              </React.Suspense>
             ) : null}
           </div>
-          
+
           {/* Post-Generation Analysis */}
           {message.analysis && (
             <div className="mt-2 pt-2 border-t border-border/50">
@@ -256,9 +351,14 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
           {message.explanation && (
             <div className="mt-2 pt-2 border-t border-border/50 text-[12px] text-muted-foreground italic">
               <React.Suspense fallback={null}>
-                  <ReactMarkdown>{message.explanation}</ReactMarkdown>
+                <ReactMarkdown>{message.explanation}</ReactMarkdown>
               </React.Suspense>
             </div>
+          )}
+
+          {/* New Results Preview for Agent flow */}
+          {message.columns && message.data && message.data.length > 0 && (
+            <DataTablePreview columns={message.columns} data={message.data} />
           )}
         </div>
 
@@ -297,14 +397,14 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
               isDark ? "bg-[#0d1117]" : "bg-white"
             )}>
               <React.Suspense fallback={<div className="h-16 animate-pulse bg-muted/20" />}>
-                <Prism 
-                  language="sql" 
+                <Prism
+                  language="sql"
                   style={isDark ? vscDarkPlus : oneLight}
-                  customStyle={{ 
-                    background: 'transparent', 
-                    padding: 0, 
-                    margin: 0, 
-                    fontSize: '11.5px', 
+                  customStyle={{
+                    background: 'transparent',
+                    padding: 0,
+                    margin: 0,
+                    fontSize: '11.5px',
                     lineHeight: '1.5',
                     fontFamily: '"JetBrains Mono", "Fira Code", monospace'
                   }}
@@ -323,8 +423,8 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                   variant="outline"
                   className={cn(
                     "h-7 text-[9px] font-bold uppercase tracking-widest transition-all",
-                    isDark 
-                      ? "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white" 
+                    isDark
+                      ? "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
                       : "border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900"
                   )}
                   onClick={() => onExplain(message.sql!)}
@@ -336,8 +436,8 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                   variant="outline"
                   className={cn(
                     "h-7 text-[9px] font-bold uppercase tracking-widest transition-all",
-                    isDark 
-                      ? "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white" 
+                    isDark
+                      ? "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
                       : "border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900"
                   )}
                   onClick={() => onOptimize(message.sql!)}
@@ -355,6 +455,70 @@ export function AIMessage({ message, onExplain, onOptimize, onApply }: AIMessage
                 Apply to Editor
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* Feedback Buttons — Only on assistant messages */}
+        {message.role === "assistant" && message.content && !message.content.startsWith("Error:") && (
+          <div className="mt-2 animate-in fade-in duration-500">
+            {!feedbackSubmitted ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-muted-foreground/50 font-bold uppercase tracking-widest mr-1">Helpful?</span>
+                  <button
+                    onClick={() => handleFeedback(1)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 hover:scale-110",
+                      feedbackRating === 1
+                        ? "bg-emerald-500/20 text-emerald-500"
+                        : "hover:bg-emerald-500/10 text-muted-foreground/40 hover:text-emerald-500"
+                    )}
+                    title="Good response"
+                  >
+                    <ThumbsUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleFeedback(-1)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all duration-200 hover:scale-110",
+                      feedbackRating === -1
+                        ? "bg-red-500/20 text-red-500"
+                        : "hover:bg-red-500/10 text-muted-foreground/40 hover:text-red-500"
+                    )}
+                    title="Bad response"
+                  >
+                    <ThumbsDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Correction input when 👎 clicked */}
+                {showCorrection && (
+                  <div className="flex gap-2 animate-in slide-in-from-top-1 duration-300">
+                    <input
+                      type="text"
+                      value={correctionText}
+                      onChange={(e) => setCorrectionText(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSubmitCorrection()}
+                      placeholder="What was wrong? (optional)"
+                      className="flex-1 text-[11px] px-3 py-1.5 rounded-lg bg-muted/30 border border-border/30 focus:border-primary/30 focus:outline-none focus:ring-1 focus:ring-primary/20 placeholder:text-muted-foreground/30"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSubmitCorrection}
+                      className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                      title="Submit feedback"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground/40 font-bold uppercase tracking-widest animate-in fade-in duration-300">
+                <Check className="h-3 w-3 text-emerald-500" />
+                Feedback recorded
+              </div>
+            )}
           </div>
         )}
       </div>

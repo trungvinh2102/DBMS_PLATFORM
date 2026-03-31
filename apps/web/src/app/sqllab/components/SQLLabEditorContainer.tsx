@@ -118,6 +118,8 @@ export function SQLLabEditorContainer({
             showErrorPanel={showErrorPanel}
             sqlDialect={sqlDialect}
             language={language}
+            databaseId={lab.selectedDS}
+            schemaId={lab.selectedSchema}
             onErrorsChange={onErrorsChange}
           />
         </Suspense>

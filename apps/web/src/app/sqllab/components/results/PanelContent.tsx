@@ -8,6 +8,7 @@ import { Terminal, XCircle, Sparkles } from "lucide-react";
 import { SQLLabDataTable } from "../SQLLabDataTable";
 import { NoSQLResults } from "../NoSQLResults";
 import { ProblemsList } from "../ProblemsList";
+import { ExplainPlanViewer } from "./ExplainPlanViewer";
 
 const ChartViewer = lazy(() => import("../ChartViewer").then((m) => ({ default: m.ChartViewer })));
 const LineageViewer = lazy(() => import("../LineageViewer").then((m) => ({ default: m.LineageViewer })));
@@ -40,6 +41,9 @@ export function PanelContent({
   const isMongoDB = dataSources?.find((ds: any) => ds.id === selectedDS)?.type === "mongodb";
 
   if (tab === "results") {
+    if (results && (results as any).isExplain) {
+      return <ExplainPlanViewer planData={(results as any).plan} dialect={(results as any).dialect} />
+    }
     if (results.length > 0) {
       return isMongoDB ? (
         <NoSQLResults data={results} />

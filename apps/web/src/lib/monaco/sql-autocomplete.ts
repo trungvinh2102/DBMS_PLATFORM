@@ -5,6 +5,7 @@
 
 import type { Monaco } from "@monaco-editor/react";
 import type * as monacoEditor from "monaco-editor";
+import { aiApi } from "@/lib/api-client";
 
 const SQL_KEYWORDS = [
   "SELECT",
@@ -62,35 +63,7 @@ const SQL_KEYWORDS = [
   "ARRAYMAP", "ARRAYFILTER", "ARRAYJOIN",
 ];
 
-const MONGO_KEYWORDS = [
-  "db",
-  "collection",
-  "find",
-  "aggregate",
-  "insertOne",
-  "insertMany",
-  "updateOne",
-  "updateMany",
-  "deleteOne",
-  "deleteMany",
-  "countDocuments",
-  "limit",
-  "sort",
-  "skip",
-  "project",
-  "match",
-  "group",
-  "lookup",
-  "unwind",
-  "sort",
-  "count",
-  "replaceOne",
-  "bulkWrite",
-  "distinct",
-  "createIndex",
-  "dropIndex",
-  "listIndexes",
-];
+
 
 /**
  * Parses table aliases from SQL text.
@@ -212,8 +185,12 @@ export const registerSqlAutocomplete = (
   columnsRef: React.MutableRefObject<
     Array<{ table: string; name: string; type: string }>
   >,
+  databaseId?: string,
+  schemaId?: string
 ) => {
-  return monaco.languages.registerCompletionItemProvider("sql", {
+  const disposables: monacoEditor.IDisposable[] = [];
+
+  disposables.push(monaco.languages.registerCompletionItemProvider("sql", {
     triggerCharacters: [".", '"'],
     provideCompletionItems: (
       model: monacoEditor.editor.ITextModel,
@@ -299,60 +276,97 @@ export const registerSqlAutocomplete = (
 
       return { suggestions };
     },
-  });
-};
+  }));
 
-export const registerMongoAutocomplete = (
-  monaco: Monaco,
-  tablesRef: React.MutableRefObject<string[]>,
-) => {
-  return monaco.languages.registerCompletionItemProvider("javascript", {
-    triggerCharacters: ["."],
-    provideCompletionItems: (
+  // Inline AI Autocomplete Provider
+  let timeout: any = null;
+  let currentRequestObj: AbortController | null = null;
+  let lastModelVersion = -1;
+
+  disposables.push(monaco.languages.registerInlineCompletionsProvider("sql", {
+    provideInlineCompletions: async (
       model: monacoEditor.editor.ITextModel,
       position: monacoEditor.Position,
+      context: monacoEditor.languages.InlineCompletionContext,
+      token: monacoEditor.CancellationToken
     ) => {
-      const word = model.getWordUntilPosition(position);
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn,
-      };
+      if (!databaseId) return { items: [] };
 
+      // We only want to trigger on explicit invoke or after typing (not constantly on every cursor move)
       const textUntilPosition = model.getValueInRange({
-        startLineNumber: position.lineNumber,
-        startColumn: 1,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column,
+        startLineNumber: 1, startColumn: 1,
+        endLineNumber: position.lineNumber, endColumn: position.column
+      });
+      
+      const textAfterPosition = model.getValueInRange({
+        startLineNumber: position.lineNumber, startColumn: position.column,
+        endLineNumber: model.getLineCount(), endColumn: model.getLineMaxColumn(model.getLineCount())
       });
 
-      // db. or db.collection.
-      const suggestions: any[] = [];
+      // Avoid triggering on empty documents
+      if (textUntilPosition.trim().length < 5) return { items: [] };
 
-      if (textUntilPosition.endsWith("db.")) {
-        // Suggest collections
-        tablesRef.current.forEach((table) => {
-          suggestions.push({
-            label: table,
-            kind: monaco.languages.CompletionItemKind.Class,
-            insertText: table,
-            range: range,
-          });
-        });
-      }
+      return new Promise((resolve) => {
+        if (timeout) clearTimeout(timeout);
+        if (currentRequestObj) currentRequestObj.abort();
 
-      // Add MongoDB keywords anyway for general use
-      MONGO_KEYWORDS.forEach((keyword) => {
-        suggestions.push({
-          label: keyword,
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: keyword,
-          range: range,
+        const modelVersionId = model.getVersionId();
+
+        token.onCancellationRequested(() => {
+          if (currentRequestObj) currentRequestObj.abort();
+          resolve({ items: [] });
         });
+
+        timeout = setTimeout(async () => {
+          // If model changed before timeout, cancel
+          if (model.getVersionId() !== modelVersionId) {
+            return resolve({ items: [] });
+          }
+
+          const abortController = new AbortController();
+          currentRequestObj = abortController;
+
+          try {
+            const res = await aiApi.completeSql({
+              databaseId,
+              schema: schemaId || "public",
+              prefix: textUntilPosition,
+              suffix: textAfterPosition
+            });
+
+            if (abortController.signal.aborted || token.isCancellationRequested) {
+              return resolve({ items: [] });
+            }
+
+            const completionText = (res as any).completion;
+            if (completionText) {
+              resolve({
+                items: [{
+                  insertText: completionText,
+                  range: new monaco.Range(
+                    position.lineNumber,
+                    position.column,
+                    position.lineNumber,
+                    position.column
+                  )
+                }]
+              });
+            } else {
+              resolve({ items: [] });
+            }
+          } catch (err) {
+            resolve({ items: [] });
+          }
+        }, 500); // Debounce duration
       });
-
-      return { suggestions };
     },
-  });
+    freeInlineCompletions() {}
+  }));
+
+  return {
+    dispose: () => {
+      disposables.forEach(d => d.dispose());
+    }
+  };
 };
+
