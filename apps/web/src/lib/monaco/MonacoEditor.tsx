@@ -40,6 +40,8 @@ interface SQLEditorProps {
   showErrorPanel?: boolean;
   sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery" | "clickhouse";
   language?: string;
+  databaseId?: string;
+  schemaId?: string;
   validationDebounceMs?: number;
   onValidationChange?: (errorCount: number, warningCount: number) => void;
   onErrorsChange?: (errors: any[]) => void;
@@ -62,6 +64,8 @@ export function SQLEditor({
   showErrorPanel = false,
   sqlDialect = "postgresql",
   language = "sql",
+  databaseId,
+  schemaId,
   validationDebounceMs = 300,
   onValidationChange,
   onErrorsChange,
@@ -74,9 +78,19 @@ export function SQLEditor({
     null,
   );
   const monacoRef = useRef<Monaco | null>(null);
+  const autocompleteDisposablesRef = useRef<monacoEditor.IDisposable[]>([]);
   const tablesRef = useRef<string[]>(tables);
   const columnsRef = useRef(columns);
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (autocompleteDisposablesRef.current.length > 0) {
+        autocompleteDisposablesRef.current.forEach((d) => d.dispose());
+        autocompleteDisposablesRef.current = [];
+      }
+    };
+  }, []);
 
   // Sync refs
   useEffect(() => {
@@ -173,9 +187,18 @@ export function SQLEditor({
         currentTheme === "dark" ? "querypie-dark" : "querypie-light",
       );
 
-      registerSqlAutocomplete(monaco, tablesRef, columnsRef);
-      registerMongoAutocomplete(monaco, tablesRef, columnsRef);
-      registerRedisAutocomplete(monaco, tablesRef);
+      // Clean up previously registered autocomplete providers
+      if (autocompleteDisposablesRef.current.length > 0) {
+        autocompleteDisposablesRef.current.forEach((d) => d.dispose());
+        autocompleteDisposablesRef.current = [];
+      }
+
+      autocompleteDisposablesRef.current.push(
+        registerSqlAutocomplete(monaco, tablesRef, columnsRef, databaseId, schemaId),
+        registerMongoAutocomplete(monaco, tablesRef, columnsRef),
+        registerRedisAutocomplete(monaco, tablesRef)
+      );
+
       registerEditorCommands({
         editor,
         monaco,

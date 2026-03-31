@@ -55,6 +55,15 @@ export function SQLLabToolbar() {
           onClick={lab.handleStop}
           className="hover:bg-red-500/5"
         />
+        {lab.isRelational && lab.selectedDSType !== "clickhouse" && (
+            <ToolbarButton
+              icon={<Zap className={cn("h-4 w-4 text-amber-500", lab.executing && "animate-pulse")} />}
+              label="Explain"
+              onClick={() => lab.handleExplain()}
+              disabled={lab.executing || !lab.selectedDS}
+              className="font-bold border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded-md"
+            />
+        )}
       </div>
 
       <div className="w-px h-6 bg-border/60 mx-1" />

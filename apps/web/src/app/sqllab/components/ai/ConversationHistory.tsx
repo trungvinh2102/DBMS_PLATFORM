@@ -76,30 +76,30 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
 
   // Group conversations by date
   // For simplicity, just render direct list since it's a small app
-  
+
   return (
-    <div className="flex flex-col gap-1 p-2 h-full overflow-y-auto scrollbar-none">
+    <div className="flex flex-col gap-2 p-2">
       {conversations.length === 0 && (
         <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/40 text-center px-4">
           <MessageSquare className="h-8 w-8 mb-2 opacity-20" />
           <p className="text-[10px] uppercase tracking-widest font-bold">Chưa có lịch sử</p>
         </div>
       )}
-      
+
       {conversations.map((conv) => (
         <div
           key={conv.id}
           onClick={() => onSelect(conv.id)}
           className={cn(
-            "group relative flex flex-col gap-1 p-3 rounded-xl border transition-all cursor-pointer overflow-hidden",
-            currentId === conv.id 
-              ? "bg-primary/10 border-primary/30 shadow-sm" 
+            "group relative flex flex-col gap-1 p-3 rounded-xl border transition-all cursor-pointer",
+            currentId === conv.id
+              ? "bg-primary/10 border-primary/40 shadow-sm ring-1 ring-primary/20"
               : "bg-muted/30 border-transparent hover:bg-muted/50 hover:border-border/50"
           )}
         >
           {conv.isPinned && (
-            <div className="absolute top-0 right-0 p-1">
-              <Pin className="h-3 w-3 text-primary fill-primary/20" />
+            <div className="absolute top-1 right-1 p-1 z-10">
+              <Pin className="h-3 w-3 text-primary fill-primary/30" />
             </div>
           )}
 
@@ -126,10 +126,10 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
             ) : (
               <div className="flex flex-col gap-0.5 overflow-hidden flex-1">
                 <span className={cn(
-                  "text-xs font-bold leading-tight truncate",
-                  currentId === conv.id ? "text-primary" : "text-foreground/80"
+                  "text-[13px] font-black leading-tight truncate block",
+                  currentId === conv.id ? "text-primary" : "text-foreground"
                 )}>
-                  {conv.title}
+                  {conv.title || "Untitled Conversation"}
                 </span>
                 <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 font-medium uppercase tracking-tighter">
                   <Clock className="h-2.5 w-2.5" />
@@ -140,30 +140,30 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
           </div>
 
           <div className={cn(
-            "flex items-center justify-end gap-0.5 transition-opacity",
-            editingId === conv.id ? "hidden" : "opacity-0 group-hover:opacity-100 mt-1"
+            "flex items-center justify-end gap-1.5 transition-all",
+            editingId === conv.id ? "hidden" : "opacity-70 group-hover:opacity-100 mt-2"
           )}>
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-primary rounded-lg"
-                onClick={(e) => handlePin(e, conv.id, conv.isPinned)}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-primary rounded-lg"
+              onClick={(e) => handlePin(e, conv.id, conv.isPinned)}
             >
               {conv.isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
             </Button>
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-amber-500 rounded-lg"
-                onClick={(e) => startEditing(e, conv.id, conv.title)}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-amber-500 rounded-lg"
+              onClick={(e) => startEditing(e, conv.id, conv.title)}
             >
               <Edit2 className="h-3.5 w-3.5" />
             </Button>
-            <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-destructive rounded-lg"
-                onClick={(e) => handleDelete(e, conv.id)}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive rounded-lg"
+              onClick={(e) => handleDelete(e, conv.id)}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>

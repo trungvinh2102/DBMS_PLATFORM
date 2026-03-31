@@ -29,7 +29,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       const partialThought = text.match(/<thinking>([\s\S]*)/);
       if (partialThought) {
         thought = partialThought[1].trim();
-        content = ""; 
+        content = "";
       }
     }
 
@@ -39,11 +39,11 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       sql = sqlMatch[1].trim();
       content = content.replace(sqlMatch[0], "").trim();
     } else {
-       const partialSql = content.match(/```sql\n([\s\S]*)/);
-       if (partialSql) {
-          sql = partialSql[1].trim();
-          content = content.replace(partialSql[0], "").trim();
-       }
+      const partialSql = content.match(/```sql\n([\s\S]*)/);
+      if (partialSql) {
+        sql = partialSql[1].trim();
+        content = content.replace(partialSql[0], "").trim();
+      }
     }
 
     // 3. Extract Analysis Section
@@ -54,7 +54,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     }
 
     if (!content && (thought || sql)) {
-        content = ""; 
+      content = "";
     }
 
     return { content, thought, sql, analysis };
@@ -74,22 +74,46 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
 
   const loadHistory = async (dbId?: string) => {
     try {
-        const history = await aiApi.getHistory(dbId);
-        if (history && history.length > 0) {
-            setMessages(history.map((m: any) => {
-                const parsed = (m.role === "assistant") ? parseStreamedContent(m.content) : { content: m.content };
-                return {
-                    id: m.id,
-                    role: m.role,
-                    ...parsed,
-                    isActionable: m.role === "assistant"
-                } as Message;
-            }));
-        } else {
-            setMessages([]);
-        }
+      const history = await aiApi.getHistory(dbId);
+      if (history && history.length > 0) {
+        setMessages(history.map((m: any) => {
+          let parsed: any;
+          if (m.role === "assistant") {
+            try {
+              // Check if content is JSON (New Agent format)
+              const rawContent = m.content.trim();
+              if (rawContent.startsWith("{") && rawContent.endsWith("}")) {
+                const data = JSON.parse(rawContent);
+                parsed = {
+                  content: data.summary,
+                  thought: data.thinking, // Map thinking from JSON to thought
+                  sql: data.sql,
+                  confidence: data.confidence,
+                  columns: data.columns,
+                  data: data.data
+                };
+              } else {
+                parsed = parseStreamedContent(m.content);
+              }
+            } catch (e) {
+              parsed = parseStreamedContent(m.content);
+            }
+          } else {
+            parsed = { content: m.content };
+          }
+
+          return {
+            id: m.id,
+            role: m.role,
+            ...parsed,
+            isActionable: m.role === "assistant"
+          } as Message;
+        }));
+      } else {
+        setMessages([]);
+      }
     } catch (e) {
-        console.error("Failed to load chat history", e);
+      console.error("Failed to load chat history", e);
     }
   };
 
@@ -144,66 +168,69 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const initialAssistantMsg: Message = {
       id: assistantMsgId,
       role: "assistant",
-      content: "Crafting the SQL...",
-      thought: "",
-      sql: "",
-      analysis: "",
+      content: "Brainstorming SQL strategy...",
       isActionable: true,
     };
-    
+
     setMessages(prev => [...prev, initialAssistantMsg]);
 
-    let accumulatedText = "";
-    let receivedConvId: string | null = null;
-
     try {
-      await aiApi.streamChat(
-        { 
-          messages: [{ role: "user", content: input }], 
-          databaseId, 
-          schema: schema || "public", 
-          modelId: selectedModel,
-          conversationId: conversationId || undefined
-        },
-        (chunk) => {
-          accumulatedText += chunk;
-          const parsed = parseStreamedContent(accumulatedText);
-          setMessages(prev => prev.map(m => 
-            m.id === assistantMsgId ? { ...m, ...parsed } : m
-          ));
-        },
-        (headers) => {
-          const cid = headers.get('X-Conversation-Id');
-          if (cid) receivedConvId = cid;
-        }
-      );
-      
-      if (receivedConvId) {
-        setConversationId(receivedConvId);
-        loadConversations(databaseId);
+      // Use the new Unified Agent Endpoint
+      const response = await aiApi.executeAgent({
+        prompt: input,
+        databaseId,
+        schema: schema || "public",
+        modelId: selectedModel,
+        conversationId: conversationId  // Send conversation context for multi-turn awareness
+      });
+
+      if (response.type === "error") {
+        throw new Error(response.message || "Agent failed to execute");
       }
+
+      if (response.conversationId) {
+        const isNewConversation = !conversationId;
+        setConversationId(response.conversationId);
+        if (isNewConversation) {
+          loadConversations(databaseId);
+        }
+      }
+
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId ? {
+          ...m,
+          content: response.summary || "SQL Generated successfully.",
+          thought: response.thinking, // Map thinking to internal thought
+          sql: response.sql,
+          columns: response.columns,
+          data: response.data,
+          confidence: response.confidence,
+          isActionable: true
+        } : m
+      ));
+
     } catch (error: any) {
       toast.error(error.message || "Failed to generate SQL");
-      setMessages(prev => prev.map(m => 
-          m.id === assistantMsgId ? { ...m, content: `Error: ${error.message}` } : m
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId ? { ...m, content: `Error: ${error.message}` } : m
       ));
     } finally {
       setIsTyping(false);
     }
-  }, [databaseId, schema, selectedModel, conversationId, isTyping, parseStreamedContent, loadConversations]);
+  }, [databaseId, schema, selectedModel, isTyping, conversationId]);
 
-  return { 
-    messages, 
-    setMessages, 
-    isTyping, 
-    setIsTyping, 
-    handleSend, 
-    loadHistory, 
+  return {
+    messages,
+    setMessages,
+    isTyping,
+    setIsTyping,
+    handleSend,
+    loadHistory,
     loadConversations,
     loadConversation,
     startNewChat,
     conversations,
     conversationId,
-    addAssistantMessage 
+    addAssistantMessage
   };
 }

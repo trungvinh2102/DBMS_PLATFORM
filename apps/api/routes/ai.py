@@ -5,7 +5,7 @@ backend/routes/ai.py
 import os
 from flask import Blueprint, request, jsonify, g, Response, stream_with_context
 from services.ai_service import ai_service
-from models.metadata import AIChatMessage, AIConversation
+from models.metadata import AIChatMessage, AIConversation, AIFeedback
 from utils.auth_middleware import login_required
 from models.metadata import AIModel, SessionLocal
 import uuid
@@ -123,6 +123,79 @@ def fix_sql():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@ai_bp.route('/complete', methods=['POST'])
+@login_required
+def autocomplete_sql():
+    data = request.json
+    try:
+        user_id = g.user.get('userId') if hasattr(g, 'user') else None
+        model_id = data.get('modelId')
+        prefix = data.get('prefix', '')
+        suffix = data.get('suffix', '')
+        
+        if not prefix:
+            return jsonify({'completion': ''})
+            
+        result = ai_service.autocomplete_sql(
+            db_id=data.get('databaseId'),
+            schema=data.get('schema', 'public'),
+            prefix=prefix,
+            suffix=suffix,
+            user_id=user_id,
+            model_id=model_id
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e), 'completion': ''}), 500
+
+@ai_bp.route('/agent', methods=['POST'])
+@login_required
+def execute_agent():
+    data = request.json
+    try:
+        user_id = g.user.get('userId') if hasattr(g, 'user') else None
+        db_id = data['databaseId']
+        model_id = data.get('modelId')
+        conv_id = data.get('conversationId')
+        prompt = data['prompt']
+        
+        session = SessionLocal()
+        try:
+            if not conv_id:
+                conv_id = str(uuid.uuid4())
+                new_conv = AIConversation(
+                    id=conv_id,
+                    title=prompt[:50] + ("..." if len(prompt) > 50 else ""),
+                    userId=user_id,
+                    databaseId=db_id
+                )
+                session.add(new_conv)
+                session.commit()
+        except Exception as e:
+            session.rollback()
+            return jsonify({'type': 'error', 'message': f"Failed to create conversation: {str(e)}"}), 500
+        finally:
+            session.close()
+
+        # Call the new execute_agent method which handles generation, execution and self-correction
+        result = ai_service.execute_agent(
+            prompt, 
+            db_id, 
+            data.get('schema', 'public'), 
+            user_id=user_id, 
+            model_id=model_id,
+            conv_id=conv_id
+        )
+        
+        # Add conv_id to result so the frontend knows which chat it belongs to
+        if isinstance(result, dict):
+            result['conversationId'] = conv_id
+            
+        status_code = 200 if result.get('type') != 'error' else 400
+        return jsonify(result), status_code
+    except Exception as e:
+        return jsonify({'type': 'error', 'message': str(e)}), 500
+
 @ai_bp.route('/stream', methods=['POST'])
 @login_required
 def stream_chat():
@@ -186,7 +259,8 @@ def stream_chat():
                 schema=data.get('schema', 'public'), 
                 model_id=model_id, 
                 user_id=user_id,
-                history=history
+                history=history,
+                conv_id=conv_id
             ):
                 full_response += chunk
                 yield chunk
@@ -329,3 +403,50 @@ def delete_conversation(id):
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
+
+# ─── AI Feedback ──────────────────────────────────────────────
+
+@ai_bp.route('/feedback', methods=['POST'])
+@login_required
+def submit_feedback():
+    """Save user feedback (thumbs up/down) on AI responses."""
+    data = request.json
+    user_id = g.user.get('userId')
+    
+    message_id = data.get('messageId')
+    rating = data.get('rating')  # 1 = positive, -1 = negative
+    correction = data.get('correction', '')
+    conversation_id = data.get('conversationId')
+    
+    if not message_id or rating not in [1, -1]:
+        return jsonify({'error': 'messageId and rating (1 or -1) are required'}), 400
+    
+    session = SessionLocal()
+    try:
+        # Upsert: update if exists, create if not
+        existing = session.query(AIFeedback).filter_by(
+            messageId=message_id, userId=user_id
+        ).first()
+        
+        if existing:
+            existing.rating = rating
+            existing.correction = correction if rating == -1 else None
+        else:
+            feedback = AIFeedback(
+                id=str(uuid.uuid4()),
+                messageId=message_id,
+                conversationId=conversation_id,
+                userId=user_id,
+                rating=rating,
+                correction=correction if rating == -1 else None
+            )
+            session.add(feedback)
+        
+        session.commit()
+        return jsonify({'message': 'Feedback saved', 'rating': rating})
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+

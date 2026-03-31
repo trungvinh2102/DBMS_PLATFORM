@@ -93,68 +93,96 @@ export function useLineage(
         }
       }
 
-      // Collect CTEs and dependencies
+      // Collect CTEs and dependencies with enhanced logic
       const allCtes = new Map<string, string[]>(); 
       let subqueryCount = 0;
 
-      const extractDeps = (s: any, deps: string[]) => {
-        if (!s) return;
-        if (s._next) extractDeps(s._next, deps);
-        if (s.from) {
-          s.from.forEach((f: any) => {
-            if (f.table) {
-              const dbName = f.db ? f.db.replace(/[`"\[\]]/g, "") : null;
-              const tableName = f.table.replace(/[`"\[\]]/g, "");
-              const fullName = dbName ? `${dbName}.${tableName}` : tableName;
-              if (!deps.includes(fullName)) deps.push(fullName);
-            }
-            if (f.expr?.ast) extractDeps(f.expr.ast, deps);
-          });
-        }
-      };
+      /**
+       * Recursively processes an AST node to find direct dependencies and register sub-entities (CTEs/Subqueries)
+       */
+      const processASTNode = (stmt: any): string[] => {
+        const directDeps: string[] = [];
+        if (!stmt) return directDeps;
 
-      const collectInfo = (stmt: any) => {
-        if (!stmt) return;
-        if (stmt.with) {
+        if (Array.isArray(stmt)) {
+          stmt.forEach((s) => {
+            const nested = processASTNode(s);
+            nested.forEach((d) => { if (!directDeps.includes(d)) directDeps.push(d); });
+          });
+          return directDeps;
+        }
+
+        // 1. Process CTEs in WITH clause
+        if (stmt.with && Array.isArray(stmt.with)) {
           stmt.with.forEach((w: any) => {
             const cteName = w.name?.value;
             if (cteName) {
-              const deps: string[] = [];
-              extractDeps(w.stmt?.ast, deps);
+              const deps = processASTNode(w.stmt?.ast);
               allCtes.set(cteName, deps);
-              collectInfo(w.stmt?.ast);
             }
           });
         }
-        if (stmt.from) {
-          stmt.from.forEach((f: any) => {
-            if (f.expr?.ast) {
-              subqueryCount++;
-              const subqueryName = f.as || `Subquery_${subqueryCount}`;
-              const deps: string[] = [];
-              extractDeps(f.expr.ast, deps);
-              allCtes.set(subqueryName, deps);
-              collectInfo(f.expr.ast);
-            }
-          });
+
+        // 2. Discover tables and subqueries in FROM, JOIN, etc.
+        const walk = (obj: any) => {
+          if (!obj || typeof obj !== "object") return;
+          if (Array.isArray(obj)) {
+            obj.forEach(walk);
+            return;
+          }
+
+          // Case A: Table reference
+          if (obj.table && typeof obj.table === "string" && !obj.expr) {
+            const dbName = obj.db && obj.db !== "null" ? obj.db.replace(/[`"\[\]]/g, "") : null;
+            const tableName = obj.table.replace(/[`"\[\]]/g, "");
+            const fullName = dbName ? `${dbName}.${tableName}` : tableName;
+            if (!directDeps.includes(fullName)) directDeps.push(fullName);
+          } 
+          // Case B: Subquery
+          else if (obj.expr && obj.expr.ast) {
+            subqueryCount++;
+            const subName = obj.as || `Subquery_${subqueryCount}`;
+            const deps = processASTNode(obj.expr.ast);
+            allCtes.set(subName, deps);
+            if (!directDeps.includes(subName)) directDeps.push(subName);
+          }
+
+          // Crawl related structures
+          if (obj.from) walk(obj.from);
+          if (obj.join) walk(obj.join);
+          if (obj.on) walk(obj.on); // Subqueries in join conditions
+          if (obj.where) walk(obj.where); // Subqueries in WHERE
+          if (obj.union) walk(obj.union);
+          if (obj._next) walk(obj._next);
+        };
+
+        walk(stmt.from);
+        if (stmt.union) {
+          const unionDeps = processASTNode(stmt.union);
+          unionDeps.forEach((d) => { if (!directDeps.includes(d)) directDeps.push(d); });
         }
-        if (stmt._next) collectInfo(stmt._next);
+        if (stmt._next) {
+          const nextDeps = processASTNode(stmt._next);
+          nextDeps.forEach((d) => { if (!directDeps.includes(d)) directDeps.push(d); });
+        }
+
+        return directDeps;
       };
 
-      if (Array.isArray(ast)) ast.forEach(collectInfo);
-      else collectInfo(ast);
+      const topLevelDeps = processASTNode(ast);
 
       const targets: string[] = [];
       const sources: string[] = [];
       const foundCtes: string[] = Array.from(allCtes.keys());
 
+      // Filter real tables from tableList
       tableList.forEach((t: string) => {
         const [type, db, table] = t.split("::");
         const dbName = db && db !== "null" ? db.replace(/[`"\[\]]/g, "") : null;
         const tableName = table.replace(/[`"\[\]]/g, "");
         const fullName = dbName ? `${dbName}.${tableName}` : tableName;
 
-        if (allCtes.has(fullName)) { /* Skip CTE */ } 
+        if (allCtes.has(fullName)) { /* CTEs are handled separately */ } 
         else if (["insert", "update", "delete", "create", "into"].includes(type)) {
           if (!targets.includes(fullName)) targets.push(fullName);
         } else {
@@ -169,39 +197,101 @@ export function useLineage(
       const nodes: Node[] = [];
       const edges: Edge[] = [];
 
-      // Build flow
+      // 1. Create Source Nodes
       sources.forEach((s, i) => {
-        nodes.push({ id: `src-${s}`, type: "source", data: { label: s }, position: { x: 50, y: 100 + i * 120 } });
+        nodes.push({ 
+          id: `src-${s}`, 
+          type: "source", 
+          data: { label: s }, 
+          position: { x: 50, y: 100 + i * 120 } 
+        });
       });
 
+      // 2. Create CTE/Subquery Nodes and their internal edges
       foundCtes.forEach((c, i) => {
-        nodes.push({ id: `cte-${c}`, type: "cte", data: { label: c }, position: { x: 350, y: 100 + i * 120 } });
+        nodes.push({ 
+          id: `cte-${c}`, 
+          type: "cte", 
+          data: { label: c }, 
+          position: { x: 350, y: 100 + i * 120 } 
+        });
+        
         const deps = allCtes.get(c) || [];
         deps.forEach((d) => {
           const sourceId = sources.includes(d) ? `src-${d}` : allCtes.has(d) ? `cte-${d}` : null;
           if (sourceId) {
-            edges.push({ id: `e-${sourceId}-${c}`, source: sourceId, target: `cte-${c}`, animated: true, style: { stroke: "#f59e0b", strokeWidth: 2 } });
+            edges.push({ 
+              id: `e-${sourceId}-${c}`, 
+              source: sourceId, 
+              target: `cte-${c}`, 
+              animated: true, 
+              style: { stroke: "#f59e0b", strokeWidth: 2 } 
+            });
           }
         });
       });
 
-      const processorY = Math.max(150, (foundCtes.length * 120) / 2);
-      nodes.push({ id: "processor-0", type: "transform", data: { label: "SQL Processor" }, position: { x: 650, y: processorY } });
-
-      foundCtes.forEach((c) => {
-        edges.push({ id: `e-cte-${c}-proc`, source: `cte-${c}`, target: "processor-0", animated: true, style: { stroke: "#f59e0b", strokeWidth: 2 } });
+      // 3. Create Processor Node
+      const processorY = Math.max(150, (foundCtes.length * 120) / 2 || (sources.length * 120) / 2);
+      nodes.push({ 
+        id: "processor-0", 
+        type: "transform", 
+        data: { label: "SQL Processor" }, 
+        position: { x: 650, y: processorY } 
       });
 
+      // 4. Connect terminal sources and CTEs to Processor
+      // Terminal means used in top-level SELECT or NOT consumed by any other CTE
+      const consumedBySomething = new Set<string>();
+      allCtes.forEach((deps) => deps.forEach((d) => consumedBySomething.add(d)));
+
       sources.forEach((s) => {
-        const isUsedInAnyCte = Array.from(allCtes.values()).some((d) => d.includes(s));
-        if (!isUsedInAnyCte) {
-          edges.push({ id: `e-src-${s}-proc`, source: `src-${s}`, target: "processor-0", animated: true, style: { stroke: "#3b82f6", strokeWidth: 2 } });
+        const sourceId = `src-${s}`;
+        const isDepOfMain = topLevelDeps.includes(s);
+        const isUnconsumed = !consumedBySomething.has(s);
+        
+        if (isDepOfMain || isUnconsumed) {
+          edges.push({ 
+            id: `e-${sourceId}-proc`, 
+            source: sourceId, 
+            target: "processor-0", 
+            animated: true, 
+            style: { stroke: "#3b82f6", strokeWidth: 2 } 
+          });
         }
       });
 
+      foundCtes.forEach((c) => {
+        const cteId = `cte-${c}`;
+        const isDepOfMain = topLevelDeps.includes(c);
+        const isUnconsumed = !consumedBySomething.has(c);
+
+        if (isDepOfMain || isUnconsumed) {
+          edges.push({ 
+            id: `e-${cteId}-proc`, 
+            source: cteId, 
+            target: "processor-0", 
+            animated: true, 
+            style: { stroke: "#f59e0b", strokeWidth: 2 } 
+          });
+        }
+      });
+
+      // 5. Connect Processor to Targets
       targets.forEach((t, i) => {
-        nodes.push({ id: `target-${i}`, type: "target", data: { label: t }, position: { x: 950, y: 100 + i * 120 } });
-        edges.push({ id: `e-proc-target-${i}`, source: "processor-0", target: `target-${i}`, animated: true, style: { stroke: "#10b981", strokeWidth: 2 } });
+        nodes.push({ 
+          id: `target-${i}`, 
+          type: "target", 
+          data: { label: t }, 
+          position: { x: 950, y: 100 + i * 120 } 
+        });
+        edges.push({ 
+          id: `e-proc-target-${i}`, 
+          source: "processor-0", 
+          target: `target-${i}`, 
+          animated: true, 
+          style: { stroke: "#10b981", strokeWidth: 2 } 
+        });
       });
 
       return { nodes, edges, error: null, metadata: { sources, targets } };

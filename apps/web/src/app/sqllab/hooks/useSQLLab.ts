@@ -53,7 +53,7 @@ export function useSQLLab() {
   }, [isRelational, selectedDSType, ui.rightPanelMode, ui]);
 
   const {
-    handleRun, handleFormat, handleStop, executing, runSQLMutation, saveQueryMutation,
+    handleRun, handleExplain, handleFormat, handleStop, executing, runSQLMutation, explainSQLMutation, saveQueryMutation,
     savedQueries, refetchSavedQueries,
   } = useSQLLabQuery({
     selectedDS: activeTab.selectedDS,
@@ -62,7 +62,7 @@ export function useSQLLab() {
     limit: settings.defaultQueryLimit,
     onSuccess: (res: any) => {
       updateActiveTab({
-        results: res.data || [],
+        results: res.isExplain ? res : (res.data || []),
         columns: res.columns || [],
         error: res.error || null,
       });
@@ -182,6 +182,11 @@ export function useSQLLab() {
       const actualSql = typeof sqlOverride === "string" ? sqlOverride : undefined;
       updateActiveTab({ error: null });
       return handleRun(actualSql || undefined);
+    },
+    handleExplain: (sqlOverride?: string | React.SyntheticEvent) => {
+      const actualSql = typeof sqlOverride === "string" ? sqlOverride : undefined;
+      updateActiveTab({ error: null });
+      return handleExplain(actualSql || undefined);
     },
     handleFormat: () => handleFormat(activeTab.sql, (s: string) => updateActiveTab({ sql: s })),
     handleStop,
