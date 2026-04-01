@@ -13,7 +13,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ["react", "react-dom"],
+    dedupe: ["react", "react-dom", "@base-ui/react"],
   },
   test: {
     environment: "jsdom",
@@ -21,8 +21,9 @@ export default defineConfig({
     setupFiles: "./vitest.setup.tsx",
     server: {
       deps: {
-        inline: [/@testing-library\/react/],
+        inline: [/@testing-library\/react/, /lucide-react/],
       },
     },
   },
 });
+

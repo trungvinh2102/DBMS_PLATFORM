@@ -1,44 +1,81 @@
 /**
  * @file apps/web/src/app/page.tsx
- * @description Main dashboard home page for the authenticated user.
- * Displays system status, metrics, quick actions, and recent activity.
+ * @description The main Home dashboard featuring a premium Async Bento Grid layout.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
-
-import { DashboardStats } from "@/components/dashboard/dashboard-stats";
+import { motion } from "motion/react";
+import { HeroAI } from "@/components/dashboard/hero-ai";
+import { ConnectionOverview } from "@/components/dashboard/connection-overview";
+import { HealthMonitor } from "@/components/dashboard/health-monitor";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { SavedQueries } from "@/components/dashboard/saved-queries";
+import { useAuth } from "@/hooks/use-auth";
 
-export default function Home() {
+// Animation variant for staggering the Bento pieces
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      ease: "easeOut" as any
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring" as any, stiffness: 300, damping: 24 } }
+};
+
+export default function HomePage() {
   const { user } = useAuth();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
 
   return (
-    <div className="w-full px-6 py-8 space-y-8">
-      {/* Header Section */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight bg-linear-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">
-          Welcome back, {user?.name?.split(" ")[0] || "User"}
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Manage your databases, execute queries, and monitor system health.
-        </p>
-      </div>
-      {/* Dashboard Content */}
-      <DashboardStats />
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-7">
-        <QuickActions />
-        <RecentActivity />
+    <div className="flex-1 h-full w-full overflow-y-auto overflow-x-hidden bg-background">
+      <div className="p-4 md:p-6 lg:p-8 relative min-h-full">
+        {/* Subtle background ambient glow */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full opacity-30 pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/20 blur-[120px] rounded-full opacity-30 pointer-events-none" />
+
+        <div className="mx-auto max-w-7xl max-xl:max-w-full">
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-4 gap-6 auto-rows-min"
+             variants={containerVariants}
+             initial="hidden"
+             animate="show"
+          >
+             {/* Row 1: Hero (Span 4) */}
+             <motion.div variants={itemVariants} className="col-span-1 md:col-span-4">
+               <HeroAI />
+             </motion.div>
+
+             {/* Row 2: Connection Overview (Span 2) + Quick Actions (Span 1x2) */}
+             <motion.div variants={itemVariants} className="col-span-1 md:col-span-2 relative z-10">
+               <ConnectionOverview />
+             </motion.div>
+             
+             <motion.div variants={itemVariants} className="col-span-1 relative z-10">
+               <HealthMonitor />
+             </motion.div>
+             
+             <motion.div variants={itemVariants} className="col-span-1 grid grid-rows-2 gap-6 relative z-10">
+               <QuickActions />
+             </motion.div>
+
+             {/* Row 3: Recent Activity (Span 3) + Saved Queries (Span 1) */}
+             <motion.div variants={itemVariants} className="col-span-1 md:col-span-3 relative z-10">
+               <RecentActivity />
+             </motion.div>
+
+             <motion.div variants={itemVariants} className="col-span-1 relative z-10">
+               <SavedQueries />
+             </motion.div>
+          </motion.div>
+        </div>
       </div>
     </div>
   );

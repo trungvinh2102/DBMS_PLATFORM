@@ -15,6 +15,8 @@ describe("useAuth hook/store", () => {
     username: "testuser",
     name: "Test User",
     role: "admin",
+    avatarUrl: null,
+    bio: null,
   };
 
   beforeEach(() => {
