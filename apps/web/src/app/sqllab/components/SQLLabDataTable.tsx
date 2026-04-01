@@ -22,12 +22,22 @@ interface SQLLabDataTableProps {
   columns: string[];
   data: any[];
   mini?: boolean;
+  editable?: boolean;
+  onSave?: (changes: Record<number, any>) => void;
+  columnMetadata?: any[];
 }
 
 /**
  * High-performance virtualized table component for database query results.
  */
-export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
+export function SQLLabDataTable({
+  columns,
+  data,
+  mini,
+  editable,
+  onSave,
+  columnMetadata,
+}: SQLLabDataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const { showNullAs } = useSettingsStore();
@@ -35,6 +45,14 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
     key: string;
     value: any;
   } | null>(null);
+
+  // Editing state
+  const [editingCell, setEditingCell] = useState<{
+    rowIndex: number;
+    colName: string;
+  } | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<Record<number, any>>({});
+  const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
 
   const filteredData = useMemo(() => {
     if (!searchTerm) return data;
@@ -61,6 +79,52 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
     if (typeof val === "object") return JSON.stringify(val);
     return String(val);
   };
+
+  const isColumnEditable = (colName: string) => {
+    if (!editable) return false;
+    const meta = columnMetadata?.find((c) => c.name === colName);
+    // Avoid editing primary keys or autoincrement fields if possible
+    if (meta?.primary_key || meta?.autoincrement) return false;
+    return true;
+  };
+
+  const handleCellChange = (rowIndex: number, colName: string, value: any) => {
+    setPendingChanges((prev) => {
+      const rowChanges = prev[rowIndex] || { ...data[rowIndex] };
+      return {
+        ...prev,
+        [rowIndex]: {
+          ...rowChanges,
+          [colName]: value,
+        },
+      };
+    });
+  };
+
+  const getCellValue = (rowIndex: number, colName: string) => {
+    if (pendingChanges[rowIndex] && colName in pendingChanges[rowIndex]) {
+      return pendingChanges[rowIndex][colName];
+    }
+    return data[rowIndex][colName];
+  };
+
+  const hasChanges = Object.keys(pendingChanges).length > 0;
+
+  // Keyboard shortcut for saving
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (hasChanges) {
+          setIsConfirmSaveOpen(true);
+        } else {
+          toast.info("No changes to save");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [hasChanges]);
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
@@ -138,47 +202,82 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
                     {i + 1}
                   </td>
                   {columns.map((col, j) => {
-                    const val = row[col];
+                    const val = getCellValue(i, col);
+                    const isEdited =
+                      pendingChanges[i] && col in pendingChanges[i];
                     const isObject = val !== null && typeof val === "object";
+                    const isEditing =
+                      editingCell?.rowIndex === i &&
+                      editingCell?.colName === col;
 
                     return (
                       <td
                         key={j}
                         className={cn(
-                          "border-r p-2 text-[11px] font-medium truncate w-45 border-border/20 transition-all select-text",
+                          "border-r p-2 text-[11px] font-medium truncate w-45 border-border/20 transition-all select-text relative",
                           mini ? "p-1.5 w-37.5" : "p-2.5",
                           isObject &&
                             "cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors",
+                          isEdited && !isEditing && "bg-amber-500/10",
+                          isEditing && "p-0",
                         )}
-                        title={displayValue(val)}
-                        onClick={() => {
+                        title={isEditing ? "" : displayValue(val)}
+                        onDoubleClick={() => {
                           if (isObject) {
                             setSelectedJson({ key: col, value: val });
                           }
                         }}
+                        onClick={() => {
+                          if (isColumnEditable(col)) {
+                            if (!isObject) {
+                              setEditingCell({ rowIndex: i, colName: col });
+                            }
+                          }
+                        }}
                       >
-                        <div className="truncate">
-                          {val === null ? (
-                            <span className="text-muted-foreground/40 italic font-black uppercase tracking-widest text-[9px]">
-                              {showNullAs}
-                            </span>
-                          ) : typeof val === "boolean" ? (
-                            <span
-                              className={cn(
-                                "text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-tighter",
-                                val
-                                  ? "text-emerald-700 bg-emerald-100/50"
-                                  : "text-red-700 bg-red-100/50",
-                              )}
-                            >
-                              {String(val)}
-                            </span>
-                          ) : (
-                            <span className="text-foreground/90">
-                              {displayValue(val)}
-                            </span>
-                          )}
-                        </div>
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            className="w-full h-full bg-background border-2 border-primary px-2 py-1 outline-none text-[11px]"
+                            value={val === null ? "" : String(val)}
+                            onChange={(e) =>
+                              handleCellChange(i, col, e.target.value)
+                            }
+                            onBlur={() => setEditingCell(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") setEditingCell(null);
+                              if (e.key === "Escape") setEditingCell(null);
+                            }}
+                          />
+                        ) : (
+                          <div className="truncate">
+                            {val === null ? (
+                              <span className="text-muted-foreground/40 italic font-black uppercase tracking-widest text-[9px]">
+                                {showNullAs}
+                              </span>
+                            ) : typeof val === "boolean" ? (
+                              <span
+                                className={cn(
+                                  "text-[9px] font-black px-1.5 py-0.5 rounded-sm uppercase tracking-tighter",
+                                  val
+                                    ? "text-emerald-700 bg-emerald-100/50"
+                                    : "text-red-700 bg-red-100/50",
+                                )}
+                              >
+                                {String(val)}
+                              </span>
+                            ) : (
+                              <span
+                                className={cn(
+                                  "text-foreground/90",
+                                  isEdited && "text-amber-600 font-bold",
+                                )}
+                              >
+                                {displayValue(val)}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                     );
                   })}
@@ -251,6 +350,81 @@ export function SQLLabDataTable({ columns, data, mini }: SQLLabDataTableProps) {
               onClick={() => setSelectedJson(null)}
             >
               Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isConfirmSaveOpen}
+        onOpenChange={setIsConfirmSaveOpen}
+      >
+        <DialogContent className="w-[400px] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
+          <DialogHeader className="px-6 py-4 bg-amber-500/10 border-b">
+            <DialogTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-amber-700">
+              <div className="p-1.5 bg-amber-500/20 rounded">
+                <Terminal className="h-4 w-4 text-amber-600" />
+              </div>
+              Confirm Changes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-6 text-xs text-muted-foreground leading-relaxed">
+            <p className="mb-4">
+              You are about to save changes to{" "}
+              <span className="font-black text-foreground">
+                {Object.keys(pendingChanges).length}
+              </span>{" "}
+              rows. This will execute update queries on the database.
+            </p>
+            <div className="max-h-[200px] overflow-auto bg-muted/20 rounded border p-2 scrollbar-thin">
+              {Object.entries(pendingChanges).map(([rowIndex, changes]) => (
+                <div key={rowIndex} className="mb-2 last:mb-0">
+                  <div className="font-black text-[9px] uppercase tracking-tighter text-muted-foreground">
+                    Row #{parseInt(rowIndex) + 1}
+                  </div>
+                  {Object.entries(changes as any).map(([col, newVal]) => {
+                    const oldVal = data[parseInt(rowIndex)][col];
+                    if (oldVal === newVal) return null;
+                    return (
+                      <div key={col} className="flex items-center gap-1 pl-2">
+                        <span className="text-muted-foreground">{col}:</span>
+                        <span className="line-through opacity-50">
+                          {String(oldVal)}
+                        </span>
+                        <ChevronDown className="h-3 w-3 -rotate-90 opacity-40" />
+                        <span className="text-amber-600 font-bold">
+                          {String(newVal)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-red-500/70 font-bold uppercase text-[9px] tracking-widest">
+              CAUTION: This action cannot be undone.
+            </p>
+          </div>
+          <div className="p-4 bg-muted/10 border-t flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-black text-[10px] tracking-widest uppercase h-8"
+              onClick={() => setIsConfirmSaveOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="font-black text-[10px] tracking-widest uppercase h-8 bg-amber-600 hover:bg-amber-700"
+              onClick={() => {
+                onSave?.(pendingChanges);
+                setPendingChanges({});
+                setIsConfirmSaveOpen(false);
+                toast.success("Changes sent to database");
+              }}
+            >
+              Confirm Save
             </Button>
           </div>
         </DialogContent>

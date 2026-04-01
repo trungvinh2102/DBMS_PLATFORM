@@ -231,6 +231,75 @@ export function useSQLLab() {
     handleUndo: ui.triggerUndo,
     handleRedo: ui.triggerRedo,
     addSchemaTab: () => { ui.setRightPanelMode("schema"); ui.setShowRightPanel(true); },
+    handleUpdateData: async (pendingChanges: Record<number, any>) => {
+      const table = ui.selectedTable;
+      const schema = activeTab.selectedSchema;
+      const dsId = activeTab.selectedDS;
+      
+      if (!table || !dsId) return;
+
+      const currentData = (tableDataMutation.data as any)?.data || [];
+      // Identify unique identification columns: Primary keys or all columns as fallback
+      let keyColumns = allColumns.filter((c: any) => c.primary_key).map((c: any) => c.name);
+      let isFallback = false;
+
+      if (keyColumns.length === 0) {
+        keyColumns = allColumns.map((c: any) => c.name);
+        isFallback = true;
+        if (keyColumns.length > 0) {
+          toast.warning("Table has no primary key. Using all columns for row identification. Multiple identical rows might be affected.", { duration: 6000 });
+        }
+      }
+
+      if (keyColumns.length === 0) {
+        toast.error("Cannot update table: No columns found for identification");
+        return;
+      }
+
+      const updates: string[] = [];
+      const rowIndices = Object.keys(pendingChanges).map(Number);
+      
+      for (const rowIndex of rowIndices) {
+        const changes = pendingChanges[rowIndex];
+        const originalRow = currentData[rowIndex];
+        
+        const setClauses = Object.entries(changes)
+          .filter(([col, val]) => val !== originalRow[col])
+          .map(([col, val]) => {
+            if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) return `"${col}" = NULL`;
+            const escapedVal = typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : val;
+            return `"${col}" = ${escapedVal}`;
+          });
+
+        if (setClauses.length === 0) continue;
+
+        const whereClauses = keyColumns.map(k => {
+          const val = originalRow[k];
+          if (val === null || val === undefined) return `"${k}" IS NULL`;
+          const escapedVal = typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : val;
+          return `"${k}" = ${escapedVal}`;
+        });
+
+        updates.push(`UPDATE "${schema}"."${table}" SET ${setClauses.join(', ')} WHERE ${whereClauses.join(' AND ')};`);
+      }
+
+      if (updates.length > 0) {
+        try {
+          // Execute updates sequentially to be safe
+          for (const sql of updates) {
+            await databaseApi.execute(dsId, sql);
+          }
+          toast.success(`Successfully updated ${updates.length} rows`);
+          // Refresh data
+          tableDataMutation.mutate({ 
+            databaseId: dsId, 
+            sql: selectedDSType === "mongodb" ? `${schema || 'db'}.${table}.find()` : `SELECT * FROM "${table}" LIMIT 100` 
+          });
+        } catch (err: any) {
+          toast.error(`Update failed: ${err.message}`);
+        }
+      }
+    },
     isLoadingColumns: isLoadingSchemas || isLoadingTables || isMetaLoadingCols,
   };
 }

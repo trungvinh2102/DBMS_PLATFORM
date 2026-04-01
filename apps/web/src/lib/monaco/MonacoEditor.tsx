@@ -231,6 +231,10 @@ export function SQLEditor({
           onChange={onChange}
           onMount={handleEditorDidMount}
           options={{
+            inlineSuggest: { 
+              enabled: settings.editorInlineSuggestions ?? true,
+              mode: "prefix"
+            },
             minimap: { enabled: settings.editorMinimap },
             tabSize: settings.editorTabSize,
             fontSize: settings.editorFontSize,

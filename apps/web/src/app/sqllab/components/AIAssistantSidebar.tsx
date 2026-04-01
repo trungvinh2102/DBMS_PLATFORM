@@ -78,12 +78,13 @@ export function AIAssistantSidebar() {
     overscan: 5,
   });
 
-  // Auto-scroll logic on new messages or typing state changes
+  // Auto-scroll logic on new messages, typing state changes, or streaming content
   useEffect(() => {
     if (messages.length > 0) {
+      // Scroll to bottom whenever messages change or the last message is being updated
       virtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
     }
-  }, [messages.length, isTyping, virtualizer]);
+  }, [messages.length, messages[messages.length - 1]?.content, messages[messages.length - 1]?.thought, isTyping, virtualizer]);
 
   /**
    * Automatic Error Fixing:
@@ -208,6 +209,10 @@ export function AIAssistantSidebar() {
     } finally { setIsTyping(false); }
   };
 
+  const handleSuggestionClick = useCallback((suggestion: string) => {
+    _handleSend(suggestion);
+  }, [_handleSend]);
+
   if (!lab.showAISidebar) return null;
 
   return (
@@ -301,6 +306,7 @@ export function AIAssistantSidebar() {
                         onExplain={handleExplain}
                         onOptimize={handleOptimize}
                         onApply={handleApplySQL}
+                        onSuggestionClick={handleSuggestionClick}
                         conversationId={conversationId}
                       />
                     ) : null}

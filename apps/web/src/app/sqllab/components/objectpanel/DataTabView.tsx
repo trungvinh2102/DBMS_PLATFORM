@@ -11,6 +11,8 @@ export function DataTabView({
   loadingTData,
   currentTData,
   currentTColumns,
+  allColumns,
+  onSave,
 }: any) {
   if (loadingTData) {
     return (
@@ -21,7 +23,14 @@ export function DataTabView({
   }
   if (currentTData.length > 0) {
     return (
-      <SQLLabDataTable columns={currentTColumns} data={currentTData} mini />
+      <SQLLabDataTable 
+        columns={currentTColumns} 
+        data={currentTData} 
+        columnMetadata={allColumns}
+        onSave={onSave}
+        editable
+        mini 
+      />
     );
   }
   return (

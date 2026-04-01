@@ -119,6 +119,28 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       return `Analyze the performance of this SQL query. First, suggest the EXPLAIN ANALYZE command I should run. Then explain what to look for in the execution plan — seq scans, nested loops, high-cost nodes, and potential missing indexes:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``;
     },
   },
+  {
+    command: "/lineage",
+    description: "Analyze query data lineage and dependencies",
+    icon: Table2,
+    requiresEditorSQL: true,
+    acceptsArgs: false,
+    buildPrompt: (ctx) => {
+      if (!ctx.editorSQL.trim()) return null;
+      return `Analyze the data lineage of this SQL query. Identify which source tables and columns are used, and how they map to the final result set columns. List all dependencies and transformations:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``;
+    },
+  },
+  {
+    command: "/quality",
+    description: "Audit SQL for quality, naming, and style",
+    icon: Wand2,
+    requiresEditorSQL: true,
+    acceptsArgs: false,
+    buildPrompt: (ctx) => {
+      if (!ctx.editorSQL.trim()) return null;
+      return `Audit this SQL query for code quality and best practices. Check for: 1. Naming conventions (aliases). 2. Formatting/Readability. 3. Redundant logic. 4. Dialect-specific optimizations. Provide a score from 1-10 and specific refactor recommendations:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``;
+    },
+  },
 ];
 
 /**

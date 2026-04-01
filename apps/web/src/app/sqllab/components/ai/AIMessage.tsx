@@ -33,6 +33,7 @@ export interface Message {
   columns?: string[];
   data?: any[];
   isActionable?: boolean;
+  suggestions?: string[];
 }
 
 interface AIMessageProps {
@@ -40,6 +41,7 @@ interface AIMessageProps {
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
   onApply: (sql: string) => void;
+  onSuggestionClick?: (suggestion: string) => void;
   conversationId?: string | null;
 }
 
@@ -48,7 +50,7 @@ interface AIMessageProps {
  * @param props - Message data and interactive handlers
  * @returns A structured, styled message bubble suitable for conversational AI
  */
-export function AIMessage({ message, onExplain, onOptimize, onApply, conversationId }: AIMessageProps) {
+export function AIMessage({ message, onExplain, onOptimize, onApply, onSuggestionClick, conversationId }: AIMessageProps) {
   const [showThought, setShowThought] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
@@ -57,6 +59,21 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, conversatio
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+
+  // Auto-expand thinking when it starts streaming
+  React.useEffect(() => {
+    if (message.thought && !message.sql && !showThought) {
+      setShowThought(true);
+    }
+  }, [message.thought, message.sql, showThought]);
+
+  const getStatus = () => {
+    if (!message.content && message.thought && !message.sql) return "Thinking...";
+    if (message.thought && message.sql && !message.content) return "Generating SQL...";
+    if (message.sql && !message.content) return "Finalizing...";
+    return null;
+  };
+  const status = getStatus();
 
   const handleFeedback = async (rating: 1 | -1) => {
     setFeedbackRating(rating);
@@ -111,6 +128,11 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, conversatio
    * Logic to extract confidence score and clean content
    */
   const extractConfidence = (content: string, msgConfidence?: number) => {
+    // If it's an error message, AI confidence is logically Zero
+    if (content.startsWith("AI Error:") || content.startsWith("Error:")) {
+      return { score: 0, cleaned: content };
+    }
+
     // If we have a direct confidence score from the Agent, use it
     if (msgConfidence !== undefined) {
       return { score: msgConfidence, cleaned: content };
@@ -262,7 +284,15 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, conversatio
                 ),
           )}
         >
-          {message.role === "assistant" && <ConfidenceScore score={score} />}
+          {status && (
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/50 flex items-center gap-1.5 animate-pulse">
+                <BrainCircuit className="h-3 w-3" />
+                {status}
+              </span>
+            </div>
+          )}
+          {message.role === "assistant" && score > 0 && <ConfidenceScore score={score} />}
 
           <div className={cn(
             message.role === "assistant"
@@ -425,13 +455,8 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, conversatio
             )}>
               <div className="grid grid-cols-2 gap-1.5">
                 <Button
-                  variant="outline"
-                  className={cn(
-                    "h-7 text-[9px] font-bold uppercase tracking-widest transition-all",
-                    isDark
-                      ? "border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
-                      : "border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900"
-                  )}
+                  variant="ghost"
+                  className="h-7 text-[9px] font-bold uppercase tracking-widest transition-all text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-transparent px-2"
                   onClick={() => onExplain(message.sql!)}
                 >
                   <FileSearch className="h-3 w-3 mr-1.5" />
@@ -524,6 +549,26 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, conversatio
                 Feedback recorded
               </div>
             )}
+          </div>
+        )}
+
+        {/* Suggestions Section */}
+        {message.role === "assistant" && message.suggestions && message.suggestions.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2 duration-700 delay-300">
+            {message.suggestions.map((suggestion, i) => (
+              <button
+                key={i}
+                onClick={() => onSuggestionClick?.(suggestion)}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10",
+                  "text-[10px] font-medium text-primary transition-all hover:scale-105 active:scale-95 group/sug flex items-center gap-2"
+                )}
+              >
+                <div className="w-1 h-1 bg-primary rounded-full animate-pulse group-hover/sug:animate-bounce" />
+                {suggestion}
+                <ArrowRight className="h-2.5 w-2.5 opacity-0 -translate-x-1 group-hover/sug:opacity-100 group-hover/sug:translate-x-0 transition-all" />
+              </button>
+            ))}
           </div>
         )}
       </div>

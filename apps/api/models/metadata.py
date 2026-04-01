@@ -202,6 +202,20 @@ class AIFeedback(Base):
     
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
 
+class SchemaEmbedding(Base):
+    """Stores vector embeddings for tables to enable semantic schema retrieval."""
+    __tablename__ = 'schema_embeddings'
+    
+    id = Column(String, primary_key=True)
+    databaseId = Column(String, ForeignKey('databases.id', ondelete='CASCADE'), nullable=False)
+    schema = Column(String, default='public')
+    tableName = Column(String, nullable=False)
+    tableDescription = Column(Text, nullable=True)
+    embedding = Column(JSONB if os.getenv("DATABASE_URL", "").startswith("postgresql") else JSON, nullable=False)
+    
+    created_on = Column(DateTime, default=datetime.datetime.utcnow)
+    changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
 # Database connection
 import sys
 from dotenv import load_dotenv

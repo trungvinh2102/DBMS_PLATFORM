@@ -19,6 +19,7 @@ export interface SettingsState {
   editorFormatOnPaste: boolean;
   editorFormatOnSave: boolean;
   editorLigatures: boolean;
+  editorInlineSuggestions: boolean;
 
   // Data
   defaultQueryLimit: number;
@@ -54,6 +55,7 @@ const defaultSettings = {
   editorFormatOnPaste: true,
   editorFormatOnSave: false,
   editorLigatures: true,
+  editorInlineSuggestions: true,
 
   // Data
   defaultQueryLimit: 1000,

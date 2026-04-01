@@ -133,7 +133,7 @@ class SqlMetadataProvider:
                 res = conn.execute(text(f"DESCRIBE TABLE `{target_schema}`.`{table}`"))
                 return [{"name": row[0], "type": row[1], "nullable": True} for row in res]
             
-            return [{"name": c["name"], "type": str(c["type"]), "nullable": c.get("nullable", True)} 
+            return [{"name": c["name"], "type": str(c["type"]), "nullable": c.get("nullable", True), "primary_key": c.get("primary_key", False), "autoincrement": c.get("autoincrement", False)} 
                     for c in inspect(conn).get_columns(table, schema=schema)]
         return self.service.run_dynamic_query(db_id, _op)
 
