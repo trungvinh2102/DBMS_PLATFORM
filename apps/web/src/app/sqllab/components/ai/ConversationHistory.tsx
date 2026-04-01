@@ -12,6 +12,14 @@ import { aiApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { vi } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Conversation {
   id: string;
@@ -32,6 +40,7 @@ interface Props {
 export function ConversationHistory({ conversations, currentId, onSelect, onRefresh }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handlePin = async (e: React.MouseEvent, id: string, currentStatus: boolean) => {
     e.stopPropagation();
@@ -43,15 +52,18 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!confirm("Bạn có chắc chắn muốn xóa cuộc hội thoại này?")) return;
+    setDeleteId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
     try {
-      await aiApi.deleteConversation(id);
+      await aiApi.deleteConversation(deleteId);
       onRefresh();
-      if (currentId === id) {
-        // Parent caller handles selection state
-      }
+      setDeleteId(null);
+      toast.success("Đã xóa cuộc hội thoại");
     } catch (err) {
       toast.error("Không thể xóa cuộc hội thoại");
     }
@@ -163,13 +175,44 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-muted-foreground hover:text-destructive rounded-lg"
-              onClick={(e) => handleDelete(e, conv.id)}
+              onClick={(e) => handleDeleteClick(e, conv.id)}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
       ))}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <DialogContent className="sm:max-w-md border-destructive/20 glass shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-4 w-4" />
+              Xác nhận xóa
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-foreground/70">
+              Bạn có chắc chắn muốn xóa cuộc hội thoại này không? Toàn bộ tin nhắn trong cuộc hội thoại sẽ bị mất vĩnh viễn.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex-row gap-2 sm:justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => setDeleteId(null)}
+              className="h-9 text-[11px] font-black uppercase tracking-[0.2em] hover:bg-muted/50 rounded-xl"
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              className="h-9 px-6 text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-destructive/20 rounded-xl"
+            >
+              Xóa ngay
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function SQLLabToolbar() {
           icon={
             <Play
               className={cn(
-                "h-4 w-4 text-primary",
+                "h-4 w-4 text-emerald-600 dark:text-emerald-500",
                 lab.executing && "animate-pulse",
               )}
             />
@@ -46,7 +46,7 @@ export function SQLLabToolbar() {
           label="Run"
           onClick={() => lab.handleRun()}
           disabled={lab.executing || !lab.selectedDS}
-          className="font-bold"
+          className="font-bold text-emerald-600 dark:text-emerald-500"
         />
         <ToolbarButton
           icon={<Square className="h-4 w-4 text-red-500/60" />}
@@ -61,7 +61,7 @@ export function SQLLabToolbar() {
               label="Explain"
               onClick={() => lab.handleExplain()}
               disabled={lab.executing || !lab.selectedDS}
-              className="font-bold border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 text-amber-600 dark:text-amber-500 rounded-md"
+              className="font-bold text-amber-600 dark:text-amber-500"
             />
         )}
       </div>

@@ -197,6 +197,8 @@ export function SQLLabObjectPanel() {
             loadingTData={lab.loadingTData}
             currentTData={lab.currentTData}
             currentTColumns={lab.currentTColumns}
+            allColumns={lab.allColumns}
+            onSave={lab.handleUpdateData}
           />
         ) : effectiveTab === "structure" ? (
           <StructureTabView

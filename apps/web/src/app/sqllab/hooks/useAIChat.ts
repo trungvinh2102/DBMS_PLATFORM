@@ -14,13 +14,42 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
 
-  const parseStreamedContent = useCallback((text: string) => {
+  const parseMessageContent = useCallback((message: any): Partial<Message> => {
+    if (message.role === "user") return { content: message.content };
+
+    let text = message.content.trim();
+    
+    // 1. Check if content is JSON (New Agent format)
+    if (text.startsWith("{") && (text.endsWith("}") || text.includes("}"))) {
+      try {
+        // Find last matching brace in case of trailing junk
+        const lastBrace = text.lastIndexOf("}");
+        const jsonStr = text.substring(0, lastBrace + 1);
+        const data = JSON.parse(jsonStr);
+        
+        return {
+          content: data.summary || data.content || "",
+          explanation: data.explanation || "",
+          thought: data.thinking || data.thought || "", // Map from standard keys
+          sql: data.sql || "",
+          analysis: data.analysis || "",
+          confidence: data.confidence,
+          columns: data.columns,
+          data: data.data,
+          suggestions: data.suggestions,
+        };
+      } catch (e) {
+        console.warn("Failed to parse JSON message, falling back to regex", e);
+      }
+    }
+
+    // 2. Legacy Streamed / Text Format extraction
     let content = text;
     let thought = "";
     let sql = "";
     let analysis = "";
 
-    // 1. Extract Thinking Section
+    // Extract Thinking Section
     const thoughtMatch = text.match(/<thinking>([\s\S]*?)<\/thinking>/);
     if (thoughtMatch) {
       thought = thoughtMatch[1].trim();
@@ -33,7 +62,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       }
     }
 
-    // 2. Extract SQL Block
+    // Extract SQL Block
     const sqlMatch = content.match(/```sql\n([\s\S]*?)\n```/);
     if (sqlMatch) {
       sql = sqlMatch[1].trim();
@@ -46,7 +75,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       }
     }
 
-    // 3. Extract Analysis Section
+    // Extract Analysis Section
     const analysisMatch = content.match(/### ANALYSIS:([\s\S]*)/i);
     if (analysisMatch) {
       analysis = analysisMatch[1].trim();
@@ -76,39 +105,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     try {
       const history = await aiApi.getHistory(dbId);
       if (history && history.length > 0) {
-        setMessages(history.map((m: any) => {
-          let parsed: any;
-          if (m.role === "assistant") {
-            try {
-              // Check if content is JSON (New Agent format)
-              const rawContent = m.content.trim();
-              if (rawContent.startsWith("{") && rawContent.endsWith("}")) {
-                const data = JSON.parse(rawContent);
-                parsed = {
-                  content: data.summary,
-                  thought: data.thinking, // Map thinking from JSON to thought
-                  sql: data.sql,
-                  confidence: data.confidence,
-                  columns: data.columns,
-                  data: data.data
-                };
-              } else {
-                parsed = parseStreamedContent(m.content);
-              }
-            } catch (e) {
-              parsed = parseStreamedContent(m.content);
-            }
-          } else {
-            parsed = { content: m.content };
-          }
-
-          return {
-            id: m.id,
-            role: m.role,
-            ...parsed,
-            isActionable: m.role === "assistant"
-          } as Message;
-        }));
+        setMessages(history.map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          ...parseMessageContent(m),
+          isActionable: m.role === "assistant"
+        } as Message)));
       } else {
         setMessages([]);
       }
@@ -132,22 +134,19 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       const res = await aiApi.getConversationMessages(id);
       setConversationId(res.id);
       if (res.messages) {
-        setMessages(res.messages.map((m: any) => {
-          const parsed = (m.role === "assistant") ? parseStreamedContent(m.content) : { content: m.content };
-          return {
-            id: m.id,
-            role: m.role,
-            ...parsed,
-            isActionable: m.role === "assistant"
-          } as Message;
-        }));
+        setMessages(res.messages.map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          ...parseMessageContent(m),
+          isActionable: m.role === "assistant"
+        } as Message)));
       }
     } catch (e) {
       toast.error("Failed to load conversation");
     } finally {
       setIsTyping(false);
     }
-  }, [parseStreamedContent]);
+  }, [parseMessageContent]);
 
   const startNewChat = useCallback(() => {
     setConversationId(null);
@@ -174,41 +173,38 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
 
     setMessages(prev => [...prev, initialAssistantMsg]);
 
+    let fullContent = "";
     try {
-      // Use the new Unified Agent Endpoint
-      const response = await aiApi.executeAgent({
-        prompt: input,
-        databaseId,
-        schema: schema || "public",
-        modelId: selectedModel,
-        conversationId: conversationId  // Send conversation context for multi-turn awareness
-      });
-
-      if (response.type === "error") {
-        throw new Error(response.message || "Agent failed to execute");
-      }
-
-      if (response.conversationId) {
-        const isNewConversation = !conversationId;
-        setConversationId(response.conversationId);
-        if (isNewConversation) {
-          loadConversations(databaseId);
+      await aiApi.streamChat(
+        {
+          text: input,
+          databaseId,
+          schema: schema || "public",
+          modelId: selectedModel,
+          conversationId: conversationId || undefined,
+        },
+        (chunk) => {
+          fullContent += chunk;
+          
+          // Parse the accumulating content to update specific fields (thinking, sql, etc.)
+          const parsed = parseMessageContent({ role: "assistant", content: fullContent });
+          
+          setMessages(prev => prev.map(m =>
+            m.id === assistantMsgId ? {
+              ...m,
+              ...parsed,
+              isActionable: true
+            } : m
+          ));
+        },
+        (headers) => {
+          const cid = headers.get("X-Conversation-Id");
+          if (cid && !conversationId) {
+            setConversationId(cid);
+            loadConversations(databaseId);
+          }
         }
-      }
-
-      setMessages(prev => prev.map(m =>
-        m.id === assistantMsgId ? {
-          ...m,
-          id: response.messageId || m.id, // Update to persistent DB ID
-          content: response.summary || "SQL Generated successfully.",
-          thought: response.thinking, // Map thinking to internal thought
-          sql: response.sql,
-          columns: response.columns,
-          data: response.data,
-          confidence: response.confidence,
-          isActionable: true
-        } : m
-      ));
+      );
 
     } catch (error: any) {
       toast.error(error.message || "Failed to generate SQL");
@@ -218,7 +214,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     } finally {
       setIsTyping(false);
     }
-  }, [databaseId, schema, selectedModel, isTyping, conversationId]);
+  }, [databaseId, schema, selectedModel, isTyping, conversationId, parseMessageContent, loadConversations]);
 
   return {
     messages,
