@@ -75,15 +75,54 @@ describe("api-client", () => {
 
   it("aiApi endpoints should work", async () => {
     server.use(
-      http.post("*/api/ai/generate-sql", () => HttpResponse.json({ sql: "S" })),
-      http.post("*/api/ai/explain-sql", () =>
-        HttpResponse.json({ explanation: "E" }),
-      ),
-      http.post("*/api/ai/optimize-sql", () => HttpResponse.json({ sql: "O" })),
+      http.post("*/api/ai/*", () => HttpResponse.json({ success: true })),
+      http.get("*/api/ai/*", () => HttpResponse.json({ data: "mock" })),
+      http.put("*/api/ai/*", () => HttpResponse.json({ success: true })),
+      http.delete("*/api/ai/*", () => HttpResponse.json({ success: true })),
+      http.get("*/api/ai-config/*", () => HttpResponse.json({ config: {} })),
+      http.post("*/api/ai-config/*", () => HttpResponse.json({ success: true }))
     );
-    expect(await aiApi.generateSQL({})).toEqual({ sql: "S" });
-    expect(await aiApi.explainSQL({})).toEqual({ explanation: "E" });
-    expect(await aiApi.optimizeSQL({})).toEqual({ sql: "O" });
+
+    // Existing test methods
+    expect(await aiApi.generateSQL({})).toEqual({ success: true });
+    expect(await aiApi.explainSQL({})).toEqual({ success: true });
+    expect(await aiApi.optimizeSQL({})).toEqual({ success: true });
+
+    // Missing aiApi methods
+    await aiApi.getModels();
+    await aiApi.addModel({});
+    await aiApi.getAIConfig(true);
+    await aiApi.saveAIConfig({});
+    await aiApi.fixSQL({});
+    await aiApi.completeSql({ databaseId: "1", schema: "public", prefix: "SELECT", suffix: ";" });
+    await aiApi.executeAgent({});
+    await aiApi.deleteModel("1");
+    await aiApi.getHistory("1");
+    await aiApi.getConversations("1");
+    await aiApi.getConversationMessages("1");
+    await aiApi.updateConversation("1", {});
+    await aiApi.deleteConversation("1");
+    await aiApi.submitFeedback({ messageId: "1", rating: 1 });
+
+    // Test streamChat
+    server.use(
+      http.post("*/api/ai/stream", () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode("chunk1"));
+            controller.close();
+          },
+        });
+        return new HttpResponse(stream, {
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      })
+    );
+
+    let chunks = "";
+    await aiApi.streamChat({}, (chunk) => { chunks += chunk; });
+    expect(chunks).toBe("chunk1");
   });
 
   it("databaseApi comprehensive coverage", async () => {
@@ -106,6 +145,8 @@ describe("api-client", () => {
     await databaseApi.getForeignKeys("1", "t");
     await databaseApi.getTableInfo("1", "t");
     await databaseApi.getDDL("1", "t");
+    await databaseApi.getAllColumns("1");
+    await databaseApi.getAllForeignKeys("1");
 
     // Other methods
     await databaseApi.health();
@@ -113,6 +154,7 @@ describe("api-client", () => {
     await databaseApi.update({});
     await databaseApi.delete("1");
     await databaseApi.test({});
+    await databaseApi.getExplainPlan("1", "SELECT * FROM t");
     await databaseApi.execute("1", "S");
     await databaseApi.saveQuery({});
     await databaseApi.getHistory("1");

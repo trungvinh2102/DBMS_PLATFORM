@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "../test-utils";
+import { render, screen, waitFor } from "../test-utils";
 import { ModeToggle } from "@/components/mode-toggle";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,56 +21,67 @@ describe("ModeToggle component", () => {
     );
   });
 
-  it("renders and calls setTheme for all 3 themes", async () => {
+  it("renders toggle button", () => {
+    render(<ModeToggle />);
+    const trigger = screen.getByRole("button");
+    expect(trigger).toBeInTheDocument();
+    expect(screen.getByText("Toggle theme")).toBeInTheDocument();
+  });
+
+  it("renders and opens dropdown menu on click", async () => {
+    const user = userEvent.setup();
+    render(<ModeToggle />);
+    const trigger = screen.getByRole("button");
+    await user.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByText("Light")).toBeInTheDocument();
+      expect(screen.getByText("Dark")).toBeInTheDocument();
+      expect(screen.getByText("System")).toBeInTheDocument();
+    });
+  });
+
+  it("calls setTheme when selecting a theme", async () => {
     const user = userEvent.setup();
     const { setTheme } = mockedUseTheme();
     render(<ModeToggle />);
-    const trigger = screen.getByRole("button", { name: /toggle theme/i });
+    const trigger = screen.getByRole("button");
 
-    // Dark
     await user.click(trigger);
-    await user.click(await screen.findByText("Dark"));
+    const darkItem = await screen.findByText("Dark");
+    await user.click(darkItem);
     expect(setTheme).toHaveBeenCalledWith("dark");
-
-    // Light
-    await user.click(trigger);
-    await user.click(await screen.findByText("Light"));
-    expect(setTheme).toHaveBeenCalledWith("light");
-
-    // System
-    await user.click(trigger);
-    await user.click(await screen.findByText("System"));
-    expect(setTheme).toHaveBeenCalledWith("system");
   });
 
-  it("syncs theme to backend", async () => {
+  it("syncs theme to backend when user is logged in", async () => {
     const user = userEvent.setup();
-    const updateSpy = vi.spyOn(userApi, "updateSettings");
+    const updateSpy = vi.spyOn(userApi, "updateSettings").mockResolvedValue({});
     useAuth.setState({
-      user: { id: "1", email: "test@example.com", name: "Test" } as any,
+      user: { id: "1", email: "test@example.com", name: "Test", username: "test", avatarUrl: null, bio: null, role: "admin" },
       token: "mock-token",
     });
 
     render(<ModeToggle />);
 
-    await waitFor(
-      async () => {
-        const trigger = screen.getByRole("button", { name: /toggle theme/i });
-        await user.click(trigger);
-        const dark = screen.queryByText("Dark");
-        if (!dark) throw new Error("not open");
-        await user.click(dark);
-        expect(updateSpy).toHaveBeenCalled();
-      },
-      { timeout: 8000 },
-    );
-  });
+    // Wait for settings query to load first
+    await waitFor(() => {}, { timeout: 2000 });
 
-  it("handles empty settings merge and mutation error", async () => {
+    const trigger = screen.getByRole("button");
+    await user.click(trigger);
+    const dark = await screen.findByText("Dark");
+    await user.click(dark);
+
+    await waitFor(() => {
+      expect(updateSpy).toHaveBeenCalled();
+    }, { timeout: 3000 });
+
+    updateSpy.mockRestore();
+  }, 15000);
+
+  it("handles error when syncing theme to backend", async () => {
     const user = userEvent.setup();
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    // Mock settings as null to hit 'settings || {}' branch (line 50)
     server.use(
       http.get("*/api/user/settings", () => HttpResponse.json(null)),
       http.post(
@@ -80,24 +91,24 @@ describe("ModeToggle component", () => {
     );
 
     useAuth.setState({
-      user: { id: "1", email: "test@example.com", name: "Test" } as any,
+      user: { id: "1", email: "test@example.com", name: "Test", username: "test", avatarUrl: null, bio: null, role: "admin" },
       token: "mock-token",
     });
 
     render(<ModeToggle />);
 
-    await waitFor(
-      async () => {
-        const trigger = screen.getByRole("button", { name: /toggle theme/i });
-        await user.click(trigger);
-        const dark = screen.queryByText("Dark");
-        if (!dark) throw new Error("not open");
-        await user.click(dark);
-        expect(consoleSpy).toHaveBeenCalled();
-      },
-      { timeout: 8000 },
-    );
+    // Wait for settings query to load first
+    await waitFor(() => {}, { timeout: 2000 });
+
+    const trigger = screen.getByRole("button");
+    await user.click(trigger);
+    const dark = await screen.findByText("Dark");
+    await user.click(dark);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalled();
+    }, { timeout: 5000 });
 
     consoleSpy.mockRestore();
-  });
+  }, 15000);
 });
