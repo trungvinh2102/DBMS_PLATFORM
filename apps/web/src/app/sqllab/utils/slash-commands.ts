@@ -5,7 +5,7 @@
  * Each command defines its action, parameter requirements, and description.
  */
 
-import { FileSearch, Wand2, Wrench, Table2, BarChart2, Zap, type LucideIcon } from "lucide-react";
+import { FileSearch, Wand2, Wrench, Table2, Zap, type LucideIcon } from "lucide-react";
 
 export interface SlashCommand {
   /** The command trigger (e.g., "/explain") */
@@ -95,17 +95,6 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       const tableName = ctx.args.trim();
       if (!tableName) return null;
       return `Describe the table "${tableName}" in detail. Show its columns, data types, constraints, and relationships. Then show a query to get 5 sample rows and basic statistics (row count, null counts for key columns).`;
-    },
-  },
-  {
-    command: "/chart",
-    description: "Suggest a chart visualization for the last query results",
-    icon: BarChart2,
-    requiresEditorSQL: true,
-    acceptsArgs: false,
-    buildPrompt: (ctx) => {
-      if (!ctx.editorSQL.trim()) return null;
-      return `Given this SQL query:\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\`\n\nAnalyze the expected result columns and suggest the best chart type (bar, line, pie, area) for visualizing the data. Explain which columns should be on X-axis and Y-axis, and why this chart type is most effective.`;
     },
   },
   {

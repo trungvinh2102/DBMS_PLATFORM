@@ -13,6 +13,7 @@ export function useSQLLabUI() {
   const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
   const [showAISidebar, setShowAISidebar] = useState<boolean>(false);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [dataOffset, setDataOffset] = useState<number>(0);
   
   const [cursorPos, setCursorPos] = useState<CursorPosition>({ lineNumber: 1, column: 1 });
   const [tabSize, setTabSize] = useState<number>(4);
@@ -45,6 +46,8 @@ export function useSQLLabUI() {
     toggleAISidebar,
     selectedTable,
     setSelectedTable,
+    dataOffset,
+    setDataOffset,
 
     // Editor States
     cursorPos,

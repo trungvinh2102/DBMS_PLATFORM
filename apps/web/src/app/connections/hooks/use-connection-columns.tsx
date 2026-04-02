@@ -23,16 +23,14 @@ import { useMutation } from "@tanstack/react-query";
 
 function TestConnectionButton({ conn }: { conn: any }) {
   const testConnectionMutation = useMutation({
-    mutationFn: (vars: any) =>
-      databaseApi.test({ ...conn.config, type: conn.type }),
+    mutationFn: () =>
+      databaseApi.test({ ...conn.config, type: conn.type, id: conn.id }),
   });
 
   const handleTest = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const result = await testConnectionMutation.mutateAsync({
-        id: conn.id,
-      });
+      const result = await testConnectionMutation.mutateAsync();
 
       if (result.success) {
         toast.success(`Connection to ${conn.name} successful`);

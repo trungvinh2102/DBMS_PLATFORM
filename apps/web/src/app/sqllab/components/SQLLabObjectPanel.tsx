@@ -227,13 +227,21 @@ export function SQLLabObjectPanel() {
       {lab.activeRightTab === "data" && lab.currentTData.length > 0 && (
         <div className="h-11 border-t flex items-center justify-between px-5 bg-muted/5 shrink-0 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">
           <div className="flex items-center gap-4">
-            <button className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center">
+            <button 
+              disabled={lab.dataOffset === 0}
+              onClick={lab.prevPage}
+              className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+            >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="tracking-tighter">
-              1-{lab.currentTData.length} OF {lab.currentTData.length}
+              {lab.dataOffset + 1}-{lab.dataOffset + lab.currentTData.length} OF {lab.tableInfo?.row_count || lab.currentTData.length + (lab.currentTData.length === lab.defaultQueryLimit ? "+" : "")}
             </span>
-            <button className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center">
+            <button 
+              disabled={lab.currentTData.length < lab.defaultQueryLimit}
+              onClick={lab.nextPage}
+              className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+            >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>

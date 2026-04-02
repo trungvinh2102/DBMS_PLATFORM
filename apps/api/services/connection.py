@@ -160,9 +160,16 @@ class ConnectionService(BaseDatabaseService):
     def _encrypt_sensitive_fields(self, config: Dict[str, Any]):
         """Encrypts password and URI fields in a configuration dictionary."""
         if config.get('password'):
-            config['password'] = encrypt(config['password'])
+            pwd = str(config['password'])
+            # Only encrypt if not already in the encrypted format (prefix check)
+            if not (':' in pwd and len(pwd.split(':')[0]) == 32):
+                config['password'] = encrypt(pwd)
+        
         if config.get('uri'):
-            config['uri'] = encrypt_uri(config['uri'])
+            uri = str(config['uri'])
+            # Only encrypt if not already in the encrypted format
+            if '****' not in uri and not (':' in uri and len(uri.split(':')[0]) == 32):
+                config['uri'] = encrypt_uri(uri)
 
     def _apply_updates(self, db: Db, data: Dict[str, Any]):
         """Applies data updates to a Db model instance."""
@@ -177,14 +184,12 @@ class ConnectionService(BaseDatabaseService):
             # Preserve existing sensitive data if masked values are provided
             if new_config.get('password') == '********':
                 new_config['password'] = db.config.get('password')
-            elif new_config.get('password'):
-                new_config['password'] = encrypt(new_config['password'])
             
             if new_config.get('uri') and '****' in new_config['uri']:
                 new_config['uri'] = db.config.get('uri')
-            elif new_config.get('uri'):
-                new_config['uri'] = encrypt_uri(new_config['uri'])
-
+            
+            # Encrypt what needs to be encrypted
+            self._encrypt_sensitive_fields(new_config)
             db.config = new_config
 
     def _prepare_test_config(self, data: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:

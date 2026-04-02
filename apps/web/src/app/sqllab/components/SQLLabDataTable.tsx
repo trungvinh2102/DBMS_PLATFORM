@@ -55,14 +55,21 @@ export function SQLLabDataTable({
   const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
 
   const filteredData = useMemo(() => {
-    if (!searchTerm) return data;
+    const dataWithIndices = data.map((row, index) => ({ ...row, _originalIndex: index }));
+    if (!searchTerm) return dataWithIndices;
     const term = searchTerm.toLowerCase();
-    return data.filter((row) =>
-      Object.values(row).some((val) =>
-        String(val).toLowerCase().includes(term),
-      ),
+    return dataWithIndices.filter((row) =>
+      Object.entries(row).some(([key, val]) => {
+        if (key === '_originalIndex') return false;
+        if (!columns.includes(key)) return false;
+        if (val === null || val === undefined) return false;
+        if (typeof val === 'object') {
+          return JSON.stringify(val).toLowerCase().includes(term);
+        }
+        return String(val).toLowerCase().includes(term);
+      }),
     );
-  }, [data, searchTerm]);
+  }, [data, searchTerm, columns]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredData.length,
@@ -88,12 +95,12 @@ export function SQLLabDataTable({
     return true;
   };
 
-  const handleCellChange = (rowIndex: number, colName: string, value: any) => {
+  const handleCellChange = (originalIndex: number, colName: string, value: any) => {
     setPendingChanges((prev) => {
-      const rowChanges = prev[rowIndex] || { ...data[rowIndex] };
+      const rowChanges = prev[originalIndex] || { ...data[originalIndex] };
       return {
         ...prev,
-        [rowIndex]: {
+        [originalIndex]: {
           ...rowChanges,
           [colName]: value,
         },
@@ -101,11 +108,11 @@ export function SQLLabDataTable({
     });
   };
 
-  const getCellValue = (rowIndex: number, colName: string) => {
-    if (pendingChanges[rowIndex] && colName in pendingChanges[rowIndex]) {
-      return pendingChanges[rowIndex][colName];
+  const getCellValue = (originalIndex: number, colName: string) => {
+    if (pendingChanges[originalIndex] && colName in pendingChanges[originalIndex]) {
+      return pendingChanges[originalIndex][colName];
     }
-    return data[rowIndex][colName];
+    return data[originalIndex][colName];
   };
 
   const hasChanges = Object.keys(pendingChanges).length > 0;
@@ -117,8 +124,6 @@ export function SQLLabDataTable({
         e.preventDefault();
         if (hasChanges) {
           setIsConfirmSaveOpen(true);
-        } else {
-          toast.info("No changes to save");
         }
       }
     };
@@ -128,31 +133,29 @@ export function SQLLabDataTable({
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
-      {!mini && (
-        <div className="p-2 border-b bg-muted/5 flex items-center gap-3 shrink-0">
-          <div className="relative flex-1 max-w-sm group">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
-            <input
-              type="text"
-              placeholder="Search in results..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full h-7 pl-8 pr-7 bg-muted/20 border border-border/40 rounded text-[11px] focus:outline-none focus:border-primary/40 focus:bg-background transition-all"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest px-2">
-            {filteredData.length} of {data.length} rows
-          </div>
+      <div className={cn("p-2 border-b bg-muted/5 flex items-center gap-3 shrink-0", mini && "p-1.5")}>
+        <div className="relative flex-1 max-w-sm group">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40 group-focus-within:text-primary transition-colors" />
+          <input
+            type="text"
+            placeholder={mini ? "Quick search..." : "Search in results..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full h-7 pl-8 pr-7 bg-muted/20 border border-border/40 rounded text-[11px] focus:outline-none focus:border-primary/40 focus:bg-background transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
-      )}
+        <div className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest px-2">
+          {filteredData.length} of {data.length} {mini ? "" : "rows"}
+        </div>
+      </div>
       <div
         ref={parentRef}
         className="flex-1 relative overflow-auto scrollbar-thin bg-background"
@@ -202,12 +205,12 @@ export function SQLLabDataTable({
                     {i + 1}
                   </td>
                   {columns.map((col, j) => {
-                    const val = getCellValue(i, col);
+                    const val = getCellValue(row._originalIndex, col);
                     const isEdited =
-                      pendingChanges[i] && col in pendingChanges[i];
+                      pendingChanges[row._originalIndex] && col in pendingChanges[row._originalIndex];
                     const isObject = val !== null && typeof val === "object";
                     const isEditing =
-                      editingCell?.rowIndex === i &&
+                      editingCell?.rowIndex === row._originalIndex &&
                       editingCell?.colName === col;
 
                     return (
@@ -217,7 +220,7 @@ export function SQLLabDataTable({
                           "border-r p-2 text-[11px] font-medium truncate w-45 border-border/20 transition-all select-text relative",
                           mini ? "p-1.5 w-37.5" : "p-2.5",
                           isObject &&
-                            "cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors",
+                          "cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors",
                           isEdited && !isEditing && "bg-amber-500/10",
                           isEditing && "p-0",
                         )}
@@ -230,7 +233,7 @@ export function SQLLabDataTable({
                         onClick={() => {
                           if (isColumnEditable(col)) {
                             if (!isObject) {
-                              setEditingCell({ rowIndex: i, colName: col });
+                              setEditingCell({ rowIndex: row._originalIndex, colName: col });
                             }
                           }
                         }}
@@ -241,7 +244,7 @@ export function SQLLabDataTable({
                             className="w-full h-full bg-background border-2 border-primary px-2 py-1 outline-none text-[11px]"
                             value={val === null ? "" : String(val)}
                             onChange={(e) =>
-                              handleCellChange(i, col, e.target.value)
+                              handleCellChange(row._originalIndex, col, e.target.value)
                             }
                             onBlur={() => setEditingCell(null)}
                             onKeyDown={(e) => {
@@ -421,7 +424,6 @@ export function SQLLabDataTable({
                 onSave?.(pendingChanges);
                 setPendingChanges({});
                 setIsConfirmSaveOpen(false);
-                toast.success("Changes sent to database");
               }}
             >
               Confirm Save

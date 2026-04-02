@@ -88,32 +88,32 @@ export function useSQLLabMetadata({
   };
 
   const indexesQuery = useQuery({
-    queryKey: ["indexes", selectedDS, selectedTable],
+    queryKey: ["indexes", selectedDS, selectedSchema, selectedTable],
     queryFn: () => databaseApi.getIndexes(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const foreignKeysQuery = useQuery({
-    queryKey: ["fks", selectedDS, selectedTable],
+    queryKey: ["fks", selectedDS, selectedSchema, selectedTable],
     queryFn: () => databaseApi.getForeignKeys(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const tableInfoQuery = useQuery({
-    queryKey: ["tableInfo", selectedDS, selectedTable],
+    queryKey: ["tableInfo", selectedDS, selectedSchema, selectedTable],
     queryFn: () => databaseApi.getTableInfo(selectedDS, selectedTable!),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const tableDDLQuery = useQuery({
-    queryKey: ["ddl", selectedDS, selectedTable],
+    queryKey: ["ddl", selectedDS, selectedSchema, selectedTable],
     queryFn: () =>
       databaseApi.getDDL(selectedDS, selectedTable!, selectedSchema),
     enabled: !!selectedDS && !!selectedTable,
   });
 
   const allColumnsQuery = useQuery({
-    queryKey: ["columns", selectedDS, selectedTable],
+    queryKey: ["columns", selectedDS, selectedSchema, selectedTable],
     queryFn: () =>
       databaseApi.getColumns(selectedDS, selectedTable!, selectedSchema),
     enabled: !!selectedDS && !!selectedTable,

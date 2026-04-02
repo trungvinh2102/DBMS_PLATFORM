@@ -23,7 +23,7 @@ export interface SyntaxError {
 
 export type RightPanelMode = "object" | "history" | "schema";
 
-export type ResultTab = "results" | "messages" | "problems" | "charts" | "lineage";
+export type ResultTab = "results" | "messages" | "problems" | "lineage";
 
 export interface CursorPosition {
   lineNumber: number;

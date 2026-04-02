@@ -1,9 +1,9 @@
 /**
  * @file SQLLabResultPanel.tsx
- * @description Master results panel for SQL Lab, organizing results, charts, lineages, and error logs using sub-components.
+ * @description Master results panel for SQL Lab, organizing results, lineages, and error logs using sub-components.
  */
 
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSQLLabContext } from "../context/SQLLabContext";
@@ -16,7 +16,7 @@ import { ResultFooter } from "./results/ResultFooter";
 const EMPTY_SYNTAX_ERRORS: any[] = [];
 
 /**
- * Orchestrates the display of query outputs, charts, and execution messages.
+ * Orchestrates the display of query outputs and execution messages.
  */
 export function SQLLabResultPanel({
   syntaxErrors = EMPTY_SYNTAX_ERRORS,
@@ -61,12 +61,6 @@ export function SQLLabResultPanel({
             errorCount={errorCount}
           >
             Problems
-          </TabButton>
-          <TabButton
-            active={effectiveTab === "charts"}
-            onClick={() => lab.setActiveResultTab("charts")}
-          >
-            Charts
           </TabButton>
           {!isMongoDB && lab.selectedDSType !== "clickhouse" && (
             <TabButton

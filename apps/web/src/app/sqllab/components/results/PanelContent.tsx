@@ -10,7 +10,6 @@ import { NoSQLResults } from "../NoSQLResults";
 import { ProblemsList } from "../ProblemsList";
 import { ExplainPlanViewer } from "./ExplainPlanViewer";
 
-const ChartViewer = lazy(() => import("../ChartViewer").then((m) => ({ default: m.ChartViewer })));
 const LineageViewer = lazy(() => import("../LineageViewer").then((m) => ({ default: m.LineageViewer })));
 
 interface PanelContentProps {
@@ -60,21 +59,6 @@ export function PanelContent({
     );
   }
   
-  if (tab === "charts") {
-    return (
-      <Suspense fallback={<div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse">Loading charts...</div>}>
-        {results.length > 0 ? (
-          <ChartViewer results={results} columns={columns} />
-        ) : (
-          <EmptyState
-            icon={<Terminal className="h-12 w-12 mb-6" />}
-            title="No Data for Charts"
-            desc="Execute a query returning data to generate charts."
-          />
-        )}
-      </Suspense>
-    );
-  }
   
   if (tab === "lineage") {
     const ds = dataSources?.find((d: any) => d.id === selectedDS);

@@ -134,10 +134,17 @@ export function useSQLLab() {
       ui.activeRightTab === "data" && 
       (type === "table" || type === "view")
     ) {
-      let sql = `SELECT * FROM "${ui.selectedTable}" LIMIT 100`;
+      const limit = settings.defaultQueryLimit || 100;
+      const offset = ui.dataOffset || 0;
+      const q = selectedDSType === "mysql" ? "`" : '"';
+      const schema = activeTab.selectedSchema;
+      const table = ui.selectedTable;
+      const fullTableName = schema && schema !== 'public' ? `${q}${schema}${q}.${q}${table}${q}` : `${q}${table}${q}`;
+      let sql = `SELECT * FROM ${fullTableName} LIMIT ${limit} OFFSET ${offset}`;
+      
       if (selectedDSType === "redis") sql = `GET "${ui.selectedTable}"`;
       else if (selectedDSType === "mongodb") {
-        const dbPrefix = (activeTab.selectedSchema && activeTab.selectedSchema !== "public") ? activeTab.selectedSchema : "db";
+        const dbPrefix = (schema && schema !== "public") ? schema : "db";
         sql = `${dbPrefix}.${ui.selectedTable}.find()`;
       }
       
@@ -146,7 +153,12 @@ export function useSQLLab() {
         tableDataMutation.mutate({ databaseId: activeTab.selectedDS, sql });
       }
     }
-  }, [ui.selectedTable, activeTab.selectedDS, ui.activeRightTab, getSelectedObjectType, selectedDSType, activeTab.selectedSchema, lastExecutedSql]);
+  }, [ui.selectedTable, activeTab.selectedDS, ui.activeRightTab, ui.dataOffset, settings.defaultQueryLimit, getSelectedObjectType, selectedDSType, activeTab.selectedSchema, lastExecutedSql, tableDataMutation]);
+
+  // Reset offset when table changes
+  useEffect(() => {
+    ui.setDataOffset(0);
+  }, [ui.selectedTable, ui.setDataOffset]);
 
   const [selectedText, setSelectedText] = [ui.cursorPos, ui.setCursorPos]; // Mocked locally for now, to be integrated better.
 
@@ -163,6 +175,11 @@ export function useSQLLab() {
     selectedSchema: activeTab.selectedSchema,
     setSelectedSchema: (sc: string) => updateActiveTab({ selectedSchema: sc }),
     resultEncoding: settings.resultEncoding,
+    defaultQueryLimit: settings.defaultQueryLimit || 1000,
+    
+    // Pagination
+    nextPage: () => ui.setDataOffset(prev => prev + (settings.defaultQueryLimit || 1000)),
+    prevPage: () => ui.setDataOffset(prev => Math.max(0, prev - (settings.defaultQueryLimit || 1000))),
     
     // Data & Results
     dataSources, schemas, isLoadingSchemas, tables, ...metadata,
@@ -246,9 +263,6 @@ export function useSQLLab() {
       if (keyColumns.length === 0) {
         keyColumns = allColumns.map((c: any) => c.name);
         isFallback = true;
-        if (keyColumns.length > 0) {
-          toast.warning("Table has no primary key. Using all columns for row identification. Multiple identical rows might be affected.", { duration: 6000 });
-        }
       }
 
       if (keyColumns.length === 0) {
@@ -256,6 +270,7 @@ export function useSQLLab() {
         return;
       }
 
+      const q = selectedDSType === "mysql" ? "`" : '"';
       const updates: string[] = [];
       const rowIndices = Object.keys(pendingChanges).map(Number);
       
@@ -266,21 +281,22 @@ export function useSQLLab() {
         const setClauses = Object.entries(changes)
           .filter(([col, val]) => val !== originalRow[col])
           .map(([col, val]) => {
-            if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) return `"${col}" = NULL`;
+            if (val === null || val === undefined || (typeof val === 'string' && val.trim() === '')) return `${q}${col}${q} = NULL`;
             const escapedVal = typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : val;
-            return `"${col}" = ${escapedVal}`;
+            return `${q}${col}${q} = ${escapedVal}`;
           });
-
+ 
         if (setClauses.length === 0) continue;
-
+ 
         const whereClauses = keyColumns.map(k => {
           const val = originalRow[k];
-          if (val === null || val === undefined) return `"${k}" IS NULL`;
+          if (val === null || val === undefined) return `${q}${k}${q} IS NULL`;
           const escapedVal = typeof val === 'string' ? `'${val.replace(/'/g, "''")}'` : val;
-          return `"${k}" = ${escapedVal}`;
+          return `${q}${k}${q} = ${escapedVal}`;
         });
-
-        updates.push(`UPDATE "${schema}"."${table}" SET ${setClauses.join(', ')} WHERE ${whereClauses.join(' AND ')};`);
+ 
+        const fullTableName = schema && schema !== 'public' ? `${q}${schema}${q}.${q}${table}${q}` : `${q}${table}${q}`;
+        updates.push(`UPDATE ${fullTableName} SET ${setClauses.join(', ')} WHERE ${whereClauses.join(' AND ')};`);
       }
 
       if (updates.length > 0) {
@@ -289,14 +305,18 @@ export function useSQLLab() {
           for (const sql of updates) {
             await databaseApi.execute(dsId, sql);
           }
-          toast.success(`Successfully updated ${updates.length} rows`);
+          toast.success(`${updates.length} rows updated`);
           // Refresh data
+          const limit = settings.defaultQueryLimit || 1000;
+          const offset = ui.dataOffset || 0;
+          const q = selectedDSType === "mysql" ? "`" : '"';
+          const fullTableName = schema && schema !== 'public' ? `${q}${schema}${q}.${q}${table}${q}` : `${q}${table}${q}`;
           tableDataMutation.mutate({ 
             databaseId: dsId, 
-            sql: selectedDSType === "mongodb" ? `${schema || 'db'}.${table}.find()` : `SELECT * FROM "${table}" LIMIT 100` 
+            sql: selectedDSType === "mongodb" ? `${schema || 'db'}.${table}.find()` : `SELECT * FROM ${fullTableName} LIMIT ${limit} OFFSET ${offset}` 
           });
         } catch (err: any) {
-          toast.error(`Update failed: ${err.message}`);
+          toast.error(err.message);
         }
       }
     },
