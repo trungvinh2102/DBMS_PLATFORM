@@ -7,7 +7,7 @@ import { http, HttpResponse } from "msw";
 
 describe("SavedQueries", () => {
   beforeEach(() => {
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
   });
 
   it("renders the Bookmarks header", () => {
@@ -16,7 +16,7 @@ describe("SavedQueries", () => {
   });
 
   it("shows skeletons when loading", () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
     // Don't resolve immediately - the loading state should show skeletons
     const { container } = render(<SavedQueries />);
     // Skeleton elements should exist during loading
@@ -26,7 +26,7 @@ describe("SavedQueries", () => {
   });
 
   it("renders saved queries list from backend", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     render(<SavedQueries />);
 
@@ -40,7 +40,7 @@ describe("SavedQueries", () => {
   });
 
   it("shows View All link when queries exist", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     render(<SavedQueries />);
 
@@ -53,7 +53,7 @@ describe("SavedQueries", () => {
   });
 
   it("shows empty state message when no saved queries", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     server.use(
       http.get("*/api/database/saved-queries", () =>

@@ -16,7 +16,7 @@ vi.mock("react-router-dom", async () => {
 describe("ProtectedRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuth.setState({ user: null, token: null });
+    useAuth.setState({ user: null });
   });
 
   it("shows loading spinner when not authenticated", () => {
@@ -54,7 +54,6 @@ describe("ProtectedRoute", () => {
         bio: null,
         role: "admin",
       },
-      token: "valid-token",
     });
 
     render(
@@ -78,7 +77,6 @@ describe("ProtectedRoute", () => {
         bio: null,
         role: "user",
       },
-      token: "valid-token",
     });
 
     render(
@@ -104,7 +102,6 @@ describe("ProtectedRoute", () => {
         bio: null,
         role: "admin",
       },
-      token: "valid-token",
     });
 
     render(

@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 describe("HeroAI", () => {
   beforeEach(() => {
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
   });
 
   it("renders greeting based on time of day", () => {
@@ -20,7 +20,6 @@ describe("HeroAI", () => {
 
   it("renders user first name when authenticated", () => {
     useAuth.setState({
-      token: "mock-token",
       user: {
         id: "1",
         email: "test@example.com",
@@ -38,7 +37,6 @@ describe("HeroAI", () => {
 
   it("shows 'Developer' as fallback when no user name", () => {
     useAuth.setState({
-      token: "mock-token",
       user: {
         id: "1",
         email: "test@example.com",

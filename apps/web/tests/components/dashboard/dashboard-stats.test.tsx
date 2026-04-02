@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 describe("DashboardStats", () => {
   it("renders stats cards correctly", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
     render(<DashboardStats />);
 
     expect(screen.getByText("Total Connections")).toBeInTheDocument();

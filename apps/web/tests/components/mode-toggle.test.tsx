@@ -12,7 +12,7 @@ const mockedUseTheme = vi.mocked(useTheme);
 
 describe("ModeToggle component", () => {
   beforeEach(() => {
-    useAuth.setState({ user: null, token: null });
+    useAuth.setState({ user: null });
     vi.clearAllMocks();
     server.use(
       http.get("*/api/user/settings", () =>
@@ -58,7 +58,6 @@ describe("ModeToggle component", () => {
     const updateSpy = vi.spyOn(userApi, "updateSettings").mockResolvedValue({});
     useAuth.setState({
       user: { id: "1", email: "test@example.com", name: "Test", username: "test", avatarUrl: null, bio: null, role: "admin" },
-      token: "mock-token",
     });
 
     render(<ModeToggle />);
@@ -92,7 +91,6 @@ describe("ModeToggle component", () => {
 
     useAuth.setState({
       user: { id: "1", email: "test@example.com", name: "Test", username: "test", avatarUrl: null, bio: null, role: "admin" },
-      token: "mock-token",
     });
 
     render(<ModeToggle />);

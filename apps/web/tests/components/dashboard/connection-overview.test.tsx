@@ -7,17 +7,17 @@ import { http, HttpResponse } from "msw";
 
 describe("ConnectionOverview", () => {
   beforeEach(() => {
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
   });
 
   it("renders the Connections header", () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
     render(<ConnectionOverview />);
     expect(screen.getByText("Connections")).toBeInTheDocument();
   });
 
   it("shows connection count when databases exist", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
     render(<ConnectionOverview />);
 
     await waitFor(() => {
@@ -26,7 +26,7 @@ describe("ConnectionOverview", () => {
   });
 
   it("shows 'No connections yet' when no databases", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     server.use(
       http.get("*/api/database/list", () => HttpResponse.json([])),
@@ -47,7 +47,7 @@ describe("ConnectionOverview", () => {
   });
 
   it("shows zero count when value is 0", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     server.use(
       http.get("*/api/database/list", () => HttpResponse.json([])),

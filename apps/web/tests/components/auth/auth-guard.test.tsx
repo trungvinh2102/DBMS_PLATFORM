@@ -18,7 +18,7 @@ vi.mock("react-router-dom", async () => {
 
 describe("AuthGuard", () => {
   beforeEach(() => {
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
     mockNavigate.mockClear();
     mockPathname = "/";
   });
@@ -34,7 +34,7 @@ describe("AuthGuard", () => {
 
   it("redirects to login when no token on non-auth page", async () => {
     mockPathname = "/dashboard";
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
 
     render(
       <AuthGuard>
@@ -49,7 +49,7 @@ describe("AuthGuard", () => {
 
   it("redirects to home when token exists on auth page", async () => {
     mockPathname = "/auth/login";
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     render(
       <AuthGuard>
@@ -64,7 +64,7 @@ describe("AuthGuard", () => {
 
   it("does not redirect when token exists on non-auth page", async () => {
     mockPathname = "/dashboard";
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
 
     render(
       <AuthGuard>
@@ -78,7 +78,7 @@ describe("AuthGuard", () => {
 
   it("does not redirect when no token on auth page", async () => {
     mockPathname = "/auth/register";
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
 
     render(
       <AuthGuard>

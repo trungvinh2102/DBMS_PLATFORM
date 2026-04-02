@@ -8,7 +8,7 @@ import { http, HttpResponse } from "msw";
 
 describe("Header", () => {
   beforeEach(() => {
-    useAuth.setState({ user: null, token: null });
+    useAuth.setState({ user: null });
     server.use(
       http.get("*/api/user/settings", () =>
         HttpResponse.json({ theme: "light" }),
@@ -46,7 +46,6 @@ describe("Header", () => {
           bio: null,
           role: "admin",
         },
-        token: "mock-token",
       });
     });
 
@@ -66,7 +65,6 @@ describe("Header", () => {
           bio: null,
           role: "admin",
         },
-        token: "mock-token",
       });
     });
 
@@ -81,9 +79,10 @@ describe("Header", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("hydrates user when token exists but user is missing", async () => {
+  it("hydrates user when cookie exists but user is missing", async () => {
     act(() => {
-      useAuth.setState({ user: null, token: "valid-token" });
+      document.cookie = "auth_token=valid-token; path=/";
+      useAuth.setState({ user: null });
     });
 
     render(<Header />);
@@ -106,7 +105,8 @@ describe("Header", () => {
     );
 
     act(() => {
-      useAuth.setState({ user: null, token: "invalid-token" });
+      document.cookie = "auth_token=invalid-token; path=/";
+      useAuth.setState({ user: null });
     });
 
     render(<Header />);

@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 describe("RecentActivity", () => {
   it("renders list of recent queries", async () => {
-    useAuth.setState({ token: "mock-token", user: { id: "1" } as any });
+    useAuth.setState({ user: { id: "1" } as any });
     render(<RecentActivity />);
 
     expect(screen.getByText("Recent Activity")).toBeInTheDocument();
