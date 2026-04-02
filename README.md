@@ -11,18 +11,18 @@ This project includes localized scripts for easy startup:
 
 ---
 
-## 💻 Desktop Application (.exe)
+## 💻 Desktop Application (.msi)
 
 The desktop app is built with **Tauri** and includes an embedded Python API sidecar for offline capabilities.
 
-### 📥 [Download Installer Directly (v1.0.0)](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/1.0.0/DBMS_Platform.exe)
+### 📥 [Download Installer Directly (v1.0.0)](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/1.0.0/DBMS.Platform_1.0.0_x64_en-US.msi)
 
 > [!TIP]
 > This link points to the current stable release. To download the very latest official version, visit the [Releases Page](https://github.com/trungvinh2102/DBMS_PLATFORM/releases).
 
 ### 🏗️ Build from Source
 
-To generate a fresh `.exe` installer:
+To generate a fresh `.msi` installer:
 
 1. Ensure all dependencies are installed: `bun install`
 2. Run the distribution command:
