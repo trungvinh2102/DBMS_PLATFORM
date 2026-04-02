@@ -35,6 +35,8 @@ env_paths = [
     # Tauri v2 preserves hierarchy for resources. The source is ../../api/.env
     # but in bundle it might be nested.
     os.path.join(base_path, '_up_', '_up_', 'api', '.env'),
+    # Tauri extracts sidecars into bin/, but resources into the root. So we need to go up one level.
+    os.path.join(base_path, '..', '_up_', '_up_', 'api', '.env'),
     # Fallback to current working directory
     os.path.abspath('.env'),
     os.path.abspath('api.env')
