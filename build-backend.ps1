@@ -38,7 +38,7 @@ if (Test-Path $SPEC_FILE) {
     & ./venv/Scripts/python -m PyInstaller $SPEC_FILE --noconfirm
 } else {
     Write-Host "No spec file found, building with default options..."
-    & ./venv/Scripts/python -m PyInstaller --onefile --name "api-$TARGET_TRIPLE" app.py --noconfirm
+    & ./venv/Scripts/python -m PyInstaller --onefile --noconsole --name "api-$TARGET_TRIPLE" app.py --noconfirm
 }
 
 # Create destination directory

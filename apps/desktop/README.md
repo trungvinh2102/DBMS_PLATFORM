@@ -94,7 +94,7 @@ After a successful build, you can find the installers here:
 ### Backend Sidecar Lifecycle
 
 When the desktop app starts:
-1. **Spawn**: The Tauri Rust core spawns `api.exe` via `tauri-plugin-shell`.
+1. **Spawn**: The Tauri Rust core spawns `api.exe` (running completely hidden without a console window) via `tauri-plugin-shell`.
 2. **Health Check**: Polls `http://127.0.0.1:5000/health` every 500ms (up to 30 attempts).
 3. **Ready Event**: Emits `backend-ready` event to the frontend once the backend is live.
 4. **Graceful Shutdown**: On window close, the sidecar process is killed to prevent orphans.
@@ -114,4 +114,4 @@ If you make any changes to the Python code in `apps/api/`, those changes **will 
 
 ---
 
-_DBMS Platform Team - v0.1.3_
+_DBMS Platform Team - v1.0.0_

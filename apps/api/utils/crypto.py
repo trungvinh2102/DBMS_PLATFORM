@@ -14,7 +14,11 @@ from cryptography.hazmat.primitives import padding
 from typing import Optional
 
 # Configuration from environment or defaults matching Node.js implementation
-ENV_SECRET = os.getenv("JWT_SECRET", "fallback-secret-key-must-be-secure")
+def get_secret(secret: Optional[str] = None) -> str:
+    """Gets the secret key, falling back to environment variable if not provided."""
+    if secret is not None:
+        return secret
+    return os.getenv("JWT_SECRET", "fallback-secret-key-must-be-secure")
 
 def get_key(secret: str) -> bytes:
     """Derives a 32-byte key from a secret string using scrypt."""
@@ -23,10 +27,9 @@ def get_key(secret: str) -> bytes:
 
 def encrypt(text: str, secret: Optional[str] = None) -> str:
     """Encrypts text using AES-256-CBC."""
-    if secret is None:
-        secret = ENV_SECRET
+    actual_secret = get_secret(secret)
     
-    key = get_key(secret)
+    key = get_key(actual_secret)
     iv = os.urandom(16)
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
     encryptor = cipher.encryptor()
@@ -40,8 +43,7 @@ def encrypt(text: str, secret: Optional[str] = None) -> str:
 
 def decrypt(encrypted_text: str, secret: Optional[str] = None) -> str:
     """Decrypts text using AES-256-CBC."""
-    if secret is None:
-        secret = ENV_SECRET
+    actual_secret = get_secret(secret)
         
     parts = encrypted_text.split(":")
     if len(parts) != 2:
@@ -50,7 +52,7 @@ def decrypt(encrypted_text: str, secret: Optional[str] = None) -> str:
     iv = bytes.fromhex(parts[0])
     ciphertext = bytes.fromhex(parts[1])
     
-    key = get_key(secret)
+    key = get_key(actual_secret)
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
     decryptor = cipher.decryptor()
     
