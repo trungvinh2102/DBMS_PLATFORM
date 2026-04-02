@@ -12,6 +12,7 @@ import { HealthMonitor } from "@/components/dashboard/health-monitor";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { SavedQueries } from "@/components/dashboard/saved-queries";
+import { DataAnalytics } from "@/components/dashboard/data-analytics";
 import { useAuth } from "@/hooks/use-auth";
 
 // Animation variant for staggering the Bento pieces
@@ -53,7 +54,12 @@ export default function HomePage() {
                <HeroAI />
              </motion.div>
 
-             {/* Row 2: Connection Overview (Span 2) + Quick Actions (Span 1x2) */}
+             {/* Row 2: Analytics Dashboard (Span 4) */}
+             <motion.div variants={itemVariants} className="col-span-1 md:col-span-4">
+               <DataAnalytics />
+             </motion.div>
+
+             {/* Row 3: Connection Overview (Span 2) + Quick Actions (Span 1x2) */}
              <motion.div variants={itemVariants} className="col-span-1 md:col-span-2 relative z-10">
                <ConnectionOverview />
              </motion.div>
@@ -66,7 +72,7 @@ export default function HomePage() {
                <QuickActions />
              </motion.div>
 
-             {/* Row 3: Recent Activity (Span 3) + Saved Queries (Span 1) */}
+             {/* Row 4: Recent Activity (Span 3) + Saved Queries (Span 1) */}
              <motion.div variants={itemVariants} className="col-span-1 md:col-span-3 relative z-10">
                <RecentActivity />
              </motion.div>

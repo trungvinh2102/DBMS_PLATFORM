@@ -32,11 +32,13 @@ export function QuickActions() {
           whileHover={{ y: -2, scale: 1.02 }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
         >
-          <div className="absolute inset-0 bg-accent/0 group-hover:bg-accent/10 transition-colors duration-300" />
-          <div className="h-12 w-12 rounded-full bg-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-            <Plus className="h-6 w-6 text-accent" />
+          {/* Accent hover glow */}
+          <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 transition-colors duration-300" />
+          
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-primary/10">
+            <Plus className="h-6 w-6 text-primary" />
           </div>
-          <span className="font-medium text-sm z-10">New DB</span>
+          <span className="font-medium text-sm z-10 text-foreground">New DB</span>
         </motion.div>
       </Link>
     </>

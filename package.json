@@ -14,7 +14,7 @@
     "dev": "turbo dev",
     "dev:web": "turbo -F web dev",
     "dev:desktop": "turbo run dev --filter=desktop",
-    "desktop:dist": "turbo run build --filter=desktop",
+    "desktop:dist": "powershell -ExecutionPolicy Bypass -File build-backend.ps1 && turbo run build --filter=desktop",
 
     "build": "turbo build",
     "start": "turbo start",

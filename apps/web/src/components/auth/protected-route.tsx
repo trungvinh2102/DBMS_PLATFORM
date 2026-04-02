@@ -17,12 +17,12 @@ export function ProtectedRoute({
   children,
   allowedRoles,
 }: ProtectedRouteProps) {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     // 1. Check if user is logged in
-    if (!token || !user) {
+    if (!user) {
       navigate("/auth/login", { replace: true });
       return;
     }
@@ -33,11 +33,11 @@ export function ProtectedRoute({
         navigate("/unauthorized", { replace: true }); // Or dashboard
       }
     }
-  }, [user, token, navigate, allowedRoles]);
+  }, [user, navigate, allowedRoles]);
 
   // While checking (or if unauthorized), you might want to show a spinner or nothing
   // Ideally, valid state renders quickly.
-  if (!token || !user) {
+  if (!user) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-neutral-950">
         <Loader2 className="h-8 w-8 animate-spin text-purple-500" />

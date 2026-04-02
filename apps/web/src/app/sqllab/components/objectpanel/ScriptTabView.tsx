@@ -3,11 +3,20 @@
  * @description Component for displaying the SQL DDL script of a table using the Monaco editor.
  */
 
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
 import { Loader2 } from "lucide-react";
-const Editor = lazy(() => import("@monaco-editor/react"));
+import Editor from "@monaco-editor/react";
+import { defineThemes } from "@/lib/monaco/themes";
 
 export function ScriptTabView({ tableDDL, monacoTheme }: any) {
+  const monacoRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    if (monacoRef.current) {
+      monacoRef.current.editor.setTheme(monacoTheme);
+    }
+  }, [monacoTheme]);
+
   return (
     <div className="h-full flex flex-col">
       <div className="p-3 border-b bg-muted/5 flex justify-between items-center shrink-0">
@@ -21,8 +30,15 @@ export function ScriptTabView({ tableDDL, monacoTheme }: any) {
             <Editor
               height="100%"
               language="sql"
-              theme={monacoTheme}
+              theme={monacoTheme === "dbms-dark" ? "vs-dark" : "vs"}
               value={tableDDL}
+              beforeMount={(monaco) => {
+                defineThemes(monaco);
+              }}
+              onMount={(editor, monaco) => {
+                monacoRef.current = monaco;
+                monaco.editor.setTheme(monacoTheme);
+              }}
               options={{
                 readOnly: true,
                 minimap: { enabled: false },

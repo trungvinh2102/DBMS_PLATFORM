@@ -41,6 +41,7 @@ const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
+  withCredentials: true,
 });
 
 // Response interceptor for error handling
@@ -75,18 +76,6 @@ api.interceptors.response.use(
     
     return Promise.reject(new Error(message));
   },
-);
-
-// Request interceptor for auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = useAuth.getState().token;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
 );
 
 // Utility to cast response
@@ -188,13 +177,12 @@ export const aiApi = {
   updateConversation: (id: string, data: any) => req(api.put(`ai/conversations/${id}`, data)),
   deleteConversation: (id: string) => req(api.delete(`ai/conversations/${id}`)),
   streamChat: async (data: any, onChunk: (chunk: string) => void, onHeaders?: (headers: Headers) => void) => {
-    const token = useAuth.getState().token;
     const response = await fetch(`${getBaseURL()}ai/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
+      credentials: "include",
       body: JSON.stringify(data),
     });
 

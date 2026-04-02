@@ -123,7 +123,7 @@ export function SQLEditor({
   useEffect(() => {
     if (monacoRef.current) {
       monacoRef.current.editor.setTheme(
-        currentTheme === "dark" ? "querypie-dark" : "querypie-light",
+        currentTheme === "dark" ? "dbms-dark" : "dbms-light",
       );
     }
   }, [currentTheme]);
@@ -184,7 +184,7 @@ export function SQLEditor({
 
       defineThemes(monaco);
       monaco.editor.setTheme(
-        currentTheme === "dark" ? "querypie-dark" : "querypie-light",
+        currentTheme === "dark" ? "dbms-dark" : "dbms-light",
       );
 
       // Clean up previously registered autocomplete providers
@@ -226,12 +226,15 @@ export function SQLEditor({
           height="100%"
           defaultLanguage={language}
           language={language}
-          theme={currentTheme === "dark" ? "querypie-dark" : "querypie-light"}
+          theme={currentTheme === "dark" ? "vs-dark" : "vs"}
+          beforeMount={(monaco) => {
+            defineThemes(monaco);
+          }}
           value={value}
           onChange={onChange}
           onMount={handleEditorDidMount}
           options={{
-            inlineSuggest: { 
+            inlineSuggest: {
               enabled: settings.editorInlineSuggestions ?? true,
               mode: "prefix"
             },

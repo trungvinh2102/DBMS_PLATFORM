@@ -4,7 +4,6 @@
  */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { setCookie, deleteCookie } from "cookies-next";
 
 export interface User {
   id: string;
@@ -17,9 +16,8 @@ export interface User {
 }
 
 interface AuthState {
-  token: string | null;
   user: User | null;
-  setAuth: (token: string, user: User) => void;
+  setAuth: (user: User) => void;
   setUser: (user: User) => void;
   logout: () => void;
 }
@@ -27,28 +25,15 @@ interface AuthState {
 export const useAuth = create<AuthState>()(
   persist(
     (set) => ({
-      token: null,
       user: null,
-      setAuth: (token, user) => {
-        // Set cookie for HTTP requests (middleware/server actions)
-        try {
-          setCookie("auth-token", token, {
-            maxAge: 60 * 60 * 24 * 7, // 7 days
-            path: "/",
-            secure: import.meta.env.PROD,
-            sameSite: "lax",
-          });
-        } catch (e) {
-          console.error("useAuth: setCookie failed", e);
-        }
-        set({ token, user });
+      setAuth: (user) => {
+        set({ user });
       },
       setUser: (user) => {
         set({ user });
       },
       logout: () => {
-        deleteCookie("auth-token");
-        set({ token: null, user: null });
+        set({ user: null });
       },
     }),
     {
