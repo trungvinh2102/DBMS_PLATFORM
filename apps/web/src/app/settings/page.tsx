@@ -195,12 +195,12 @@ function SettingsContent() {
         onValueChange={(val) => setSearchParams({ tab: val })}
       >
         <div className="flex items-center justify-between border-b border-border/40 pb-4">
-          <TabsList className="flex h-14 items-center bg-card/30 backdrop-blur-md border border-border/40 p-1.5 rounded-[1.2rem] shadow-premium gap-1 w-fit">
+          <TabsList className="flex h-14 items-center bg-card/40 backdrop-blur-md border border-border/60 p-1.5 rounded-[1.2rem] shadow-premium gap-1 w-fit">
             {TABS.map((tab) => (
               <TabsTrigger 
                 key={tab.value} 
                 value={tab.value}
-                className="flex items-center py-2.5 px-6 rounded-xl transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:shadow-primary/20 hover:bg-muted/50 group whitespace-nowrap h-full"
+                className="flex items-center py-2.5 px-6 rounded-xl transition-all data-active:bg-primary data-active:text-primary-foreground data-active:shadow-lg data-active:shadow-primary/20 hover:bg-muted/50 group whitespace-nowrap h-full border border-transparent data-active:border-primary/10"
               >
                 <tab.icon className="mr-2.5 h-4 w-4 transition-transform group-hover:scale-110" />
                 <span className="font-bold tracking-tight text-sm">{tab.label}</span>

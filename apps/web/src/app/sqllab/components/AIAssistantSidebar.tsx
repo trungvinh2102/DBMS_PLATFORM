@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function AIAssistantSidebar() {
   const lab = useSQLLabContext();
@@ -46,7 +47,9 @@ export function AIAssistantSidebar() {
     conversations,
     conversationId,
     addAssistantMessage,
-    setIsTyping
+    setIsTyping,
+    isFetchingConversation,
+    isLoadingConversations
   } = useAIChat(lab.selectedDS || undefined, lab.selectedSchema, selectedModel);
 
   // Initialize models and load history on mount or database change
@@ -55,7 +58,7 @@ export function AIAssistantSidebar() {
       try {
         const [models] = await Promise.all([
           aiApi.getModels(),
-          loadConversations() // Unfilter - show all conversations
+          loadConversations(lab.selectedDS || undefined) // Filter by current database
         ]);
 
         setAvailableModels(models);
@@ -256,7 +259,8 @@ export function AIAssistantSidebar() {
               conversations={conversations}
               currentId={conversationId}
               onSelect={(id) => { loadConversation(id); setShowHistory(false); }}
-              onRefresh={() => loadConversations()}
+              onRefresh={() => loadConversations(lab.selectedDS || undefined)}
+              isLoading={isLoadingConversations}
             />
           </div>
         </div>
@@ -267,55 +271,70 @@ export function AIAssistantSidebar() {
         >
           <div
             className="relative w-full"
-            style={{ height: `${virtualizer.getTotalSize()}px` }}
+            style={{ height: isFetchingConversation ? 'auto' : `${virtualizer.getTotalSize()}px` }}
           >
-            {virtualizer.getVirtualItems().map((vMsg) => {
-              const isLastTyping = isTyping && vMsg.index === messages.length;
-              const m = messages[vMsg.index];
+            {isFetchingConversation ? (
+              <div className="flex flex-col gap-8 w-full animate-pulse">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className={cn("flex gap-3 w-full", i % 2 === 0 ? "flex-row-reverse" : "flex-row")}>
+                    <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                    <div className={cn("flex flex-col gap-2 w-[80%]", i % 2 === 0 ? "items-end" : "items-start")}>
+                      <Skeleton className="h-4 w-24 mb-1" />
+                      <Skeleton className={cn("h-20 w-full rounded-2xl", i % 2 === 0 ? "rounded-tr-none" : "rounded-tl-none")} />
+                      {i % 2 !== 0 && <Skeleton className="h-32 w-full rounded-xl mt-2" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              virtualizer.getVirtualItems().map((vMsg) => {
+                const isLastTyping = isTyping && vMsg.index === messages.length;
+                const m = messages[vMsg.index];
 
-              return (
-                <div
-                  key={vMsg.key}
-                  ref={virtualizer.measureElement}
-                  data-index={vMsg.index}
-                  className="absolute top-0 left-0 w-full"
-                  style={{ transform: `translateY(${vMsg.start}px)` }}
-                >
-                  <div className="pb-6">
-                    {isLastTyping ? (
-                      <div className="relative overflow-hidden bg-muted/20 p-6 rounded-3xl border border-dashed border-primary/20 flex flex-col items-center gap-4 transition-all duration-1000">
-                        <div className="absolute inset-0 glass-orb" />
-                        <div className="relative z-10 flex items-center justify-center">
-                          <BrainCircuit className="h-8 w-8 text-primary animate-pulse" />
-                          <Sparkles className="h-4 w-4 text-primary absolute -top-1 -right-1 animate-bounce" />
-                        </div>
-                        <div className="relative z-10 flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/80 animate-pulse">
-                            Synthesizing Intelligence
-                          </span>
-                          <div className="flex gap-1">
-                            {[0, 1, 2].map((i) => (
-                              <div key={i} className="w-1 h-1 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: `${i * 0.2}s` }} />
-                            ))}
+                return (
+                  <div
+                    key={vMsg.key}
+                    ref={virtualizer.measureElement}
+                    data-index={vMsg.index}
+                    className="absolute top-0 left-0 w-full"
+                    style={{ transform: `translateY(${vMsg.start}px)` }}
+                  >
+                    <div className="pb-6">
+                      {isLastTyping ? (
+                        <div className="relative overflow-hidden bg-muted/20 p-6 rounded-3xl border border-dashed border-primary/20 flex flex-col items-center gap-4 transition-all duration-1000">
+                          <div className="absolute inset-0 glass-orb" />
+                          <div className="relative z-10 flex items-center justify-center">
+                            <BrainCircuit className="h-8 w-8 text-primary animate-pulse" />
+                            <Sparkles className="h-4 w-4 text-primary absolute -top-1 -right-1 animate-bounce" />
+                          </div>
+                          <div className="relative z-10 flex flex-col items-center gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/80 animate-pulse">
+                              Synthesizing Intelligence
+                            </span>
+                            <div className="flex gap-1">
+                              {[0, 1, 2].map((i) => (
+                                <div key={i} className="w-1 h-1 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: `${i * 0.2}s` }} />
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : m ? (
-                      <AIMessage
-                        message={m}
-                        onExplain={handleExplain}
-                        onOptimize={handleOptimize}
-                        onApply={handleApplySQL}
-                        onSuggestionClick={handleSuggestionClick}
-                        conversationId={conversationId}
-                      />
-                    ) : null}
+                      ) : m ? (
+                        <AIMessage
+                          message={m}
+                          onExplain={handleExplain}
+                          onOptimize={handleOptimize}
+                          onApply={handleApplySQL}
+                          onSuggestionClick={handleSuggestionClick}
+                          conversationId={conversationId}
+                        />
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
 
-            {messages.length === 0 && !isTyping && (
+            {messages.length === 0 && !isTyping && !isFetchingConversation && (
               <div className="h-full mt-20 flex flex-col items-center justify-center p-8 text-center opacity-30 select-none">
                 <Sparkles className="h-12 w-12 text-primary mb-4" />
                 <h2 className="text-xl font-black uppercase tracking-tighter">New Chat</h2>

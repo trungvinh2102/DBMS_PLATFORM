@@ -44,14 +44,36 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Response interceptor for error handling
+// Request interceptor for authentication
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
+// Response interceptor for error handling and token management
 api.interceptors.response.use(
-  (response: any) => response.data,
+  (response: any) => {
+    // Save token if it exists in response (for standalone apps)
+    if (response.data?.token) {
+      localStorage.setItem("auth_token", response.data.token);
+    }
+    return response.data;
+  },
   (error: any) => {
     // Check for 401 Unauthorized
     if (error.response?.status === 401) {
       const isLoginRequest = error.config.url?.includes("auth/login");
       const isAlreadyOnLoginPage = typeof window !== "undefined" && window.location.pathname.includes("/auth/login");
+
+      // Clear token on 401
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+      }
 
       if (!isLoginRequest && !isAlreadyOnLoginPage) {
         // Clear auth state and redirect to login
@@ -149,6 +171,7 @@ export const databaseApi = {
 export const authApi = {
   login: (data: any) => req(api.post("auth/login", data)),
   register: (data: any) => req(api.post("auth/register", data)),
+  logout: () => req(api.post("auth/logout")),
 };
 
 export const userApi = {
@@ -181,6 +204,7 @@ export const aiApi = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${typeof window !== "undefined" ? localStorage.getItem("auth_token") || "" : ""}`,
       },
       credentials: "include",
       body: JSON.stringify(data),

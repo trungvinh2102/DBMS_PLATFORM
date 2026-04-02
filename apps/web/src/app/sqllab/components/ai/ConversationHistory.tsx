@@ -35,9 +35,10 @@ interface Props {
   currentId: string | null;
   onSelect: (id: string) => void;
   onRefresh: () => void;
+  isLoading?: boolean;
 }
 
-export function ConversationHistory({ conversations, currentId, onSelect, onRefresh }: Props) {
+export function ConversationHistory({ conversations, currentId, onSelect, onRefresh, isLoading }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -91,14 +92,32 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
 
   return (
     <div className="flex flex-col gap-2 p-2">
-      {conversations.length === 0 && (
+      {isLoading ? (
+        <div className="flex flex-col gap-2 animate-pulse">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="p-3 rounded-xl border border-border/20 bg-muted/20 flex flex-col gap-2">
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col gap-1.5 w-full">
+                  <div className="h-3 w-[60%] bg-muted rounded-md" />
+                  <div className="h-2 w-[30%] bg-muted/60 rounded-md" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-1">
+                <div className="h-5 w-5 bg-muted rounded-lg" />
+                <div className="h-5 w-5 bg-muted rounded-lg" />
+                <div className="h-5 w-5 bg-muted rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : conversations.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-muted-foreground/40 text-center px-4">
           <MessageSquare className="h-8 w-8 mb-2 opacity-20" />
           <p className="text-[10px] uppercase tracking-widest font-bold">Chưa có lịch sử</p>
         </div>
-      )}
+      ) : null}
 
-      {conversations.map((conv) => (
+      {!isLoading && conversations.map((conv) => (
         <div
           key={conv.id}
           onClick={() => onSelect(conv.id)}

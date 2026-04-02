@@ -18,20 +18,21 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 export function RecentActivity() {
-  const { token } = useAuth();
+  const { user } = useAuth();
 
   const { data: connectionsData } = useQuery({
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
-    enabled: !!token,
+    enabled: !!user,
   });
   const connections = connectionsData as any[] | undefined;
 
   const { data: historyData, isLoading } = useQuery({
     queryKey: ["queryHistory", "recent"],
     queryFn: () => databaseApi.getHistory(),
-    enabled: !!token,
+    enabled: !!user,
   });
+
 
   const recentQueries = (historyData as any[])?.slice(0, 5) || [];
 

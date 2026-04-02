@@ -33,6 +33,9 @@ export const useAuth = create<AuthState>()(
         set({ user });
       },
       logout: () => {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth_token");
+        }
         set({ user: null });
       },
     }),

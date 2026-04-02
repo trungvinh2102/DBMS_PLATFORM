@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DBMS Platform",
+  "productName": "DBMS_Platform",
   "version": "1.0.0",
   "identifier": "com.dbms.platform",
   "build": {

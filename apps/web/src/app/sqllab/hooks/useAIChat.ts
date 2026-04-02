@@ -11,6 +11,8 @@ import { Message } from "../components/ai/AIMessage";
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isFetchingConversation, setIsFetchingConversation] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
 
@@ -102,6 +104,8 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, []);
 
   const loadHistory = async (dbId?: string) => {
+    setIsFetchingConversation(true);
+    setMessages([]);
     try {
       const history = await aiApi.getHistory(dbId);
       if (history && history.length > 0) {
@@ -116,20 +120,26 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       }
     } catch (e) {
       console.error("Failed to load chat history", e);
+    } finally {
+      setIsFetchingConversation(false);
     }
   };
 
   const loadConversations = useCallback(async (dbId?: string) => {
+    setIsLoadingConversations(true);
     try {
       const list = await aiApi.getConversations(dbId);
       setConversations(list);
     } catch (e) {
       console.error("Failed to load conversation list", e);
+    } finally {
+      setIsLoadingConversations(false);
     }
   }, []);
 
   const loadConversation = useCallback(async (id: string) => {
-    setIsTyping(true);
+    setIsFetchingConversation(true);
+    setMessages([]); // Clear immediately to show skeletons
     try {
       const res = await aiApi.getConversationMessages(id);
       setConversationId(res.id);
@@ -144,7 +154,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     } catch (e) {
       toast.error("Failed to load conversation");
     } finally {
-      setIsTyping(false);
+      setIsFetchingConversation(false);
     }
   }, [parseMessageContent]);
 
@@ -221,6 +231,8 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     setMessages,
     isTyping,
     setIsTyping,
+    isFetchingConversation,
+    isLoadingConversations,
     handleSend,
     loadHistory,
     loadConversations,

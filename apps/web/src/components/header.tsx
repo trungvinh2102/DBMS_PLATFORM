@@ -32,7 +32,7 @@ import { ModeToggle } from "./mode-toggle";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { userApi, resolveUrl } from "@/lib/api-client";
+import { userApi, resolveUrl, authApi } from "@/lib/api-client";
 
 // Sample data from app-sidebar.tsx
 const data = {
@@ -65,7 +65,7 @@ const data = {
 
 export function Header() {
   // Use destructured state for better control and access to actions
-  const { user, token, logout, setUser } = useAuth();
+  const { user, logout, setUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
@@ -76,19 +76,22 @@ export function Header() {
     setMounted(true);
   }, []);
 
-  // Hydrate user if token exists but user is missing
+  // Hydrate user if user is missing
   React.useEffect(() => {
-    if (token && !user) {
+    if (!user) {
       userApi
         .getMe()
         .then((userData) => {
           setUser(userData);
         })
         .catch((error) => {
-          console.error("Failed to fetch user profile:", error);
+          // Ignore 401 errors during initial hydration
+          if (error.message !== "Unauthorized") {
+            console.error("Failed to fetch user profile:", error);
+          }
         });
     }
-  }, [token, user, setUser]);
+  }, [user, setUser]);
 
   if (isAuthPage) {
     return null;
@@ -128,7 +131,7 @@ export function Header() {
           <ModeToggle />
 
           {/* User Profile */}
-          {mounted && (user || token) ? (
+          {mounted && user ? (
             user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -197,9 +200,15 @@ export function Header() {
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={() => {
-                      logout();
-                      navigate("/auth/login");
+                    onClick={async () => {
+                      try {
+                        await authApi.logout();
+                      } catch (error) {
+                        console.error("Failed to logout:", error);
+                      } finally {
+                        logout();
+                        navigate("/auth/login");
+                      }
                     }}
                   >
                     <LogOut className="mr-2 h-4 w-4" />

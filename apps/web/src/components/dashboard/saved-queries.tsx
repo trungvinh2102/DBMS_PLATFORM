@@ -16,13 +16,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 export function SavedQueries() {
-  const { token } = useAuth();
+  const { user } = useAuth();
 
   const { data: savedQueryData, isLoading } = useQuery({
     queryKey: ["savedQueries"],
     queryFn: () => databaseApi.listSavedQueries(),
-    enabled: !!token,
+    enabled: !!user,
   });
+
 
   const savedQueries = (savedQueryData as any[])?.slice(0, 4) || [];
 

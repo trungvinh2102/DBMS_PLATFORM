@@ -21,18 +21,18 @@ export function DashboardStats() {
   });
 
   // Fetch Connections Count
-  const { token } = useAuth();
+  const { user } = useAuth();
   const { data: connections, isLoading: isLoadingConnections } = useQuery({
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
-    enabled: !!token,
+    enabled: !!user,
   });
 
   // Fetch Saved Queries
   const { data: savedQueries, isLoading: isLoadingSavedQueries } = useQuery({
     queryKey: ["savedQueries"],
     queryFn: () => databaseApi.listSavedQueries(),
-    enabled: !!token,
+    enabled: !!user,
     retry: false,
   });
 

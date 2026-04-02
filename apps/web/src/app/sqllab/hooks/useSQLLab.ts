@@ -59,7 +59,7 @@ export function useSQLLab() {
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
     autoCommit: ui.activeResultTab === "results", // Generic, specific ones can override
-    limit: settings.defaultQueryLimit,
+    limit: ui.queryLimit,
     onSuccess: (res: any) => {
       updateActiveTab({
         results: res.isExplain ? res : (res.data || []),
@@ -175,11 +175,11 @@ export function useSQLLab() {
     selectedSchema: activeTab.selectedSchema,
     setSelectedSchema: (sc: string) => updateActiveTab({ selectedSchema: sc }),
     resultEncoding: settings.resultEncoding,
-    defaultQueryLimit: settings.defaultQueryLimit || 1000,
+    defaultQueryLimit: ui.queryLimit,
     
     // Pagination
-    nextPage: () => ui.setDataOffset(prev => prev + (settings.defaultQueryLimit || 1000)),
-    prevPage: () => ui.setDataOffset(prev => Math.max(0, prev - (settings.defaultQueryLimit || 1000))),
+    nextPage: () => ui.setDataOffset(prev => prev + ui.queryLimit),
+    prevPage: () => ui.setDataOffset(prev => Math.max(0, prev - ui.queryLimit)),
     
     // Data & Results
     dataSources, schemas, isLoadingSchemas, tables, ...metadata,

@@ -19,10 +19,15 @@ def login_required(f):
             return f(*args, **kwargs)
             
         token = None
+        # Priority 1: Check Authorization Header
         if 'Authorization' in request.headers:
             auth_header = request.headers['Authorization']
             if auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
+        
+        # Priority 2: Check Cookie
+        if not token:
+            token = request.cookies.get('auth_token')
         
         if not token:
             return jsonify({'message': 'Token is missing'}), 401

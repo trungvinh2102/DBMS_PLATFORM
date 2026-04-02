@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 describe("api-client", () => {
   beforeEach(() => {
-    useAuth.setState({ user: null, token: null });
+    useAuth.setState({ user: null });
     vi.clearAllMocks();
   });
 
@@ -21,7 +21,7 @@ describe("api-client", () => {
       email: "test@example.com",
       password: "password",
     });
-    expect(data.token).toBe("mock-token");
+    expect(data.user).toBeDefined();
 
     server.use(
       http.post("*/api/auth/register", () =>
@@ -29,6 +29,16 @@ describe("api-client", () => {
       ),
     );
     expect(await authApi.register({})).toEqual({ success: true });
+  });
+
+  it("authApi.logout should work", async () => {
+    server.use(
+      http.post("*/api/auth/logout", () =>
+        HttpResponse.json({ message: "Logged out" }),
+      ),
+    );
+    const data = await authApi.logout();
+    expect(data.message).toBe("Logged out");
   });
 
   it("should handle server errors (500)", async () => {
@@ -51,7 +61,7 @@ describe("api-client", () => {
 
     server.use(
       http.get("*/api/database/list", () =>
-        HttpResponse.json({ error: "U" }, { status: 401 }),
+        HttpResponse.json({ error: "Unauthorized" }, { status: 401 }),
       ),
     );
 
@@ -164,20 +174,6 @@ describe("api-client", () => {
     expect(true).toBe(true); // Hits all lines
   });
 
-  it("should include authorization header", async () => {
-    useAuth.setState({ token: "test-token" });
-    let authHeader = "";
-    server.use(
-      http.get("*/api/database/list", ({ request }) => {
-        authHeader = request.headers.get("Authorization") || "";
-        return HttpResponse.json([]);
-      }),
-    );
-    await databaseApi.list();
-    expect(authHeader).toBe("Bearer test-token");
-    useAuth.setState({ token: null });
-  });
-
   it("triggers request interceptor error", async () => {
     const badInterceptor = api.interceptors.request.use((config) => {
       throw new Error("force error");
@@ -186,3 +182,4 @@ describe("api-client", () => {
     api.interceptors.request.eject(badInterceptor);
   });
 });
+

@@ -21,27 +21,19 @@ describe("useAuth hook/store", () => {
 
   beforeEach(() => {
     // Reset Zustand state
-    useAuth.setState({ token: null, user: null });
+    useAuth.setState({ user: null });
     vi.clearAllMocks();
   });
 
   it("should initialize with null values", () => {
     const state = useAuth.getState();
-    expect(state.token).toBeNull();
     expect(state.user).toBeNull();
   });
 
-  it("should set authentication state and cookie", () => {
-    const token = "mock-token";
-    useAuth.getState().setAuth(token, mockUser);
+  it("should set authentication state", () => {
+    useAuth.getState().setAuth(mockUser);
 
-    expect(useAuth.getState().token).toBe(token);
     expect(useAuth.getState().user).toEqual(mockUser);
-    expect(setCookie).toHaveBeenCalledWith(
-      "auth-token",
-      token,
-      expect.any(Object),
-    );
   });
 
   it("should update user profile", () => {
@@ -51,26 +43,11 @@ describe("useAuth hook/store", () => {
     expect(useAuth.getState().user).toEqual(updatedUser);
   });
 
-  it("should clear state and delete cookie on logout", () => {
-    useAuth.getState().setAuth("token", mockUser);
+  it("should clear state on logout", () => {
+    useAuth.getState().setAuth(mockUser);
     useAuth.getState().logout();
 
-    expect(useAuth.getState().token).toBeNull();
     expect(useAuth.getState().user).toBeNull();
-    expect(deleteCookie).toHaveBeenCalledWith("auth-token");
-  });
-  it("should catch config errors when setting cookie fails", () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    (setCookie as any).mockImplementationOnce(() => {
-      throw new Error("Cookie error");
-    });
-
-    useAuth.getState().setAuth("token", mockUser);
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "useAuth: setCookie failed",
-      expect.any(Error),
-    );
-    consoleSpy.mockRestore();
   });
 });
+

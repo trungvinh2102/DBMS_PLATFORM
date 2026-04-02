@@ -144,8 +144,8 @@ export function SQLLabToolbar() {
         </span>
         <Input
           type="number"
-          value={1000} // Simplified for now as limit was localized in hook
-          onChange={(e) => {}}
+          value={lab.queryLimit}
+          onChange={(e) => lab.setQueryLimit(Number(e.target.value))}
           className="h-7 w-20 px-2 text-xs bg-muted/30"
           min={0}
         />
