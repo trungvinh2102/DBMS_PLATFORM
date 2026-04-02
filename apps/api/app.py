@@ -87,7 +87,7 @@ def create_app():
             "http://127.0.0.1:1420"
         ],
         "expose_headers": ["Authorization"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "X-App-Platform"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     }}, supports_credentials=True)
     # No manual headers needed, flask-cors will handle it.

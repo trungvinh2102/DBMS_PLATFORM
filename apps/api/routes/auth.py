@@ -21,11 +21,21 @@ def login():
         
         token = result['token']
         
-        # Check if request is from a standalone app (Tauri/Mobile)
+        # Check if request is from a standalone app (Tauri/Mobile) or dev environment
         origin = request.headers.get('Origin', '')
-        is_standalone = 'tauri' in origin or 'app' in origin or '127.0.0.1' in origin
+        platform = request.headers.get('X-App-Platform', '')
+        
+        # Standalone if: custom header present, origin is tauri/app, OR it's local development
+        is_standalone = (
+            platform == 'tauri' or 
+            'tauri' in origin or 
+            'app' in origin or 
+            'localhost' in origin or 
+            '127.0.0.1' in origin
+        )
         
         # Only remove token from body for standard web browsers to maintain security
+        # If it's a web browser but NOT on localhost, we keep it secure with cookies only
         if not is_standalone:
             result.pop('token')
             
@@ -54,7 +64,15 @@ def register():
         token = result['token']
         
         origin = request.headers.get('Origin', '')
-        is_standalone = 'tauri' in origin or 'app' in origin or '127.0.0.1' in origin
+        platform = request.headers.get('X-App-Platform', '')
+        
+        is_standalone = (
+            platform == 'tauri' or 
+            'tauri' in origin or 
+            'app' in origin or 
+            'localhost' in origin or 
+            '127.0.0.1' in origin
+        )
         
         if not is_standalone:
             result.pop('token')

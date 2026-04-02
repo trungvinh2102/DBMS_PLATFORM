@@ -51,7 +51,7 @@ export default function RegisterPage() {
   const registerMutation = useMutation({
     mutationFn: (data: any) => authApi.register(data),
     onSuccess: (data: any) => {
-      setAuth(data.user);
+      setAuth(data.user, data.token);
       toast.success("Account created successfully!");
       navigate("/");
     },

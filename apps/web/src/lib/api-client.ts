@@ -44,24 +44,34 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Request interceptor for authentication
+// Request interceptor to add platform header and auth token
 api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (typeof window !== "undefined") {
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        
+        // Mark as standalone if in Tauri/App environment
+        const isStandalone = 
+            protocol === 'app:' || 
+            protocol === 'tauri:' ||
+            hostname === 'tauri.localhost';
+            
+        if (isStandalone) {
+            config.headers["X-App-Platform"] = "tauri";
+        }
+        
+        // Attach token from state if available (fallback for desktop cookies)
+        const token = useAuth.getState().token;
+        if (token) {
+            config.headers["Authorization"] = `Bearer ${token}`;
+        }
     }
-  }
-  return config;
+    return config;
 });
 
 // Response interceptor for error handling and token management
 api.interceptors.response.use(
   (response: any) => {
-    // Save token if it exists in response (for standalone apps)
-    if (response.data?.token) {
-      localStorage.setItem("auth_token", response.data.token);
-    }
     return response.data;
   },
   (error: any) => {
@@ -69,11 +79,6 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const isLoginRequest = error.config.url?.includes("auth/login");
       const isAlreadyOnLoginPage = typeof window !== "undefined" && window.location.pathname.includes("/auth/login");
-
-      // Clear token on 401
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("auth_token");
-      }
 
       if (!isLoginRequest && !isAlreadyOnLoginPage) {
         // Clear auth state and redirect to login
@@ -204,7 +209,6 @@ export const aiApi = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${typeof window !== "undefined" ? localStorage.getItem("auth_token") || "" : ""}`,
       },
       credentials: "include",
       body: JSON.stringify(data),
