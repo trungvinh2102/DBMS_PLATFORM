@@ -627,7 +627,7 @@ dependencies = [
 
 [[package]]
 name = "dbms-platform"
-version = "0.2.1"
+version = "1.0.0"
 dependencies = [
  "log",
  "reqwest 0.12.28",
