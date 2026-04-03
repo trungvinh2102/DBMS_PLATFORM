@@ -43,18 +43,19 @@ export function HeroAI() {
           </p>
         </div>
 
+        {/* AI Command Bar Placeholder */}
         <div className="w-full md:w-auto md:min-w-[400px]">
           <div className="relative group/input">
             <div className="absolute inset-0 bg-linear-to-r from-primary/20 to-accent/20 rounded-xl blur-md opacity-0 group-hover/input:opacity-100 transition-opacity duration-300 -z-10" />
-            <div className="flex items-center gap-3 bg-white/50 dark:bg-black/40 border border-black/5 dark:border-white/10 shadow-sm rounded-xl px-4 py-3 cursor-text hover:border-primary/50 dark:hover:border-primary/50 transition-all">
+            <div className="flex items-center gap-3 bg-black/5 dark:bg-black/40 border border-black/10 dark:border-white/10 rounded-xl px-4 py-3 cursor-text hover:border-primary/50 dark:hover:border-primary/50 transition-colors">
               <Sparkles className="h-5 w-5 text-primary" />
               <input
                 type="text"
                 placeholder="Ask AI to write SQL, fix errors, or search..."
-                className="bg-transparent border-none outline-none text-sm w-full text-foreground placeholder-muted-foreground/70"
+                className="bg-transparent border-none outline-none text-sm w-full text-foreground placeholder:-muted-foreground/70"
                 autoComplete="off"
               />
-              <div className="hidden md:flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-1 rounded-md border border-black/5 dark:border-white/5">
+              <div className="hidden md:flex items-center gap-1 text-xs text-muted-foreground bg-black/5 dark:bg-white/5 px-2 py-1 rounded-md">
                 <Command className="h-3 w-3" />
                 <span>K</span>
               </div>

@@ -8,6 +8,7 @@
 import { motion } from "motion/react";
 import { HeroAI } from "@/components/dashboard/hero-ai";
 import { ConnectionOverview } from "@/components/dashboard/connection-overview";
+import { HealthMonitor } from "@/components/dashboard/health-monitor";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentActivity } from "@/components/dashboard/recent-activity";
 import { SavedQueries } from "@/components/dashboard/saved-queries";
@@ -37,9 +38,9 @@ export default function HomePage() {
   return (
     <div className="flex-1 h-full w-full overflow-y-auto overflow-x-hidden bg-background">
       <div className="p-4 md:p-6 lg:p-8 relative min-h-full">
-        {/* Subtle background ambient glow - adjusted for light/dark mode */}
-        <div className="absolute top-[-15%] left-[-15%] w-[45%] h-[45%] bg-primary/20 dark:bg-primary/20 blur-[140px] rounded-full opacity-20 dark:opacity-30 pointer-events-none" />
-        <div className="absolute bottom-[-15%] right-[-15%] w-[45%] h-[45%] bg-accent/20 dark:bg-accent/20 blur-[140px] rounded-full opacity-20 dark:opacity-30 pointer-events-none" />
+        {/* Subtle background ambient glow */}
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full opacity-30 pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/20 blur-[120px] rounded-full opacity-30 pointer-events-none" />
 
         <div className="mx-auto max-w-7xl max-xl:max-w-full">
           <motion.div
@@ -61,6 +62,10 @@ export default function HomePage() {
             {/* Row 3: Connection Overview (Span 2) + Quick Actions (Span 1x2) */}
             <motion.div variants={itemVariants} className="col-span-1 md:col-span-2 relative z-10">
               <ConnectionOverview />
+            </motion.div>
+
+            <motion.div variants={itemVariants} className="col-span-1 relative z-10">
+              <HealthMonitor />
             </motion.div>
 
             <motion.div variants={itemVariants} className="col-span-1 grid grid-rows-2 gap-6 relative z-10">
