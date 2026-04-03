@@ -132,15 +132,39 @@ export function useConnectionColumns({
         </span>
       ),
       cell: ({ row }) => {
-        const dbName =
-          row.original.databaseName || row.original.config.database || "-";
+        const type = row.original.type;
+        const isFileBased = ["sqlite", "duckdb"].includes(type);
+        const fullName = row.original.databaseName || row.original.config.database || "-";
+        
+        if (isFileBased && fullName !== "-" && (fullName.includes("/") || fullName.includes("\\"))) {
+          const parts = fullName.split(/[\\/]/);
+          const filename = parts[parts.length - 1];
+          const directory = parts.slice(0, parts.length - 1).join("/");
+          
+          return (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1">
+                <div className="h-4 w-4 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
+                  <FileText className="h-2 w-2 text-slate-400" />
+                </div>
+                <span className="text-[13px] font-bold text-slate-900 dark:text-slate-100">
+                  {filename}
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono pl-5 truncate max-w-[250px]" title={fullName}>
+                {directory}/
+              </span>
+            </div>
+          );
+        }
+
         return (
           <div className="flex items-center gap-1">
             <div className="h-4 w-4 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
               <FileText className="h-2 w-2 text-slate-400" />
             </div>
             <span className="text-[13px] font-medium text-slate-900 dark:text-slate-100">
-              {dbName}
+              {fullName}
             </span>
           </div>
         );

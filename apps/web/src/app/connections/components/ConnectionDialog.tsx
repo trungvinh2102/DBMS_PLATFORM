@@ -59,15 +59,19 @@ export function ConnectionDialog({
 
   const handleTestConnection = async () => {
     try {
-      // Build config from form data - encrypt sensitive fields
-      const config = {
-        uri: formData.uri ? encrypt(formData.uri) : undefined,
-        host: formData.host,
-        port: parseInt(formData.port) || undefined,
-        user: formData.user,
-        password: formData.password ? encrypt(formData.password) : undefined,
-        database: formData.database,
-      };
+      const isFileBased = ['sqlite', 'duckdb'].includes(selectedType);
+
+      // File-based databases only need the file path
+      const config = isFileBased
+        ? { database: formData.database }
+        : {
+            uri: formData.uri ? encrypt(formData.uri) : undefined,
+            host: formData.host,
+            port: parseInt(formData.port) || undefined,
+            user: formData.user,
+            password: formData.password ? encrypt(formData.password) : undefined,
+            database: formData.database,
+          };
 
       const result = await testConnectionMutation.mutateAsync({
         type: selectedType,

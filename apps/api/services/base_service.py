@@ -6,7 +6,7 @@ Base service for database operations providing shared functionality like connect
 
 from typing import Tuple, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, pool
+from sqlalchemy import create_engine, pool, event
 import logging
 
 from models.metadata import Db, SessionLocal
@@ -97,14 +97,31 @@ class BaseDatabaseService:
         logger.info(f"Connecting to {db_type} with: {masked_conn_str}")
 
         try:
-            engine = create_engine(
-                conn_str,
-                poolclass=pool.QueuePool,
-                pool_size=int(config.get('pool_size', 5)),
-                max_overflow=int(config.get('max_overflow', 10)),
-                pool_timeout=int(config.get('pool_timeout', 30)),
-                pool_recycle=int(config.get('pool_recycle', 1800)),
-            )
+            # File-based databases (SQLite, DuckDB) use NullPool to avoid file-locking issues
+            if db_type in ['sqlite', 'duckdb']:
+                engine = create_engine(conn_str, poolclass=pool.NullPool)
+                
+                # Set SQLite performance PRAGMAs on every new connection
+                # We skip this if the engine is a mock (common in tests)
+                is_mock = type(engine).__name__ == 'MagicMock' or type(engine).__name__ == 'Mock'
+                if db_type == 'sqlite' and not is_mock:
+                    @event.listens_for(engine, "connect")
+                    def _set_sqlite_pragma(dbapi_connection, connection_record):
+                        cursor = dbapi_connection.cursor()
+                        cursor.execute("PRAGMA journal_mode=WAL")
+                        cursor.execute("PRAGMA synchronous=NORMAL")
+                        cursor.execute("PRAGMA foreign_keys=ON")
+                        cursor.close()
+            else:
+                # Server-based databases use QueuePool for connection reuse
+                engine = create_engine(
+                    conn_str,
+                    poolclass=pool.QueuePool,
+                    pool_size=int(config.get('pool_size', 5)),
+                    max_overflow=int(config.get('max_overflow', 10)),
+                    pool_timeout=int(config.get('pool_timeout', 30)),
+                    pool_recycle=int(config.get('pool_recycle', 1800)),
+                )
 
             if db_id:
                 _engine_cache[db_id] = engine

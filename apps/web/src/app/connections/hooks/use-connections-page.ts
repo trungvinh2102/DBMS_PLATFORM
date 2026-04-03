@@ -57,14 +57,19 @@ export function useConnectionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const config = {
-        uri: formData.uri ? encrypt(formData.uri) : undefined,
-        host: formData.host,
-        port: formData.port ? parseInt(formData.port) : undefined,
-        user: formData.user,
-        password: formData.password ? encrypt(formData.password) : undefined,
-        database: formData.database,
-      };
+      const isFileBased = ['sqlite', 'duckdb'].includes(selectedType);
+
+      // File-based databases only need the file path — no credentials
+      const config = isFileBased
+        ? { database: formData.database }
+        : {
+            uri: formData.uri ? encrypt(formData.uri) : undefined,
+            host: formData.host,
+            port: formData.port ? parseInt(formData.port) : undefined,
+            user: formData.user,
+            password: formData.password ? encrypt(formData.password) : undefined,
+            database: formData.database,
+          };
 
       if (editingId) {
         const updateConfig = { ...config };
@@ -72,16 +77,30 @@ export function useConnectionsPage() {
           updateConfig.password = "********";
         }
 
+        // For display name, use filename if file-based and path provided
+        let displayName = formData.database;
+        if (isFileBased && formData.database) {
+          const parts = formData.database.split(/[\\/]/);
+          displayName = parts[parts.length - 1] || formData.database;
+        }
+
         await updateMutation.mutateAsync({
           id: editingId,
-          databaseName: formData.database,
+          databaseName: displayName,
           type: selectedType,
           config: updateConfig,
         });
         toast.success("Connection updated successfully");
       } else {
+        // For display name, use filename if file-based and path provided
+        let displayName = formData.database;
+        if (isFileBased && formData.database) {
+          const parts = formData.database.split(/[\\/]/);
+          displayName = parts[parts.length - 1] || formData.database;
+        }
+
         await createMutation.mutateAsync({
-          databaseName: formData.database,
+          databaseName: displayName,
           type: selectedType,
           config,
         });
@@ -98,9 +117,10 @@ export function useConnectionsPage() {
   };
 
   const resetForm = (type: string) => {
+    const isFileBased = ['sqlite', 'duckdb'].includes(type);
     setFormData({
-      host: "localhost",
-      port: DEFAULT_PORTS[type] || "5432",
+      host: isFileBased ? "" : "localhost",
+      port: isFileBased ? "" : (DEFAULT_PORTS[type] || "5432"),
       user: "",
       password: "",
       database: "",

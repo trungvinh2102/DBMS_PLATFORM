@@ -1,9 +1,12 @@
-import { Database, Server, Hash, User, Lock, Zap, Link2, Settings2, ShieldAlert } from "lucide-react";
+import { Database, Server, Hash, User, Lock, Zap, Link2, Settings2, ShieldAlert, HardDrive, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ChangeEvent } from "react";
+
+/** Database types that use local file paths instead of host/port/credentials */
+const FILE_BASED_TYPES = ["sqlite", "duckdb"];
 
 interface GeneralTabProps {
   dbType?: string;
@@ -15,10 +18,74 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
   const isClickhouse = dbType === "clickhouse";
   const isMongodb = dbType === "mongodb";
   const isRedis = dbType === "redis";
+  const isSqlite = dbType === "sqlite";
+  const isDuckdb = dbType === "duckdb";
+  const isFileBased = FILE_BASED_TYPES.includes(dbType || "");
   const useUri = config.useUri || false;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* SQLite Configuration Section */}
+      {isSqlite && (
+        <div className="p-4 bg-sky-500/5 border border-sky-500/10 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-sky-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">SQLite Configuration</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-bold">
+              <span className="px-2 py-0.5 bg-sky-500/10 text-sky-600 dark:text-sky-400 rounded-md border border-sky-500/20">
+                FILE-BASED
+              </span>
+              <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-md border border-emerald-500/20">
+                OLTP
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between px-1">
+            <div className="space-y-0.5">
+              <Label className="text-[11px] font-bold">WAL Journal Mode</Label>
+              <p className="text-[10px] text-muted-foreground">Recommended for concurrent access and performance</p>
+            </div>
+            <div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-md border border-emerald-500/20 text-[10px] font-bold">
+              ENABLED (AUTO)
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DuckDB Configuration Section */}
+      {isDuckdb && (
+        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-amber-500" />
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">DuckDB Configuration</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-bold">
+              <span className="px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-md border border-amber-500/20">
+                FILE-BASED
+              </span>
+              <span className="px-2 py-0.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-md border border-purple-500/20">
+                OLAP
+              </span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between px-1">
+            <div className="space-y-0.5">
+              <Label className="text-[11px] font-bold">Read-Only Mode</Label>
+              <p className="text-[10px] text-muted-foreground">Open database in read-only mode to prevent modifications</p>
+            </div>
+            <Switch
+              checked={config.readOnly || false}
+              onCheckedChange={(checked: boolean) => onChange("readOnly", checked)}
+            />
+          </div>
+        </div>
+      )}
+
       {isClickhouse && (
         <div className="p-4 bg-orange-500/5 border border-orange-500/10 rounded-2xl space-y-4">
           <div className="flex items-center justify-between">
@@ -182,6 +249,25 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
               <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
               <p className="text-[10px] text-amber-600 font-medium"> Ensure special characters in your password are URL encoded (e.g. @ becomes %40)</p>
             </div>
+          </div>
+        </div>
+      ) : isFileBased ? (
+        /* File-based database: show only file path field */
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database File Path</Label>
+            </div>
+            <Input 
+              value={config.database || ""} 
+              onChange={(e) => onChange("database", e.target.value)} 
+              className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm font-mono"
+              placeholder={isSqlite ? "C:\\Users\\data\\mydb.sqlite" : "C:\\Users\\data\\analytics.duckdb"}
+            />
+            <p className="text-[10px] text-muted-foreground/60">
+              Enter the full path to your database file. A new file will be created if it doesn't exist.
+            </p>
           </div>
         </div>
       ) : (

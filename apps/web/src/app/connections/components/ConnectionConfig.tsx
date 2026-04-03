@@ -20,8 +20,12 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
-  Activity
+  Activity,
+  HardDrive
 } from "lucide-react";
+
+/** Database types that use local file paths instead of host/port/credentials */
+const FILE_BASED_TYPES = ["sqlite", "duckdb"];
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -85,6 +89,8 @@ export function ConnectionConfig({
     [activeConn.type]
   );
 
+  const isFileBased = FILE_BASED_TYPES.includes(activeConn.type);
+
   const envColor = useMemo(() => {
     if (environment === "PRODUCTION") return "red";
     if (environment === "STAGING") return "amber";
@@ -122,42 +128,43 @@ export function ConnectionConfig({
   const handleTestConnection = async () => {
     setTestStatus('TESTING');
     setTestProgress(10);
-    setTestMessage("Resolving host...");
+    setTestMessage(isFileBased ? "Locating file..." : "Resolving host...");
 
     // Simulate real steps for "WOW" factor
     setTimeout(() => {
       setTestProgress(40);
-      setTestMessage("Establishing TCP/IP handshake...");
+      setTestMessage(isFileBased ? "Opening database file..." : "Establishing TCP/IP handshake...");
     }, 800);
 
     setTimeout(async () => {
       try {
         setTestProgress(70);
-        setTestMessage("Authenticating with credentials...");
+        setTestMessage(isFileBased ? "Verifying file integrity..." : "Authenticating with credentials...");
+
+        // File-based DBs only need database path
+        const testConfig = isFileBased
+          ? { database: config.database }
+          : { ...config, sslMode, sshConfig };
 
         const result = await databaseApi.test({
           id: activeConn.id,
           type: activeConn.type,
-          config: {
-            ...config,
-            sslMode,
-            sshConfig
-          }
+          config: testConfig,
         });
 
         if (result.success) {
           setTestStatus('SUCCESS');
           setTestProgress(100);
-          setTestMessage("Connection established successfully!");
+          setTestMessage(isFileBased ? "Database file accessible!" : "Connection established successfully!");
           toast.success("Connection test passed");
         } else {
           setTestStatus('ERROR');
-          setTestMessage(result.message || "Auth failed: Access Denied");
+          setTestMessage(result.message || (isFileBased ? "File not accessible" : "Auth failed: Access Denied"));
           toast.error("Test failed: " + result.message);
         }
       } catch (err: any) {
         setTestStatus('ERROR');
-        setTestMessage(err.message || "Network unreachable");
+        setTestMessage(err.message || (isFileBased ? "File not found" : "Network unreachable"));
         toast.error("Test failed: " + err.message);
       }
     }, 1500);
@@ -188,7 +195,13 @@ export function ConnectionConfig({
                 {dbType?.icon} {dbType?.name}
               </span>
               <span>•</span>
-              <span className="font-mono text-[10px]">{config.host}:{config.port}</span>
+              {isFileBased ? (
+                <span className="font-mono text-[10px] truncate max-w-[300px]" title={config.database}>
+                  {config.database || 'No file path'}
+                </span>
+              ) : (
+                <span className="font-mono text-[10px]">{config.host}:{config.port}</span>
+              )}
             </div>
           </div>
         </div>
@@ -275,47 +288,85 @@ export function ConnectionConfig({
 
           {/* Quick Stats */}
           <div className="p-6 rounded-2xl border border-border/40 bg-muted/5 text-[11px] space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">SSL Security</span>
-              <span className="font-bold flex items-center gap-1">
-                {sslMode !== 'DISABLE' ? <ShieldCheck className="h-3 w-3 text-emerald-500" /> : 'UNSECURED'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">SSH Tunnel</span>
-              <span className="font-bold">{sshConfig.enabled ? 'ACTIVE' : 'NONE'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Pool Capacity</span>
-              <span className="font-bold">{config.pool_size || 5} / {config.max_overflow || 10}</span>
-            </div>
-            <div className="pt-2 border-t border-border/40 flex justify-between">
-              <span className="text-muted-foreground">Compliance</span>
-              <span className="font-bold text-blue-500">{accessConfig.audit_enabled ? 'SOX/SOC2' : 'BASIC'}</span>
-            </div>
+            {isFileBased ? (
+              /* File-based database stats */
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Type</span>
+                  <span className="font-bold flex items-center gap-1">
+                    <HardDrive className="h-3 w-3 text-muted-foreground" />
+                    FILE-BASED
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Engine</span>
+                  <span className="font-bold uppercase">{activeConn.type === 'sqlite' ? 'OLTP' : 'OLAP'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Pooling</span>
+                  <span className="font-bold">NullPool</span>
+                </div>
+                {activeConn.type === 'sqlite' && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Journal</span>
+                    <span className="font-bold text-emerald-500">WAL</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-border/40 flex justify-between">
+                  <span className="text-muted-foreground">Compliance</span>
+                  <span className="font-bold text-blue-500">{accessConfig.audit_enabled ? 'SOX/SOC2' : 'BASIC'}</span>
+                </div>
+              </>
+            ) : (
+              /* Server-based database stats */
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SSL Security</span>
+                  <span className="font-bold flex items-center gap-1">
+                    {sslMode !== 'DISABLE' ? <ShieldCheck className="h-3 w-3 text-emerald-500" /> : 'UNSECURED'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SSH Tunnel</span>
+                  <span className="font-bold">{sshConfig.enabled ? 'ACTIVE' : 'NONE'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Pool Capacity</span>
+                  <span className="font-bold">{config.pool_size || 5} / {config.max_overflow || 10}</span>
+                </div>
+                <div className="pt-2 border-t border-border/40 flex justify-between">
+                  <span className="text-muted-foreground">Compliance</span>
+                  <span className="font-bold text-blue-500">{accessConfig.audit_enabled ? 'SOX/SOC2' : 'BASIC'}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* Tabbed Content */}
         <div className="lg:col-span-2">
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="bg-muted/10 p-1 border border-border/50 rounded-xl mb-6 grid grid-cols-4 h-11">
+            <TabsList className={`bg-muted/10 p-1 border border-border/50 rounded-xl mb-6 grid h-11 ${isFileBased ? 'grid-cols-2' : 'grid-cols-4'}`}>
               <TabsTrigger value="general" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                <Database className="h-3.5 w-3.5" />
-                Credentials
+                {isFileBased ? <HardDrive className="h-3.5 w-3.5" /> : <Database className="h-3.5 w-3.5" />}
+                {isFileBased ? 'Configuration' : 'Credentials'}
               </TabsTrigger>
-              <TabsTrigger value="security" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                <Key className="h-3.5 w-3.5" />
-                Security
-              </TabsTrigger>
+              {!isFileBased && (
+                <TabsTrigger value="security" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
+                  <Key className="h-3.5 w-3.5" />
+                  Security
+                </TabsTrigger>
+              )}
               <TabsTrigger value="access" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
                 <Clock className="h-3.5 w-3.5" />
                 Access
               </TabsTrigger>
-              <TabsTrigger value="performance" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
-                <BarChart3 className="h-3.5 w-3.5" />
-                Performance
-              </TabsTrigger>
+              {!isFileBased && (
+                <TabsTrigger value="performance" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary font-bold text-[10px] uppercase tracking-wider gap-2">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Performance
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="general" className="mt-0 ring-offset-background focus-visible:outline-none">

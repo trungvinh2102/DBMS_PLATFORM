@@ -6,6 +6,7 @@ Service for managing database connection configurations (CRUD) and connectivity 
 
 import uuid
 import logging
+import os
 from typing import Dict, Any, List, Optional, Tuple
 
 from services.base_service import BaseDatabaseService
@@ -15,6 +16,9 @@ from utils.crypto import encrypt, decrypt
 from utils.connection_utils import ConnectionStringBuilder
 
 logger = logging.getLogger(__name__)
+
+# Database types that are file-based (no host/port/credentials)
+FILE_BASED_TYPES = {'sqlite', 'duckdb'}
 
 class ConnectionService(BaseDatabaseService):
     """
@@ -37,7 +41,9 @@ class ConnectionService(BaseDatabaseService):
             self._verify_connection(data)
 
             config = data['config'].copy()
-            self._encrypt_sensitive_fields(config)
+            # Skip encryption for file-based databases (no sensitive credentials)
+            if data.get('type', '').lower() not in FILE_BASED_TYPES:
+                self._encrypt_sensitive_fields(config)
                  
             new_db = Db(
                 id=str(uuid.uuid4()),
@@ -115,7 +121,7 @@ class ConnectionService(BaseDatabaseService):
             if not config:
                 return {"success": False, "message": "Missing configuration"}
 
-            self._decrypt_test_config(config)
+            self._decrypt_test_config(config, db_type)
 
             if db_type == 'mongodb':
                 return self._test_mongodb(config)
@@ -188,8 +194,9 @@ class ConnectionService(BaseDatabaseService):
             if new_config.get('uri') and '****' in new_config['uri']:
                 new_config['uri'] = db.config.get('uri')
             
-            # Encrypt what needs to be encrypted
-            self._encrypt_sensitive_fields(new_config)
+            # Encrypt what needs to be encrypted (skip for file-based DBs)
+            if db.type and db.type.lower() not in FILE_BASED_TYPES:
+                self._encrypt_sensitive_fields(new_config)
             db.config = new_config
 
     def _prepare_test_config(self, data: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
@@ -224,8 +231,12 @@ class ConnectionService(BaseDatabaseService):
             
         return db_type, config
 
-    def _decrypt_test_config(self, config: Dict[str, Any]):
+    def _decrypt_test_config(self, config: Dict[str, Any], db_type: str = ''):
         """Decrypts sensitive fields in the test configuration."""
+        # Skip decryption for file-based databases (no encrypted fields)
+        if db_type.lower() in FILE_BASED_TYPES:
+            return
+            
         if config.get('password'):
             # Detect if it's already an encrypted string (prefix/format check)
             pwd = str(config['password'])

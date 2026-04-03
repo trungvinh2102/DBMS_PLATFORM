@@ -94,10 +94,19 @@ class ConnectionStringBuilder:
             )
 
         elif db_type == 'sqlite':
+            # Handle in-memory mode
+            if dbname == ':memory:' or not dbname:
+                return "sqlite:///:memory:"
+            # Normalize Windows backslashes to forward slashes
+            dbname = dbname.replace('\\', '/')
             return f"sqlite:///{dbname}"
 
         elif db_type == 'duckdb':
-            # DuckDB SQLAlchemy URI format: duckdb:///path/to/file.duckdb
+            # Handle in-memory mode
+            if dbname == ':memory:' or not dbname:
+                return "duckdb:///:memory:"
+            # Normalize Windows backslashes to forward slashes
+            dbname = dbname.replace('\\', '/')
             return f"duckdb:///{dbname}"
 
         elif db_type == 'clickhouse':

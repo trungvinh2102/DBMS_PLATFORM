@@ -52,9 +52,9 @@ export function buildUri(
 
   // Special handling for local-file based databases
   if (type === "sqlite" || type === "duckdb") {
-    // Return the triple-slash format for local files
-    // Ensure the path starts with a single / (after the three / in protocol:///)
-    const cleanPath = database.startsWith("/") ? database : `/${database}`;
+    // Return the triple-slash format for local files - normalize backslashes
+    const normalizedPath = database.replace(/\\/g, "/");
+    const cleanPath = normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
     return `${protocol}://${cleanPath}`;
   }
 
