@@ -100,6 +100,15 @@ class SqlMetadataProvider:
                     ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
                 """)
                 res = conn.execute(query, {"schema": schema})
+            elif conn.dialect.name == 'sqlite':
+                # SQLite doesn't have information_schema, use pragma
+                tables = conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+                result = {}
+                for table_row in tables:
+                    t_name = table_row[0]
+                    col_res = conn.execute(text(f"PRAGMA table_info('{t_name}')")).fetchall()
+                    result[t_name] = [{"name": c[1], "type": c[2], "nullable": not c[3]} for c in col_res]
+                return result
             else:
                 # Standard SQL fallback using information_schema
                 query = text("""
@@ -196,6 +205,11 @@ class SqlMetadataProvider:
                             "total_size": f"{res[0] / 1024 / 1024:.2f} MB" if res[0] else "0 MB",
                             "row_count": res[1] or 0
                         }
+
+                if conn.dialect.name == 'sqlite':
+                    # SQLite row count using simple select
+                    res = conn.execute(text(f"SELECT COUNT(*) FROM '{table}'")).fetchone()
+                    return {"row_count": res[0] if res else 0, "total_size": "N/A for SQLite SQLite"}
 
                 # Postgres fallback (shared with others potentially)
                 query = text("""

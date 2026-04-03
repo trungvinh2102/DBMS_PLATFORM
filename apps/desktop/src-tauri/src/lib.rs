@@ -10,7 +10,8 @@ use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
 /// Maximum number of health-check attempts before giving up.
-const HEALTH_CHECK_MAX_RETRIES: u32 = 30;
+/// Increased to 180 (90 seconds) to allow time for Docker Desktop to start.
+const HEALTH_CHECK_MAX_RETRIES: u32 = 180;
 
 /// Delay between each health-check attempt (in milliseconds).
 const HEALTH_CHECK_INTERVAL_MS: u64 = 500;
@@ -110,6 +111,7 @@ fn shutdown_sidecar(state: &SidecarState) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_log::Builder::default().build())
         .manage(SidecarState(Mutex::new(None)))
         .setup(|app| {

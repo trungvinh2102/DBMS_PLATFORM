@@ -10,6 +10,8 @@ import {
   SiMongodb,
   SiClickhouse,
   SiRedis,
+  SiSqlite,
+  SiDuckdb,
 } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 
@@ -46,6 +48,18 @@ export const DB_TYPES = [
     icon: <SiRedis />,
     color: "text-red-500",
   },
+  {
+    id: "sqlite",
+    name: "SQLite",
+    icon: <SiSqlite />,
+    color: "text-blue-400",
+  },
+  {
+    id: "duckdb",
+    name: "DuckDB",
+    icon: <SiDuckdb />,
+    color: "text-amber-500",
+  },
 ] as const;
 
 export const DEFAULT_PORTS: Record<string, string> = {
@@ -56,6 +70,8 @@ export const DEFAULT_PORTS: Record<string, string> = {
   mongodb: "27017",
   clickhouse: "8123",
   redis: "6379",
+  sqlite: "N/A",
+  duckdb: "N/A",
 };
 
 // URI protocol prefixes for each database type
@@ -67,4 +83,6 @@ export const DB_URI_PROTOCOLS: Record<string, string> = {
   mongodb: "mongodb",
   clickhouse: "clickhouse",
   redis: "redis",
+  sqlite: "sqlite",
+  duckdb: "duckdb",
 };

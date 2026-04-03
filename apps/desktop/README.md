@@ -61,13 +61,13 @@ If you need more control, you can build parts separately:
 
 ```powershell
 # Default (GNU target)
-./build-backend.ps1
+powershell -ExecutionPolicy Bypass -File build_msvc.ps1
 
 # Or specify MSVC target
-./build-backend.ps1 -Target msvc
+powershell -ExecutionPolicy Bypass -File build_msvc.ps1 -Target msvc
 ```
 
-#### B. Build Tauri App
+#### B. Build Tauri App 
 
 ```bash
 export RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu

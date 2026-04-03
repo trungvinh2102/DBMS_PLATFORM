@@ -23,6 +23,10 @@ clickhouse-connect
 clickhouse-sqlalchemy
 clickhouse-driver
 
+# Analytics (Offline-First)
+duckdb
+duckdb-engine
+
 # Utils
 redis
 cloudinary

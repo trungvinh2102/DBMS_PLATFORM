@@ -96,6 +96,10 @@ class ConnectionStringBuilder:
         elif db_type == 'sqlite':
             return f"sqlite:///{dbname}"
 
+        elif db_type == 'duckdb':
+            # DuckDB SQLAlchemy URI format: duckdb:///path/to/file.duckdb
+            return f"duckdb:///{dbname}"
+
         elif db_type == 'clickhouse':
             protocol = config.get('protocol', 'http').lower()
             secure = config.get('secure', False)

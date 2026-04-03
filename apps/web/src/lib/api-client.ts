@@ -115,6 +115,8 @@ export const databaseApi = {
   update: (data: any) => req(api.post("database/update", data)),
   delete: (id: string) => req(api.post("database/delete", { id })),
   test: (data: any) => req(api.post("database/test", data)),
+  connectLocal: (data: { path: string; type: 'sqlite' | 'duckdb'; name?: string }) => 
+    req(api.post("database/connect-local", data)),
 
   // Metadata
   getSchemas: (databaseId: string) =>
@@ -153,6 +155,8 @@ export const databaseApi = {
     req(api.get("database/all-columns", { params: { databaseId, schema } })),
   getAllForeignKeys: (databaseId: string, schema?: string) =>
     req(api.get("database/all-foreign-keys", { params: { databaseId, schema } })),
+  getDiagnostics: (databaseId: string, table: string) =>
+    req(api.get("database/diagnostics", { params: { databaseId, table } })),
 
   // Execution
   execute: (
@@ -205,14 +209,35 @@ export const aiApi = {
   updateConversation: (id: string, data: any) => req(api.put(`ai/conversations/${id}`, data)),
   deleteConversation: (id: string) => req(api.delete(`ai/conversations/${id}`)),
   streamChat: async (data: any, onChunk: (chunk: string) => void, onHeaders?: (headers: Headers) => void) => {
+    const token = useAuth.getState().token;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol;
+      const isStandalone = 
+        protocol === 'app:' || 
+        protocol === 'tauri:' ||
+        hostname === 'tauri.localhost';
+          
+      if (isStandalone) {
+        headers["X-App-Platform"] = "tauri";
+      }
+    }
+
     const response = await fetch(`${getBaseURL()}ai/stream`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       credentials: "include",
       body: JSON.stringify(data),
     });
+
 
     if (onHeaders) {
         onHeaders(response.headers);

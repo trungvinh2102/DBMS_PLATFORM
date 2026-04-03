@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 import os
 import datetime
 import enum
+import time
 
 Base = declarative_base()
 
@@ -31,8 +32,8 @@ class Db(Base):
     sslMode = Column(Enum(SSLMode, name="SSLMode"), default=SSLMode.DISABLE)
     sshConfig = Column(JSON, nullable=True)
     
-    # Tags handling: Postgres uses ARRAY, others (like SQLite) use JSON or Text
-    tags = Column(ARRAY(String), nullable=True)
+    # Tags handling: Postgres uses ARRAY, others (like SQLite) use JSON
+    tags = Column(JSON().with_variant(ARRAY(String), "postgresql"), nullable=True)
     
     username = Column(String, nullable=True)
     password = Column(String, nullable=True)
@@ -211,7 +212,7 @@ class SchemaEmbedding(Base):
     schema = Column(String, default='public')
     tableName = Column(String, nullable=False)
     tableDescription = Column(Text, nullable=True)
-    embedding = Column(JSONB if os.getenv("DATABASE_URL", "").startswith("postgresql") else JSON, nullable=False)
+    embedding = Column(JSON().with_variant(JSONB, "postgresql"), nullable=False)
     
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -221,26 +222,41 @@ import sys
 from dotenv import load_dotenv
 
 def init_engine():
-    # Attempt 1: Standard load from current workdir
-    load_dotenv()
-    url = os.getenv("DATABASE_URL")
+    # EXTRA HARD UNSET: Ensure no persistent OS env var can overwrite our offline-first goal
+    os.environ.pop("DATABASE_URL", None)
     
-    # Attempt 2: Load from apps/api/.env (relative to this file)
-    if not url:
-        models_dir = os.path.dirname(os.path.abspath(__file__))
-        api_dir = os.path.dirname(models_dir)
-        api_env = os.path.join(api_dir, '.env')
-        if os.path.exists(api_env):
-            load_dotenv(api_env, override=True)
-            url = os.getenv("DATABASE_URL")
+    # Attempt 1: Load from .env files but ONLY if they are explicitly provided
+    # We skip Attempt 1 (generic load_dotenv) because it's too risky with OS env vars
+    
+    # Attempt 2: Load from specific apps/api/.env
+    models_dir = os.path.dirname(os.path.abspath(__file__))
+    api_dir = os.path.dirname(models_dir)
+    api_env = os.path.join(api_dir, '.env')
+    if os.path.exists(api_env):
+        load_dotenv(api_env, override=True)
+        url = os.getenv("DATABASE_URL")
+        if url and url.startswith("postgresql"):
+            # Check if it was commented out or is empty
+            if not url.strip(): url = None
             
-    # Attempt 3: Load from root .env (relative to this file)
-    if not url:
-        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        root_env = os.path.join(root_dir, '.env')
-        if os.path.exists(root_env):
-            load_dotenv(root_env, override=True)
-            url = os.getenv("DATABASE_URL")
+    # Final check: If still no URL or it's a leftover empty string, FORCE SQLite
+    if not url or not str(url).strip():
+        # Resolve persistent data directory based on OS
+        from pathlib import Path
+        
+        if getattr(sys, 'frozen', False):
+            app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
+            data_dir = Path(app_data) / 'DBMSPlatform'
+        else:
+            data_dir = Path.home() / '.dbms_platform'
+            
+        try:
+            data_dir.mkdir(parents=True, exist_ok=True)
+            db_path = (data_dir / 'dbms_platform.db').absolute()
+            url = f"sqlite:///{db_path}"
+        except Exception as e:
+            print(f"ERROR: Could not create data directory {data_dir}: {e}")
+            url = "sqlite:///dbms_platform.db"
 
     # Final cleanup
     if url:
@@ -250,20 +266,25 @@ def init_engine():
             url = url[1:-1].strip()
 
     if not url:
-        print("WARNING: DATABASE_URL not found in any .env file. Checking hardcoded fallback...")
-        # Fallback to SQLite for standalone/portable use
+        print("WARNING: DATABASE_URL not found in any .env file. Using local SQLite fallback...")
+        # Resolve persistent data directory based on OS
+        from pathlib import Path
+        
         if getattr(sys, 'frozen', False):
             # If running as an EXE (PyInstaller)
             app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
-            data_dir = os.path.join(app_data, 'DBMSPlatform')
-            
-            if not os.path.exists(data_dir):
-                os.makedirs(data_dir, exist_ok=True)
-            
-            db_path = os.path.join(data_dir, 'dbms_platform.db').replace('\\', '/')
-            url = f"sqlite:///{db_path}"
+            data_dir = Path(app_data) / 'DBMSPlatform'
         else:
-            url = "sqlite:///dbms_platform.db"
+            # For development, use user home or local folder
+            data_dir = Path.home() / '.dbms_platform'
+            
+        try:
+            data_dir.mkdir(parents=True, exist_ok=True)
+            db_path = (data_dir / 'dbms_platform.db').absolute()
+            url = f"sqlite:///{db_path}"
+        except Exception as e:
+            print(f"ERROR: Could not create data directory {data_dir}: {e}")
+            url = "sqlite:///dbms_platform.db" # Fail-safe to current dir
 
     print(f"Backend: Database connection initialized.")
     # Log masked URL for safety
@@ -274,12 +295,22 @@ def init_engine():
     
     engine = create_engine(url)
     
-    # Test connection
+    # Simple connection check
     try:
         with engine.connect() as conn:
-            pass
+            print("Backend: System database (SQLite) connected successfully.")
     except Exception as e:
-        print(f"WARNING: Database connection failed: {e}")
+        print(f"WARNING: Initial database check failed: {e}")
+            
+    # Enable WAL mode for SQLite performance
+    if url.startswith("sqlite"):
+        from sqlalchemy import event
+        @event.listens_for(engine, 'connect')
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.close()
             
     return engine, url
 

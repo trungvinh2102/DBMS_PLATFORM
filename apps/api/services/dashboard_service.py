@@ -22,11 +22,17 @@ class DashboardService:
             if not db_config:
                 return {"error": "Database not found"}
 
-            # Standard health/system stats (Generic for now)
+            # Enhanced stats from DuckDB (Analytical engine)
+            from services.analytics_service import analytics_service
+            analytics_stats = analytics_service.get_query_performance_trends()
+            status_dist = analytics_service.get_status_distribution()
+            
+            # Standard health/system stats (Default context)
             stats = {
-                "health": {"score": 100, "status": "Healthy"},
+                "health": {"score": 95 if not any(s['status'] == 'Error' for s in status_dist) else 80, "status": "Healthy"},
                 "connections": {"current": 0, "max": 100, "trend": [0, 0, 0, 0, 0]},
-                "performance": [],
+                "performance": analytics_stats,
+                "status_counts": status_dist,
                 "storage": {"used_gb": 0, "free_gb": 0, "total_gb": 0},
                 "top_slow_queries": []
             }

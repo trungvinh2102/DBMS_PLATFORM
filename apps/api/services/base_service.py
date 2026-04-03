@@ -87,7 +87,7 @@ class BaseDatabaseService:
         if db_type in ['redis', 'mongodb']:
             return None
 
-        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse']:
+        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'duckdb']:
             raise Exception(f"Database type '{db_type}' is not supported via SQLAlchemy.")
 
         conn_str = ConnectionStringBuilder.build_uri(db_type, config)

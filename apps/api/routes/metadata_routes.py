@@ -215,3 +215,18 @@ def get_table_info():
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
         return jsonify({'error': str(e)}), status
+
+@metadata_bp.route('/diagnostics', methods=['GET'])
+def get_diagnostics():
+    """Retrieves advanced statistical profiling (histograms) for a table."""
+    db_id = request.args.get('databaseId')
+    table = request.args.get('table')
+    if not db_id or not table:
+        return jsonify({'error': 'databaseId and table are both required'}), 400
+    
+    from services.local_db_service import local_db_service
+    try:
+        diagnostics = local_db_service.get_diagnostics(db_id, table)
+        return jsonify(diagnostics)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

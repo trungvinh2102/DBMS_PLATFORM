@@ -78,3 +78,21 @@ def test_connection():
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@connection_bp.route('/connect-local', methods=['POST'])
+def connect_local():
+    """Connects to a local SQLite or DuckDB file."""
+    data = request.json
+    if not data or 'path' not in data or 'type' not in data:
+        return jsonify({'error': 'path and type (sqlite/duckdb) are required'}), 400
+    
+    from services.local_db_service import local_db_service
+    try:
+        result = local_db_service.connect_external_file(
+            path=data['path'],
+            db_type=data['type'],
+            name=data.get('name')
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

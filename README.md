@@ -36,7 +36,7 @@ To generate a fresh `.msi` installer:
 ## 🛠️ Architecture
 
 - **Frontend (`apps/web`)**: ReactJS 19, TailwindCSS, shadcn/ui, TanStack Query.
-- **Backend (`apps/api`)**: Flask (Python), PostgreSQL, SQLAlchemy.
+- **Backend (`apps/api`)**: Flask (Python), SQLite (System DB), SQLAlchemy.
 - **Desktop (`apps/desktop`)**: Tauri wrapper with automated backend lifecycle management.
 
 ---
@@ -47,7 +47,6 @@ To generate a fresh `.msi` installer:
 
 - **Bun** (Runtime)
 - **Python 3.10+** (Backend)
-- **Docker** (For PostgreSQL)
 
 ### 2. Installation
 
@@ -58,29 +57,18 @@ pip install -r apps/api/requirements.txt
 
 ### 3. Database Setup
 
-The platform requires a PostgreSQL database. Follow these steps to set it up:
+The platform uses **SQLite** automatically for its internal system metadata. 
 
-#### A. Using Docker (Recommended)
-If you have Docker installed, you can use the provided configuration:
-1. **Download/Copy** the [docker-compose.yml](https://github.com/trungvinh2102/DBMS_PLATFORM/blob/dev1.0/docker-compose.yml) file to your server.
-2. Run the following command to start the database:
-   ```bash
-   docker compose up -d
-   ```
+#### A. Zero-Config Startup
+When you run the app for the first time, it will automatically create a local database file:
+- **Windows**: `%APPDATA%\DBMSPlatform\dbms_platform.db`
+- **Linux/macOS**: `~/.dbms_platform/dbms_platform.db`
 
-#### B. Configure Environment
-Create an `.env` file in `apps/api/` (or next to the `.exe` for desktop users) with your connection string:
-```env
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/dbms_platform"
-```
+No external database installation (like Docker or Postgres) is required for the application to function.
 
-#### C. Initialize & Seed (For Developers)
-If you are running from source, initialize the schema and default data:
-1. **Create Tables**:
-   ```bash
-   python apps/api/scripts/setup_db.py
-   ```
-2. **Seed Admin User**:
+#### B. Initialize & Seed (Optional)
+The system initializes tables on first run. If you want to seed default data:
+1. **Seed Admin User**:
    ```bash
    python apps/api/scripts/seed.py
    ```

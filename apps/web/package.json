@@ -16,6 +16,8 @@
     "@ai-sdk/google": "^3.0.43",
     "@ai-sdk/react": "^3.0.118",
     "@base-ui/react": "^1.0.0",
+    "@tauri-apps/api": "latest",
+    "@tauri-apps/plugin-dialog": "latest",
     "@hookform/resolvers": "^5.2.2",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-label": "^2.1.8",

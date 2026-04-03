@@ -11,6 +11,7 @@
     "shell:allow-execute",
     "shell:allow-spawn",
     "shell:allow-open",
+    "dialog:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [

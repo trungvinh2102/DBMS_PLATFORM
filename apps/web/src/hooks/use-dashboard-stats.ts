@@ -7,6 +7,15 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api-client";
 
 // Standardize the shape for our Recharts widgets
+export interface DashboardStatsPerformance {
+  time: string;
+  avg_latency: number;
+  total_queries: number;
+  cpu?: number;
+  memory?: number;
+  tps?: number;
+}
+
 export interface DashboardStats {
   health: {
     score: number;
@@ -17,11 +26,10 @@ export interface DashboardStats {
     max: number;
     trend: number[];
   };
-  performance: Array<{
-    time: string;
-    cpu: number;
-    memory: number;
-    tps: number;
+  performance: DashboardStatsPerformance[];
+  status_counts?: Array<{
+    status: string;
+    count: number;
   }>;
   storage: {
     used_gb: number;

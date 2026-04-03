@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import psutil
+import platform
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,8 +46,14 @@ for p in env_paths:
     if os.path.exists(p):
         print(f"Backend: Loading configuration from {p}")
         load_dotenv(dotenv_path=p, override=True)
+        # Verify if DATABASE_URL was actually set by this or exists
+        if not os.getenv("DATABASE_URL"):
+            # Purge from environment to force SQLite fallback if it was previously set in terminal
+            os.environ.pop("DATABASE_URL", None)
         break
 else:
+    # No .env file found, purge any leftover DATABASE_URL from system env to be safe
+    os.environ.pop("DATABASE_URL", None)
     load_dotenv()
 
 from routes.connection_routes import connection_bp

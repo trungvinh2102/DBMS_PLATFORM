@@ -11,6 +11,20 @@ import { DB_URI_PROTOCOLS } from "../components/constants";
 export function parseUri(uri: string) {
   try {
     const url = new URL(uri);
+    const protocol = url.protocol.replace(':', '').toLowerCase();
+
+    // Special handling for local-file protocols
+    if (protocol === 'sqlite' || protocol === 'duckdb') {
+      return {
+        host: "",
+        port: "",
+        user: "",
+        password: "",
+        // The file path starts after protocol:///
+        database: url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname,
+      };
+    }
+
     return {
       host: url.hostname || "",
       port: url.port || "",
@@ -35,6 +49,15 @@ export function buildUri(
   database: string,
 ): string {
   let protocol = DB_URI_PROTOCOLS[type] || type;
+
+  // Special handling for local-file based databases
+  if (type === "sqlite" || type === "duckdb") {
+    // Return the triple-slash format for local files
+    // Ensure the path starts with a single / (after the three / in protocol:///)
+    const cleanPath = database.startsWith("/") ? database : `/${database}`;
+    return `${protocol}://${cleanPath}`;
+  }
+
   if (type === "mongodb" && !port) {
     protocol = "mongodb+srv";
   }
@@ -71,25 +94,25 @@ export function buildUri(
  */
 export function maskPasswordInUri(uri: string): string {
   if (!uri) return "";
-  
+
   try {
     // Find the last '@' which separates credentials from host
     const lastAtIndex = uri.lastIndexOf("@");
     if (lastAtIndex === -1) return uri;
-    
+
     const credentialsPart = uri.substring(0, lastAtIndex);
     const hostPart = uri.substring(lastAtIndex);
-    
+
     // Find the last colon in the credentials part (after the protocol)
     const protocolEndIndex = credentialsPart.indexOf("://");
     const searchFrom = protocolEndIndex === -1 ? 0 : protocolEndIndex + 3;
     const lastColonIndex = credentialsPart.lastIndexOf(":");
-    
+
     if (lastColonIndex > searchFrom - 1) {
       const maskedCredentials = credentialsPart.substring(0, lastColonIndex + 1) + "********";
       return maskedCredentials + hostPart;
     }
-    
+
     return uri;
   } catch {
     return uri.replace(/:(.*)@/, ":********@");

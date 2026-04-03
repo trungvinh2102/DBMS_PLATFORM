@@ -274,8 +274,13 @@ def stream_chat():
             yield error_msg
 
     return Response(stream_with_context(generate()), mimetype='text/plain', headers={
-        'X-Conversation-Id': conv_id
+        'X-Conversation-Id': conv_id,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Accel-Buffering': 'no'
     })
+
 
 @ai_bp.route('/history', methods=['GET'])
 @login_required
