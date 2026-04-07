@@ -22,7 +22,20 @@ cloudinary.config(
 )
 
 class UserService:
+
     def get_profile(self, user_id):
+        # Handle desktop mode mock user
+        if user_id == "desktop-admin-id":
+            return {
+                "id": "desktop-admin-id",
+                "email": "admin@dbms.local",
+                "username": "admin",
+                "name": "Local Desktop Admin",
+                "avatarUrl": None,
+                "bio": "Running in Desktop Mode (No Auth)",
+                "role": "Admin"
+            }
+            
         session = SessionLocal()
         try:
             user = session.query(User).filter(User.id == user_id).first()
@@ -39,6 +52,7 @@ class UserService:
         finally:
             if session:
                 session.close()
+
 
     def update_profile(self, user_id, data):
         session = SessionLocal()
@@ -105,13 +119,23 @@ class UserService:
             if session:
                 session.close()
 
+
     def get_settings(self, user_id):
+        # Even for mock user, try to fetch from DB for persistence
         session = SessionLocal()
         try:
             # Check UserSetting
             setting = session.query(UserSetting).filter(UserSetting.userId == user_id).first()
             if setting:
                 return setting.settings
+            
+            # Default settings if none exist
+            if user_id == "desktop-admin-id":
+                return {
+                    "layout": "default",
+                    "theme": "dark",
+                    "editor": {"fontSize": 14}
+                }
             return None
         finally:
             if session:
@@ -122,11 +146,6 @@ class UserService:
         try:
             setting = session.query(UserSetting).filter(UserSetting.userId == user_id).first()
             if setting:
-                # Merge or replace? The existing API seemed to be UPSERT replacing
-                # Logic: setting.settings = settings_data
-                # But if we want partial update, we merge.
-                # Assuming complete replacement or careful merge from frontend.
-                # The generic update usually replaces the JSON blob.
                 setting.settings = settings_data
             else:
                 new_setting = UserSetting(
@@ -140,6 +159,7 @@ class UserService:
         finally:
             if session:
                 session.close()
+
 
 
 user_service = UserService()

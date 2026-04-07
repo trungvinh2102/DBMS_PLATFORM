@@ -31,7 +31,8 @@ import {
 import { ModeToggle } from "./mode-toggle";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, IS_AUTH_DISABLED } from "@/hooks/use-auth";
+
 import { userApi, resolveUrl, authApi } from "@/lib/api-client";
 
 // Sample data from app-sidebar.tsx
@@ -130,8 +131,8 @@ export function Header() {
         <div className="ml-auto flex items-center gap-2">
           <ModeToggle />
 
-          {/* User Profile */}
-          {mounted && user ? (
+          {/* User Profile - Hidden completely in Disable Auth mode */}
+          {!IS_AUTH_DISABLED && mounted && (
             user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -219,7 +220,8 @@ export function Header() {
             ) : (
               <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
             )
-          ) : (
+          )}
+          {!IS_AUTH_DISABLED && mounted && !user && (
             <Link
               to="/auth/login"
               className={buttonVariants({ variant: "default", size: "sm" })}
@@ -227,6 +229,7 @@ export function Header() {
               Sign In
             </Link>
           )}
+
         </div>
       </div>
     </header>

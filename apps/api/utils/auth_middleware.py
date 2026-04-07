@@ -12,10 +12,26 @@ from models.metadata import User, SessionLocal
 SECRET_KEY = os.getenv("JWT_SECRET", "secret")
 ALGORITHM = "HS256"
 
+# Flag to bypass all auth/permission checks for Desktop/local mode
+DISABLE_AUTH = str(os.getenv("DISABLE_AUTH", "false")).lower() == "true"
+
+# Mock Admin user for DISABLE_AUTH mode
+MOCK_ADMIN = {
+    'userId': 'desktop-admin-id',
+    'email': 'admin@dbms.local',
+    'role': 'Admin',
+    'username': 'admin'
+}
+
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
+            
+        # Bypass check if auth is disabled
+        if DISABLE_AUTH:
+            g.user = MOCK_ADMIN
             return f(*args, **kwargs)
             
         token = None
@@ -61,7 +77,13 @@ def admin_required(f):
         if request.method == 'OPTIONS':
             return f(*args, **kwargs)
             
+        # Bypass check if auth is disabled
+        if DISABLE_AUTH:
+            g.user = MOCK_ADMIN
+            return f(*args, **kwargs)
+            
         if not g.user or g.user.get('role') != 'Admin':
             return jsonify({'message': 'Admin access required'}), 403
         return f(*args, **kwargs)
     return decorated
+

@@ -1,9 +1,9 @@
-/**
- * @file hooks/use-auth.ts
- * @description Hook to manage authentication state and user profile
- */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
+export const IS_AUTH_DISABLED = String(import.meta.env.VITE_DISABLE_AUTH).toLowerCase() === "true";
+
+
 
 export interface User {
   id: string;

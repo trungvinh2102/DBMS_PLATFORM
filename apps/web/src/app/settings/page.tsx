@@ -22,7 +22,8 @@ import {
 } from "@/stores/use-settings-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, IS_AUTH_DISABLED } from "@/hooks/use-auth";
+
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -146,16 +147,17 @@ function SettingsContent() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
-
   if (!mounted) return null;
 
   const TABS = [
+
     { value: "general", label: "General", icon: Palette },
     { value: "editor", label: "Editor", icon: Settings2 },
     { value: "data", label: "Data", icon: Database },
     { value: "ai", label: "AI Assistant", icon: Sparkles },
-    { value: "account", label: "Account", icon: User },
+    ...(!IS_AUTH_DISABLED ? [{ value: "account", label: "Account", icon: User }] : []),
   ];
+
 
   return (
     <div className="container mx-auto py-4 px-2 md:px-2 max-w-6xl">
@@ -234,14 +236,17 @@ function SettingsContent() {
             <TabsContent value="ai" className="mt-0 focus-visible:outline-none">
               <AISettings />
             </TabsContent>
-            <TabsContent value="account" className="mt-0 focus-visible:outline-none">
-              <AccountSettings user={user} />
-            </TabsContent>
+            {!IS_AUTH_DISABLED && (
+              <TabsContent value="account" className="mt-0 focus-visible:outline-none">
+                <AccountSettings user={user} />
+              </TabsContent>
+            )}
           </Suspense>
         </div>
       </Tabs>
     </div>
   );
+
 }
 
 export default function SettingsPage() {

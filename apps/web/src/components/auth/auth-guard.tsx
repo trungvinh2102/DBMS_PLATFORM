@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, IS_AUTH_DISABLED } from "@/hooks/use-auth";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -10,6 +10,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   useEffect(() => {
+    // If auth is disabled globally (Desktop Mode), skip all auth redirects
+    if (IS_AUTH_DISABLED) return;
+
     const isAuthPage = location.pathname.startsWith("/auth");
 
     if (!user && !isAuthPage) {
@@ -20,6 +23,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       navigate("/", { replace: true });
     }
   }, [user, location.pathname, navigate]);
+
 
   // Optionally show nothing while redirecting to prevent screen flicker
   // But for now, we just return children as the effect will handle the redirect
