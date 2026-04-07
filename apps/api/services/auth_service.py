@@ -102,7 +102,8 @@ class AuthService:
                 }
             }
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def register(self, data):
         session = SessionLocal()

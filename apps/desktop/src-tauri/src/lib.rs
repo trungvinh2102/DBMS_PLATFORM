@@ -5,7 +5,7 @@
 
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{AppHandle, Manager, Emitter, RunEvent, WindowEvent};
+use tauri::{Manager, Emitter, RunEvent, WindowEvent};
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 

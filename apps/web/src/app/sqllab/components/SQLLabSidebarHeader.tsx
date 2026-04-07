@@ -21,13 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import { SidebarFolder } from "./sidebar/SidebarFolder";
+import { getDBIcon, formatDBName } from "./sidebar/sidebar-utils";
 import { useSQLLabContext } from "../context/SQLLabContext";
 
 export function SQLLabSidebarHeader({
   searchQuery,
   setSearchQuery,
-  getDBIcon,
+  getDBIcon: getDBIconProp,
 }: {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -35,48 +36,53 @@ export function SQLLabSidebarHeader({
 }) {
   const lab = useSQLLabContext();
   const selectedDSData = lab.dataSources?.find((ds: DataSource) => ds.id === lab.selectedDS);
+  const activeFormatted = formatDBName(selectedDSData);
+
   return (
     <div className="p-3 pb-4 flex flex-col gap-3 border-b border-border/40">
       <DropdownMenu>
         <DropdownMenuTrigger className="outline-none w-full group">
           <div className="flex items-center gap-3 p-2 rounded-xl transition-all hover:bg-muted/40 cursor-pointer w-full text-left">
             <div className="h-9 w-9 bg-muted/30 rounded-lg flex items-center justify-center shrink-0 border border-border/40">
-              {getDBIcon(selectedDSData?.type || "")}
+              {getDBIconProp(selectedDSData?.type || "")}
             </div>
             <div className="flex flex-col items-start overflow-hidden flex-1 leading-tight">
               <span className="text-sm font-bold truncate w-full tracking-tight text-foreground/90">
-                {selectedDSData?.databaseName || "Select Database"}
+                {activeFormatted.title}
               </span>
-              <span className="text-[10px] text-muted-foreground/60 truncate w-full font-medium">
-                {selectedDSData?.config?.host}
+              <span className="text-[10px] text-muted-foreground/60 truncate w-full font-medium font-mono uppercase tracking-tighter">
+                {activeFormatted.subtitle}
               </span>
             </div>
             <ChevronsUpDown className="h-4 w-4 opacity-20 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-68 ml-2 shadow-2xl rounded-2xl border-muted-foreground/10 bg-background/95 backdrop-blur-md">
-          {lab.dataSources.map((ds: any) => (
-            <DropdownMenuItem
-              key={ds.id}
-              onClick={() => lab.setSelectedDS(ds.id)}
-              className={cn(
-                "flex items-center gap-3 py-2.5 px-3 cursor-pointer rounded-xl m-1",
-                lab.selectedDS === ds.id
-                  ? "bg-primary/10 text-primary font-bold"
-                  : "hover:bg-muted/50",
-              )}
-            >
-              <div className="h-6 w-6 bg-muted/20 rounded-md flex items-center justify-center border border-border/20 scale-75">
-                {getDBIcon(ds.type)}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-bold">{ds.databaseName}</span>
-                <span className="text-[9px] opacity-40">
-                  {ds.config?.host || "localhost"}
-                </span>
-              </div>
-            </DropdownMenuItem>
-          ))}
+        <DropdownMenuContent className="w-68 ml-2 shadow-2xl rounded-2xl border-muted-foreground/10 bg-background/95 backdrop-blur-md z-[100]">
+          {lab.dataSources.map((ds: any) => {
+            const formatted = formatDBName(ds);
+            return (
+              <DropdownMenuItem
+                key={ds.id}
+                onClick={() => lab.setSelectedDS(ds.id)}
+                className={cn(
+                  "flex items-center gap-3 py-2.5 px-3 cursor-pointer rounded-xl m-1",
+                  lab.selectedDS === ds.id
+                    ? "bg-primary/10 text-primary font-bold"
+                    : "hover:bg-muted/50",
+                )}
+              >
+                <div className="h-6 w-6 bg-muted/20 rounded-md flex items-center justify-center border border-border/20 scale-75 shrink-0">
+                  {getDBIconProp(ds.type)}
+                </div>
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-xs font-bold truncate">{formatted.title}</span>
+                  <span className="text-[9px] opacity-40 font-mono truncate uppercase">
+                    {formatted.subtitle}
+                  </span>
+                </div>
+              </DropdownMenuItem>
+            );
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -95,7 +101,7 @@ export function SQLLabSidebarHeader({
               />
             </div>
           </SelectTrigger>
-          <SelectContent className="rounded-2xl border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5">
+          <SelectContent className="rounded-2xl border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5 z-[101]">
             {lab.schemas.map((s: any) => (
               <SelectItem
                 key={s}

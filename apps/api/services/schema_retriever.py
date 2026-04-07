@@ -32,9 +32,20 @@ class SchemaRetriever:
 
     def __init__(self):
         self.embedding_model = "models/gemini-embedding-2-preview"
-        api_key = _get_system_api_key()
-        if HAS_GENAI and api_key:
-            genai.configure(api_key=api_key)
+        # Delay initialization of Gemini to first use or use a safe wrapper
+        self._api_configured = False
+
+    def _ensure_genai(self):
+        """Ensures the GenerativeAI SDK is configured with an API key."""
+        if not self._api_configured:
+            api_key = _get_system_api_key()
+            if HAS_GENAI and api_key:
+                try:
+                    genai.configure(api_key=api_key)
+                    self._api_configured = True
+                except Exception as e:
+                    logger.error(f"Failed to configure GenAI for embeddings: {e}")
+        return self._api_configured
 
     def index_database(self, database_id: str, schema: str = "public"):
         """

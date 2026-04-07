@@ -101,7 +101,8 @@ export function useSQLLab() {
     if (schemas?.length) {
       if (!activeTab.selectedSchema || !schemas.includes(activeTab.selectedSchema)) {
         let def = schemas[0];
-        if (selectedDSType === "clickhouse") def = schemas.includes("default") ? "default" : schemas[0];
+        if (["sqlite", "duckdb"].includes(selectedDSType)) def = schemas.includes("main") ? "main" : schemas[0];
+        else if (selectedDSType === "clickhouse") def = schemas.includes("default") ? "default" : schemas[0];
         else if (selectedDSType === "redis") def = schemas.includes("0") ? "0" : schemas[0];
         else def = schemas.includes("public") ? "public" : schemas[0];
         updateActiveTab({ selectedSchema: def });

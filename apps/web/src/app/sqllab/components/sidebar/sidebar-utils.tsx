@@ -13,6 +13,7 @@ import {
   SiMongodb,
   SiRedis,
   SiClickhouse,
+  SiDuckdb,
 } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 
@@ -31,6 +32,8 @@ export const getDBIcon = (type: string) => {
     return <SiOracle className="h-5 w-5 text-red-500" />;
   if (t.includes("sqlite"))
     return <SiSqlite className="h-5 w-5 text-sky-500" />;
+  if (t.includes("duckdb"))
+    return <SiDuckdb className="h-5 w-5 text-yellow-500" />;
   if (t.includes("mongodb"))
     return <SiMongodb className="h-5 w-5 text-emerald-500" />;
   if (t.includes("redis"))
@@ -38,4 +41,34 @@ export const getDBIcon = (type: string) => {
   if (t.includes("clickhouse"))
     return <SiClickhouse className="h-5 w-5 text-orange-500" />;
   return <Database className="h-5 w-5" />;
+};
+
+/**
+ * Formats the database name and subtext for display.
+ * For file-based databases, parses the path to show filename as primary.
+ */
+export const formatDBName = (ds: any) => {
+  if (!ds) return { title: "Select Database", subtitle: "" };
+  
+  const type = ds.type?.toLowerCase() || "";
+  const isFile = ["sqlite", "duckdb"].includes(type);
+  
+  if (isFile) {
+    const path = ds.config?.database || ds.databaseName || "";
+    if (path.includes("/") || path.includes("\\")) {
+      const parts = path.split(/[\\/]/);
+      const filename = parts[parts.length - 1];
+      const dir = parts.slice(0, -1).join("/") + "/";
+      return { 
+        title: filename || path, 
+        subtitle: dir.length > 30 ? "..." + dir.slice(-27) : dir 
+      };
+    }
+    return { title: path || "Local Database", subtitle: type.toUpperCase() };
+  }
+  
+  return { 
+    title: ds.databaseName || "Untitled", 
+    subtitle: ds.config?.host || "localhost" 
+  };
 };

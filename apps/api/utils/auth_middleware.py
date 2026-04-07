@@ -46,7 +46,8 @@ def login_required(f):
                     return jsonify({'message': 'User no longer exists'}), 401
                 g.user = payload # {userId, email, role}
             finally:
-                session.close()
+                if session:
+                    session.close()
                 
         except Exception as e:
             return jsonify({'message': f'Token is invalid: {str(e)}'}), 401

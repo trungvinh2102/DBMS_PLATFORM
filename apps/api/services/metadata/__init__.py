@@ -43,7 +43,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching schemas for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_tables(self, database_id: str, schema: str = 'public') -> List[str]:
         """Lists all table or collection names within a specific schema or database."""
@@ -59,7 +60,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching tables for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_views(self, database_id: str, schema: str = 'public') -> List[str]:
         """Lists all defined views within a given schema."""
@@ -75,7 +77,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching views for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_columns(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
         """Retrieves or infers column details for a specific table or collection."""
@@ -91,7 +94,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching columns for {table}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_all_columns(self, database_id: str, schema: str) -> Dict[str, List[Dict[str, Any]]]:
         """Retrieves columns for all tables and views in a schema, optimized for performance."""
@@ -121,7 +125,8 @@ class MetadataService(BaseDatabaseService):
                 result[obj] = self.get_columns(database_id, schema, obj)
             return result
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_indexes(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
         """Lists all defined indices for the specified table or collection."""
@@ -137,7 +142,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching indexes for {table}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_foreign_keys(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
         """Retrieves foreign key constraints defined for a given table."""
@@ -151,7 +157,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching foreign keys for {table}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_table_info(self, database_id: str, schema: str, table: str) -> Dict[str, Any]:
         """Retrieves size estimates and row count details for a given table."""
@@ -167,7 +174,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching table info for {table}: {e}")
             return {}
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_table_ddl(self, database_id: str, schema: str, table: str) -> str:
         """Retrieves or generates the CREATE TABLE DDL for the specified object."""
@@ -183,7 +191,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error generating DDL for {table}: {e}")
             return f"-- Failed to generate DDL: {e}"
         finally:
-            session.close()
+            if session:
+                session.close()
 
     # --- SQL specific methods still using text queries directly for simplicity ---
 
@@ -199,7 +208,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching functions for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_procedures(self, database_id: str, schema: str = 'public') -> List[str]:
         """Lists all database procedures defined in the schema."""
@@ -213,7 +223,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching procedures for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_triggers(self, database_id: str, schema: str = 'public') -> List[str]:
         """Lists all triggers defined within the schema."""
@@ -227,7 +238,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching triggers for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_events(self, database_id: str, schema: str = 'public') -> List[str]:
         """Lists all scheduled database events (MySQL Specific)."""
@@ -241,7 +253,8 @@ class MetadataService(BaseDatabaseService):
             logger.error(f"Error fetching events for {database_id}: {e}")
             return []
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_all_foreign_keys(self, database_id: str, schema: str = 'public') -> List[Dict[str, Any]]:
         """Retrieves foreign key constraints for all tables in the schema."""

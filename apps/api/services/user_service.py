@@ -37,7 +37,8 @@ class UserService:
                 "role": user.role.name if user.role else None
             }
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def update_profile(self, user_id, data):
         session = SessionLocal()
@@ -83,7 +84,8 @@ class UserService:
                 }
             }
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def change_password(self, user_id, old_password, new_password):
         session = SessionLocal()
@@ -100,7 +102,8 @@ class UserService:
             session.commit()
             return {"success": True}
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def get_settings(self, user_id):
         session = SessionLocal()
@@ -111,7 +114,8 @@ class UserService:
                 return setting.settings
             return None
         finally:
-            session.close()
+            if session:
+                session.close()
 
     def update_settings(self, user_id, settings_data):
         session = SessionLocal()
@@ -134,6 +138,8 @@ class UserService:
             session.commit()
             return {"success": True}
         finally:
-            session.close()
+            if session:
+                session.close()
+
 
 user_service = UserService()

@@ -37,7 +37,8 @@ def _get_system_api_key() -> Optional[str]:
     except Exception as e:
         logger.warning(f"Failed to load DB key: {e}")
     finally:
-        session.close()
+        if session:
+            session.close()
     return os.getenv("GOOGLE_API_KEY")
 
 class BaseAIService:
@@ -45,18 +46,27 @@ class BaseAIService:
     def __init__(self, model_name: str = 'gemini-2.5-flash'):
         self.model_name = model_name
         self._context_mgr = ConversationContextManager()
-        
-        api_key = _get_system_api_key()
-        if HAS_GENAI and api_key:
-            try:
-                genai.configure(api_key=api_key)
-            except Exception as e:
-                logger.error(f"Failed to configure global Gemini: {e}")
+        self._api_configured = False
+
+    def _ensure_genai(self):
+        """Ensures the GenerativeAI SDK is configured with an API key."""
+        if not self._api_configured:
+            api_key = _get_system_api_key()
+            if HAS_GENAI and api_key:
+                try:
+                    genai.configure(api_key=api_key)
+                    self._api_configured = True
+                except Exception as e:
+                    logger.error(f"Failed to configure global Gemini: {e}")
+        return self._api_configured
 
     def _generate_response(self, combined_prompt: str, model_id: Optional[str] = None, user_id: Optional[str] = None) -> str:
         """Internal helper to communicate with the Gemini API, using user-specific keys if available."""
         if not HAS_GENAI:
             return "AI Error: google-generativeai package is not installed"
+            
+        # Ensure base configuration
+        self._ensure_genai()
             
         # Try user-specific config
         if user_id:
@@ -68,7 +78,8 @@ class BaseAIService:
                     key = decrypt_key(config.apiKey)
                     if key:
                         genai.configure(api_key=key)
-                session.close()
+                if session:
+                    session.close()
             except Exception as e:
                 logger.error(f"Failed to use user AI key: {e}")
 
@@ -125,7 +136,9 @@ class BaseAIService:
             session.rollback()
             return None
         finally:
-            session.close()
+            if session:
+                session.close()
+
 
     def _save_generated_query(self, sql: str, prompt: Optional[str], explanation: Optional[str], user_id: Optional[str] = None, db_id: Optional[str] = None):
         """Persists AI generated SQL queries to the database."""
@@ -145,7 +158,9 @@ class BaseAIService:
             logger.error(f"Failed to save AI generated query: {e}")
             session.rollback()
         finally:
-            session.close()
+            if session:
+                session.close()
+
 
     def _extract_sql(self, text: str) -> str:
         """Parses the SQL code block out of the AI's markdown response."""

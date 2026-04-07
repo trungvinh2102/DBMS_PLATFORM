@@ -73,6 +73,56 @@ from models.metadata import User
 from services.auth_service import auth_service
 import uuid
 
+def setup_database(app):
+    """Ensure the system database is ready with schema and default seeds (Zero-Setup)."""
+    with app.app_context():
+        from models.metadata import Base, engine, Role, User, SessionLocal
+        import uuid
+        
+        if engine:
+            try:
+                print("Backend: Checking and initializing database schema...")
+                Base.metadata.create_all(engine)
+                
+                session = SessionLocal()
+                # 1. Seed Roles
+                roles_data = [
+                    {"name": "Admin", "description": "Full system access"},
+                    {"name": "Creator", "description": "Can create and manage resources"},
+                    {"name": "Viewer", "description": "Can view shared resources"},
+                    {"name": "Default", "description": "Basic access"},
+                ]
+                for rd in roles_data:
+                    if not session.query(Role).filter(Role.name == rd["name"]).first():
+                        rid = "default" if rd["name"] == "Default" else str(uuid.uuid4())
+                        session.add(Role(id=rid, name=rd["name"], description=rd["description"]))
+                
+                # 2. Seed Default Admin if no users exist
+                if session.query(User).count() == 0:
+                    admin_role = session.query(Role).filter(Role.name == "Admin").first()
+                    if admin_role:
+                        from services.auth_service import auth_service
+                        hashed_pw = auth_service.get_password_hash("password123")
+                        admin_user = User(
+                            id=str(uuid.uuid4()),
+                            email="admin@dbms.local",
+                            username="admin",
+                            password=hashed_pw,
+                            name="System Admin",
+                            roleId=admin_role.id
+                        )
+                        session.add(admin_user)
+                        print("Backend: Default admin user created (admin / password123)")
+                
+                session.commit()
+                session.close()
+                print("Backend: Database setup complete.")
+            except Exception as e:
+                print(f"Backend Error: Automated setup failed: {e}")
+                if 'session' in locals():
+                    session.rollback()
+                    session.close()
+
 def create_app():
     """Application factory for Flask."""
     app = Flask(__name__)
@@ -82,6 +132,7 @@ def create_app():
         "origins": [
             "tauri://localhost", 
             "http://tauri.localhost", 
+            "https://tauri.localhost",
             "http://localhost:3000", 
             "http://127.0.0.1:3000",
             "http://localhost:3001", 
@@ -90,49 +141,46 @@ def create_app():
             "http://127.0.0.1:3002",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "http://localhost:1420", # Common Tauri/Vite dev port
-            "http://127.0.0.1:1420"
+            "http://localhost:1420", 
+            "http://127.0.0.1:1420",
+            "http://localhost:1421",
+            "http://127.0.0.1:1421"
         ],
         "expose_headers": ["Authorization"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "X-App-Platform"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     }}, supports_credentials=True)
-    # No manual headers needed, flask-cors will handle it.
 
-    # Register Blueprints (Granular Database Routes)
+    # Register Blueprints
     app.register_blueprint(connection_bp, url_prefix='/api/database')
     app.register_blueprint(metadata_bp, url_prefix='/api/database')
     app.register_blueprint(execution_bp, url_prefix='/api/database')
-    
-    # Other Blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(ai_config_bp, url_prefix='/api/ai-config')
     app.register_blueprint(dashboard_bp, url_prefix='/api/database/dashboard')
 
+    # Run automated setup
+    setup_database(app)
+
     @app.before_request
     def log_request_info():
-        # Log all requests including OPTIONS to debug CORS/Network issues
         print(f"API Request: {request.method} {request.path} (Origin: {request.headers.get('Origin')})")
 
     @app.route('/api/health')
     @app.route('/health')
     def health():
-        """Health check endpoint."""
         logger.info("Health check requested")
         return {'status': 'ok'}
         
     @app.errorhandler(404)
     def handle_404(e):
-        logger.warning(f"404 Not Found: {request.path}")
         return jsonify(error="Not Found", path=request.path), 404
 
     @app.errorhandler(Exception)
     def handle_exception(e):
-        """Global exception handler for unhandled server errors."""
-        app.logger.error(f"Global Exception: {e}", exc_info=True)
-        print(f"BACKEND ERROR: {str(e)}") # Direct print for sidecar visibility
+        print(f"BACKEND ERROR: {str(e)}")
         return jsonify(error="Internal Server Error", message=str(e)), 500
 
     return app
@@ -166,100 +214,9 @@ if __name__ == '__main__':
     monitor_thread = threading.Thread(target=monitor_parent, daemon=True)
     monitor_thread.start()
 
-    # Ensure database tables are created and seeded
-    from models.metadata import Base, engine, Role, User, SessionLocal, Db, SavedQuery, QueryHistory, UserSetting, AIModel, AIConversation, AIChatMessage
-    debug_msg = f"Backend: AIModel class has 'description': {hasattr(AIModel, 'description')}"
-    logger.info(debug_msg)
-    print(debug_msg) # Direct print to console
-    if engine:
-        logger.info("Backend: Creating database tables if they don't exist...")
-        Base.metadata.create_all(engine)
-        
-        # SIMPLE MIGRATION: Check for missing columns in existing tables (SQLAlchemy create_all doesn't add columns)
-        from sqlalchemy import text, inspect
-        try:
-            inspector = inspect(engine)
-            
-            # Helper to add column if missing
-            def add_column_if_missing(table_name, column_name, column_type):
-                columns = [c['name'] for c in inspector.get_columns(table_name)]
-                if column_name not in columns:
-                    logger.info(f"Backend: Migrating database - adding '{column_name}' to '{table_name}' table...")
-                    with engine.connect() as conn:
-                        conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN \"{column_name}\" {column_type}"))
-                        conn.commit()
-
-            # Check users table
-            add_column_if_missing("users", "avatarUrl", "TEXT")
-            add_column_if_missing("users", "bio", "TEXT")
-            add_column_if_missing("users", "created_on", "TIMESTAMP")
-            add_column_if_missing("users", "changed_on", "TIMESTAMP")
-
-            # Check ai_models table
-            add_column_if_missing("ai_models", "description", "TEXT")
-            add_column_if_missing("ai_models", "isDefault", "BOOLEAN DEFAULT FALSE")
-            add_column_if_missing("ai_models", "isActive", "BOOLEAN DEFAULT TRUE")
-            add_column_if_missing("ai_models", "provider", "TEXT DEFAULT 'Google'")
-            add_column_if_missing("ai_models", "created_on", "TIMESTAMP")
-
-            # AI and Settings tables
-            add_column_if_missing("user_settings", "created_on", "TIMESTAMP")
-            add_column_if_missing("user_settings", "changed_on", "TIMESTAMP")
-            add_column_if_missing("user_ai_configs", "created_on", "TIMESTAMP")
-            add_column_if_missing("user_ai_configs", "changed_on", "TIMESTAMP")
-            add_column_if_missing("ai_chat_messages", "created_on", "TIMESTAMP")
-            add_column_if_missing("ai_chat_messages", "conversationId", "TEXT")
-            add_column_if_missing("ai_generated_queries", "created_on", "TIMESTAMP")
-
-            logger.info("Backend: Schema check complete.")
-        except Exception as e:
-            logger.warning(f"Backend: Auto-migration check skipped or failed: {e}")
-            # If it failed due to some Postgres specific issue, we might want to log more info
-            import traceback
-            logger.debug(traceback.format_exc())
-        
-        # Seed initial roles if missing
-        session = SessionLocal()
-        try:
-            for role_name in ["Default", "Admin"]:
-                r = session.query(Role).filter(Role.name == role_name).first()
-                if not r:
-                    logger.info(f"Backend: Seeding '{role_name}' role...")
-                    # Using hardcoded IDs or uuids. Hardcode default for backward compat
-                    rid = "default" if role_name == "Default" else str(uuid.uuid4())
-                    session.add(Role(id=rid, name=role_name))
-            session.commit()
-            logger.info("Backend: Roles seeded successfully.")
-        except Exception as e:
-            logger.error(f"Backend: Failed to seed roles: {e}", exc_info=True)
-            session.rollback()
-        finally:
-            session.close()
-        
-        # SEED: Create default admin if no users exist
-        session = SessionLocal()
-        try:
-            if session.query(User).count() == 0:
-                logger.info("Backend: Seeding default admin user (admin / admin123)...")
-                admin_role = session.query(Role).filter(Role.name == "Admin").first()
-                if admin_role:
-                    from services.auth_service import auth_service
-                    hashed_pw = auth_service.get_password_hash("password123")
-                    admin_user = User(
-                        id=str(uuid.uuid4()),
-                        email="admin@dbms.local",
-                        username="admin",
-                        password=hashed_pw,
-                        name="System Admin",
-                        roleId=admin_role.id
-                    )
-                    session.add(admin_user)
-                    session.commit()
-        except Exception as e:
-            logger.error(f"Backend: Failed to seed admin user: {e}")
-            session.rollback()
-        finally:
-            session.close()
+    # app = create_app() is now handled below with proper migration called during creation
+    # The setup logic is now inside create_app() factory for robust zero-setup behavior.
+    pass
             
     app = create_app()
     # Get port and host

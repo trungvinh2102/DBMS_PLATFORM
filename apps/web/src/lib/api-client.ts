@@ -22,6 +22,7 @@ const getBaseURL = () => {
         const isStandalone = 
             protocol === 'app:' || 
             protocol === 'tauri:' ||
+            protocol === 'https:' && hostname === 'tauri.localhost' ||
             hostname === 'tauri.localhost' ||
             hostname === 'localhost' ||
             hostname === '127.0.0.1';
@@ -54,7 +55,10 @@ api.interceptors.request.use((config) => {
         const isStandalone = 
             protocol === 'app:' || 
             protocol === 'tauri:' ||
-            hostname === 'tauri.localhost';
+            protocol === 'https:' && hostname === 'tauri.localhost' ||
+            hostname === 'tauri.localhost' ||
+            hostname === 'localhost' ||
+            hostname === '127.0.0.1';
             
         if (isStandalone) {
             config.headers["X-App-Platform"] = "tauri";

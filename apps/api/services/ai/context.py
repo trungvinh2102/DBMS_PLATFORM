@@ -106,7 +106,10 @@ class SchemaContextService:
         try:
             return BaseDatabaseService().get_db_config(db_id, session)[0]
         except Exception: return "SQL"
-        finally: session.close()
+        finally:
+            if session:
+                session.close()
+
 
     def _build_table_ddl(self, table: str, columns: List[Dict], all_fks: List[Dict]) -> List[str]:
         """Simple DDL constructor."""

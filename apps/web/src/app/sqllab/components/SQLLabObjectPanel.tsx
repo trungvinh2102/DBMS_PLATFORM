@@ -46,6 +46,7 @@ import {
   TriggerTabView,
   InfoTabView,
   ScriptTabView,
+  DiagnosticsTabView,
 } from "./ObjectPanelTabs";
 
 import { useSQLLabContext } from "../context/SQLLabContext";
@@ -79,16 +80,19 @@ export function SQLLabObjectPanel() {
   const { resolvedTheme } = useTheme();
   const monacoTheme = resolvedTheme === "dark" ? "dbms-dark" : "dbms-light";
 
+  const isDiagnosticsSupported = ["sqlite", "duckdb"].includes(lab.selectedDSType);
+
   let availableTabs = [
     "Data",
     "Structure",
+    ...(isDiagnosticsSupported ? ["Diagnostics"] : []),
     "Index",
     ...(lab.isRelational && lab.selectedDSType !== "clickhouse" ? ["Relation", "Trigger"] : []),
     "Info",
     ...(lab.isRelational ? ["Script"] : []),
   ];
   if (lab.selectedObjectType === "view") {
-    availableTabs = ["Data", "Structure", "Info", ...(lab.isRelational ? ["Script"] : [])];
+    availableTabs = ["Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), "Info", ...(lab.isRelational ? ["Script"] : [])];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
       lab.selectedObjectType || "",
@@ -206,6 +210,11 @@ export function SQLLabObjectPanel() {
             columnsData={lab.allColumns as any}
             structureSearch={structureSearch}
             setStructureSearch={setStructureSearch}
+          />
+        ) : effectiveTab === "diagnostics" ? (
+          <DiagnosticsTabView
+            databaseId={lab.selectedDS}
+            table={lab.selectedTable}
           />
         ) : effectiveTab === "index" ? (
           <IndexTabView indexes={lab.indexes} />

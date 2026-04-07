@@ -222,86 +222,42 @@ import sys
 from dotenv import load_dotenv
 
 def init_engine():
-    # EXTRA HARD UNSET: Ensure no persistent OS env var can overwrite our offline-first goal
+    # 1. EXTRA HARD UNSET: Ensure no persistent OS env var can overwrite our offline-first goal
     os.environ.pop("DATABASE_URL", None)
     
-    # Attempt 1: Load from .env files but ONLY if they are explicitly provided
-    # We skip Attempt 1 (generic load_dotenv) because it's too risky with OS env vars
-    
-    # Attempt 2: Load from specific apps/api/.env
+    # 2. Attempt to load from specific apps/api/.env (highest priority if exists)
     models_dir = os.path.dirname(os.path.abspath(__file__))
     api_dir = os.path.dirname(models_dir)
     api_env = os.path.join(api_dir, '.env')
+    url = None
     if os.path.exists(api_env):
         load_dotenv(api_env, override=True)
         url = os.getenv("DATABASE_URL")
-        if url and url.startswith("postgresql"):
-            # Check if it was commented out or is empty
-            if not url.strip(): url = None
             
-    # Final check: If still no URL or it's a leftover empty string, FORCE SQLite
+    # 3. Final check: If still no URL, FORCE SQLite in a guaranteed writable Zero-Setup location
     if not url or not str(url).strip():
-        # Resolve persistent data directory based on OS
         from pathlib import Path
         
-        if getattr(sys, 'frozen', False):
-            app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
-            data_dir = Path(app_data) / 'DBMSPlatform'
-        else:
-            data_dir = Path.home() / '.dbms_platform'
+        # Use user home directory to ensure both Web and Desktop see the same data
+        # and always have write permissions.
+        data_dir = Path.home() / '.dbms_platform'
             
         try:
             data_dir.mkdir(parents=True, exist_ok=True)
-            db_path = (data_dir / 'dbms_platform.db').absolute()
-            url = f"sqlite:///{db_path}"
+            db_path = (data_dir / 'dbms_platform.db').resolve()
+            # On Windows, we must ensure forward slashes for the URL to be valid
+            db_path_str = str(db_path).replace("\\", "/")
+            url = f"sqlite:///{db_path_str}"
+            print(f"Backend: Zero-Setup SQLite enabled at: {db_path_str}")
         except Exception as e:
-            print(f"ERROR: Could not create data directory {data_dir}: {e}")
-            url = "sqlite:///dbms_platform.db"
+            print(f"Backend Warning: Could not use home directory ({e}), falling back to relative path.")
+            url = "sqlite:///dbms_platform.db" 
 
-    # Final cleanup
-    if url:
-        # Handle cases where the URL might be wrapped in quotes in the .env file
-        url = url.strip()
-        if (url.startswith('"') and url.endswith('"')) or (url.startswith("'") and url.endswith("'")):
-            url = url[1:-1].strip()
-
-    if not url:
-        print("WARNING: DATABASE_URL not found in any .env file. Using local SQLite fallback...")
-        # Resolve persistent data directory based on OS
-        from pathlib import Path
-        
-        if getattr(sys, 'frozen', False):
-            # If running as an EXE (PyInstaller)
-            app_data = os.getenv('APPDATA') or os.path.expanduser('~/AppData/Roaming')
-            data_dir = Path(app_data) / 'DBMSPlatform'
-        else:
-            # For development, use user home or local folder
-            data_dir = Path.home() / '.dbms_platform'
-            
-        try:
-            data_dir.mkdir(parents=True, exist_ok=True)
-            db_path = (data_dir / 'dbms_platform.db').absolute()
-            url = f"sqlite:///{db_path}"
-        except Exception as e:
-            print(f"ERROR: Could not create data directory {data_dir}: {e}")
-            url = "sqlite:///dbms_platform.db" # Fail-safe to current dir
-
-    print(f"Backend: Database connection initialized.")
-    # Log masked URL for safety
-    masked_url = url
-    if '@' in url:
-        masked_url = '***' + url[url.find('@'):]
-    print(f"Backend: Target: {masked_url}")
+    print(f"Backend: Data source initialized successfully.")
     
-    engine = create_engine(url)
+    # Create engine with thread safety for SQLite
+    engine = create_engine(url, connect_args={"check_same_thread": False} if "sqlite" in url else {})
     
-    # Simple connection check
-    try:
-        with engine.connect() as conn:
-            print("Backend: System database (SQLite) connected successfully.")
-    except Exception as e:
-        print(f"WARNING: Initial database check failed: {e}")
-            
     # Enable WAL mode for SQLite performance
     if url.startswith("sqlite"):
         from sqlalchemy import event

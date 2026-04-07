@@ -222,4 +222,5 @@ class BaseDatabaseService:
         finally:
             if connection:
                 connection.close()
-            session.close()
+            if session:
+                session.close()

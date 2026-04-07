@@ -11,6 +11,7 @@ import { RelationTabView } from "./objectpanel/RelationTabView";
 import { TriggerTabView } from "./objectpanel/TriggerTabView";
 import { InfoTabView } from "./objectpanel/InfoTabView";
 import { ScriptTabView } from "./objectpanel/ScriptTabView";
+import { DiagnosticsTabView } from "./objectpanel/DiagnosticsTabView";
 
 export {
   EmptyObjectSelection,
@@ -21,4 +22,5 @@ export {
   TriggerTabView,
   InfoTabView,
   ScriptTabView,
+  DiagnosticsTabView,
 };

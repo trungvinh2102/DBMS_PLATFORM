@@ -22,6 +22,14 @@ class SqlMetadataProvider:
             if conn.dialect.name in ['clickhouse', 'clickhousedb']:
                 res = conn.execute(text("SHOW DATABASES"))
                 return [row[0] for row in res]
+            if conn.dialect.name == 'sqlite':
+                return ['main']
+            if conn.dialect.name == 'duckdb':
+                # DuckDB typically uses 'main' as default
+                try:
+                    return inspect(conn).get_schema_names()
+                except Exception:
+                    return ['main']
             return inspect(conn).get_schema_names()
         return self.service.run_dynamic_query(db_id, _op)
 
@@ -207,9 +215,20 @@ class SqlMetadataProvider:
                         }
 
                 if conn.dialect.name == 'sqlite':
-                    # SQLite row count using simple select
-                    res = conn.execute(text(f"SELECT COUNT(*) FROM '{table}'")).fetchone()
-                    return {"row_count": res[0] if res else 0, "total_size": "N/A for SQLite SQLite"}
+                    # SQLite row count and size calculation
+                    res_count = conn.execute(text(f"SELECT COUNT(*) FROM '{table}'")).fetchone()
+                    try:
+                        # Page size * Page count = Total size in bytes
+                        res_size = conn.execute(text("PRAGMA page_count")).fetchone()[0] * conn.execute(text("PRAGMA page_size")).fetchone()[0]
+                        total_size = f"{res_size / 1024 / 1024:.2f} MB"
+                    except Exception:
+                        total_size = "N/A"
+                    return {"row_count": res_count[0] if res_count else 0, "total_size": total_size}
+
+                if conn.dialect.name == 'duckdb':
+                    # DuckDB row count
+                    res_count = conn.execute(text(f"SELECT COUNT(*) FROM \"{table}\"")).fetchone()
+                    return {"row_count": res_count[0] if res_count else 0, "total_size": "Dynamic"}
 
                 # Postgres fallback (shared with others potentially)
                 query = text("""
@@ -243,12 +262,12 @@ class SqlMetadataProvider:
                 
                 # Fetch columns for building DDL
                 cols_data = self.get_columns(db_id, schema, table)
-                pk_query = text("""
-                    SELECT kcu.column_name FROM information_schema.table_constraints tc
-                    JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
-                    WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = :schema AND tc.table_name = :table
-                """)
-                pks = [r[0] for r in conn.execute(pk_query, {"schema": schema, "table": table})]
+                
+                # Check for PKs using inspector (more cross-DB compatible than information_schema)
+                try:
+                    pks = inspect(conn).get_pk_constraint(table, schema=schema).get("constrained_columns", [])
+                except Exception:
+                    pks = []
                 
                 lines = [f'  "{c["name"]}" {c["type"].upper()}' for c in cols_data]
                 pk_cols = ", ".join([f'"{k}"' for k in pks])
@@ -263,7 +282,7 @@ class SqlMetadataProvider:
     def get_functions(self, db_id: str, schema: str) -> List[str]:
         """Lists all database functions defined in the schema."""
         def _op(conn):
-            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+            if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
                 return []
             query = text("SELECT routine_name FROM information_schema.routines WHERE routine_schema = :s AND routine_type = 'FUNCTION'")
             return [row[0] for row in conn.execute(query, {"s": schema})]
@@ -272,7 +291,7 @@ class SqlMetadataProvider:
     def get_procedures(self, db_id: str, schema: str) -> List[str]:
         """Lists all database procedures defined in the schema."""
         def _op(conn):
-            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+            if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
                 return []
             query = text("SELECT routine_name FROM information_schema.routines WHERE routine_schema = :s AND routine_type = 'PROCEDURE'")
             return [row[0] for row in conn.execute(query, {"s": schema})]
@@ -281,7 +300,7 @@ class SqlMetadataProvider:
     def get_triggers(self, db_id: str, schema: str) -> List[str]:
         """Lists all triggers defined within the schema."""
         def _op(conn):
-            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
+            if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
                 return []
             query = text("SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema = :s")
             return [row[0] for row in conn.execute(query, {"s": schema})]
@@ -300,8 +319,10 @@ class SqlMetadataProvider:
     def get_all_foreign_keys(self, db_id: str, schema: str) -> List[Dict[str, Any]]:
         """Retrieves all foreign keys for all tables in a schema using a single query."""
         def _op(conn):
-            if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                return []
+            if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
+                # Lite databases don't support optimized batch FK retrieval via information_schema
+                # Force inspector fallback
+                return self._inspector_fk_fallback(conn, schema)
             
             # Optimized query for Foreign Keys
             if conn.dialect.name == 'postgresql':
@@ -357,29 +378,32 @@ class SqlMetadataProvider:
                 res = conn.execute(query, {"schema": schema})
             else:
                 # Fallback to standard SQL schema query (might not handle multi-column FKs correctly in all DBs)
-                query = text("""
-                    SELECT
-                        kcu1.table_name,
-                        kcu1.constraint_name,
-                        kcu1.column_name,
-                        kcu2.table_schema AS foreign_schema,
-                        kcu2.table_name AS foreign_table,
-                        kcu2.column_name AS foreign_column
-                    FROM
-                        information_schema.referential_constraints AS rc
-                    JOIN
-                        information_schema.key_column_usage AS kcu1
-                          ON kcu1.constraint_name = rc.constraint_name
-                          AND kcu1.constraint_schema = rc.constraint_schema
-                    JOIN
-                        information_schema.key_column_usage AS kcu2
-                          ON kcu2.constraint_name = rc.unique_constraint_name
-                          AND kcu2.constraint_schema = rc.unique_constraint_schema
-                          AND kcu2.ordinal_position = kcu1.ordinal_position
-                    WHERE
-                        kcu1.table_schema = :schema
-                """)
-                res = conn.execute(query, {"schema": schema})
+                try:
+                    query = text("""
+                        SELECT
+                            kcu1.table_name,
+                            kcu1.constraint_name,
+                            kcu1.column_name,
+                            kcu2.table_schema AS foreign_schema,
+                            kcu2.table_name AS foreign_table,
+                            kcu2.column_name AS foreign_column
+                        FROM
+                            information_schema.referential_constraints AS rc
+                        JOIN
+                            information_schema.key_column_usage AS kcu1
+                              ON kcu1.constraint_name = rc.constraint_name
+                              AND kcu1.constraint_schema = rc.constraint_schema
+                        JOIN
+                            information_schema.key_column_usage AS kcu2
+                              ON kcu2.constraint_name = rc.unique_constraint_name
+                              AND kcu2.constraint_schema = rc.unique_constraint_schema
+                              AND kcu2.ordinal_position = kcu1.ordinal_position
+                        WHERE
+                            kcu1.table_schema = :schema
+                    """)
+                    res = conn.execute(query, {"schema": schema})
+                except Exception:
+                    return self._inspector_fk_fallback(conn, schema)
             
             try:
                 all_fks = []
@@ -395,22 +419,31 @@ class SqlMetadataProvider:
                 return all_fks
             except Exception as e:
                 logger.warning(f"Optimized FK fetch failed, using inspector fallback: {e}")
-                inspector = inspect(conn)
-                tables = inspector.get_table_names(schema=schema)
-                all_fks = []
-                for table in tables:
-                    try:
-                        fks = inspector.get_foreign_keys(table, schema=schema)
-                        for fk in fks:
-                            all_fks.append({
-                                "table": table,
-                                "constraint": fk.get("name"),
-                                "column": ", ".join(fk["constrained_columns"]),
-                                "foreignSchema": fk.get("referred_schema"),
-                                "foreignTable": fk["referred_table"],
-                                "foreignColumn": ", ".join(fk["referred_columns"]),
-                            })
-                    except Exception:
-                        continue
-                return all_fks
+                return self._inspector_fk_fallback(conn, schema)
+
         return self.service.run_dynamic_query(db_id, _op)
+
+    def _inspector_fk_fallback(self, conn, schema: str) -> List[Dict[str, Any]]:
+        """Fallback method to discover foreign keys using inspector.get_foreign_keys."""
+        try:
+            inspector = inspect(conn)
+            tables = inspector.get_table_names(schema=schema)
+            all_fks = []
+            for table in tables:
+                try:
+                    fks = inspector.get_foreign_keys(table, schema=schema)
+                    for fk in fks:
+                        all_fks.append({
+                            "table": table,
+                            "constraint": fk.get("name"),
+                            "column": ", ".join(fk["constrained_columns"]),
+                            "foreignSchema": fk.get("referred_schema"),
+                            "foreignTable": fk["referred_table"],
+                            "foreignColumn": ", ".join(fk["referred_columns"]),
+                        })
+                except Exception:
+                    continue
+            return all_fks
+        except Exception as e:
+            logger.error(f"Failed to use inspector fallback for foreign keys: {e}")
+            return []

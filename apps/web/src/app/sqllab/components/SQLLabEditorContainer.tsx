@@ -24,6 +24,7 @@ export interface SyntaxError {
 }
 
 import { useSQLLabContext } from "../context/SQLLabContext";
+import { formatDBName } from "./sidebar/sidebar-utils";
 
 export function SQLLabEditorContainer({
   enableValidation = true,
@@ -35,6 +36,9 @@ export function SQLLabEditorContainer({
   onErrorsChange?: (errors: SyntaxError[]) => void;
 }) {
   const lab = useSQLLabContext();
+  const selectedDSData = lab.dataSources?.find((ds: any) => ds.id === lab.selectedDS);
+  const formatted = formatDBName(selectedDSData);
+  
   const language = lab.isRelational ? "sql" : (lab.selectedDSType === "redis" ? "redis" : "javascript");
   const sqlDialect = lab.selectedDSType as any || "postgresql";
   return (
@@ -90,12 +94,12 @@ export function SQLLabEditorContainer({
       <div className="flex items-center h-9 px-4 bg-background border-b text-[10px] text-muted-foreground/60 gap-1.5 shrink-0 font-medium">
         <Database className="h-3 w-3 opacity-40 shrink-0" />
         <span className="font-bold text-foreground/70 lowercase tracking-tight">
-          {lab.selectedDSName.toLowerCase().replace(/\s+/g, "_") || "no_selection"}
+          {formatted.title.toLowerCase().replace(/\s+/g, "_")}
         </span>
         <ChevronRight className="h-3 w-3 opacity-20 shrink-0" />
-        <span className="opacity-80">{lab.selectedSchema}</span>
+        <span className="opacity-80 font-mono lower">{lab.selectedSchema || "main"}</span>
         <ChevronRight className="h-3 w-3 opacity-20 shrink-0" />
-        <span className="opacity-40 italic">Editor</span>
+        <span className="opacity-40 italic">query_editor</span>
       </div>
 
       <div className="flex-1 relative overflow-hidden bg-background">
