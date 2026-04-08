@@ -8,9 +8,9 @@ import { queryClient } from "@/lib/query-client";
 
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
+import { DesktopReadyGuard } from "./desktop-ready-guard";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  console.log('Providers: Rendering');
   return (
     <ThemeProvider
       attribute="class"
@@ -19,7 +19,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>
-        {children}
+        <DesktopReadyGuard>
+          {children}
+        </DesktopReadyGuard>
         <ReactQueryDevtools />
       </QueryClientProvider>
       <Toaster richColors />

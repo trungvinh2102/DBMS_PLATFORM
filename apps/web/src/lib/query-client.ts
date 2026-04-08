@@ -10,6 +10,13 @@ import { toast } from "sonner";
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => {
+      // Suppress network errors while backend is still starting up in desktop mode
+      const isBackendReady = (window as any).__BACKEND_READY__ !== false;
+      if (!isBackendReady && error.message.includes("Network Error")) {
+        console.warn("Suppressing Network Error toast because backend is still initializing");
+        return;
+      }
+
       toast.error(error.message, {
         action: {
           label: "retry",
