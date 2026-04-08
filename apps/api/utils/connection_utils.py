@@ -30,9 +30,19 @@ class ConnectionStringBuilder:
             ]:
                 if d in drivers:
                     return d
-        except Exception as e:
-            logger.error(f"ODBC driver detection failed: {e}")
+        except Exception:
+            # pyodbc not installed or ODBC not available
+            pass
         return None
+
+    @staticmethod
+    def has_library(lib_name: str) -> bool:
+        """Checks if a python library is installed."""
+        try:
+            __import__(lib_name)
+            return True
+        except ImportError:
+            return False
 
     @staticmethod
     def build_uri(db_type: str, config: Dict[str, Any]) -> str:
@@ -55,11 +65,23 @@ class ConnectionStringBuilder:
                 conn_str = conn_str.replace('postgresql://', 'postgresql+psycopg2://')
             elif conn_str.startswith('mysql://'):
                 conn_str = conn_str.replace('mysql://', 'mysql+pymysql://')
-            elif conn_str.startswith('mssql://') or conn_str.startswith('sqlserver://'):
-                conn_str = conn_str.replace('sqlserver://', 'mssql+pyodbc://')
-                conn_str = conn_str.replace('mssql://', 'mssql+pyodbc://')
+            elif (conn_str.startswith('mssql://') or 
+                  conn_str.startswith('ms-sql://') or
+                  conn_str.startswith('sqlserver://') or
+                  conn_str.startswith('mssql+pyodbc://') or
+                  conn_str.startswith('mssql+pytds://')):
+                
+                has_pyodbc = ConnectionStringBuilder.has_library('pyodbc')
+                dialect = "mssql+pyodbc" if has_pyodbc else "mssql+pytds"
+                
+                # Replace any of the mssql-like schemes with the correct dialect
+                prefixes = ['sqlserver://', 'ms-sql://', 'mssql://', 'mssql+pyodbc://', 'mssql+pytds://']
+                for prefix in prefixes:
+                    if conn_str.startswith(prefix):
+                        conn_str = conn_str.replace(prefix, f'{dialect}://', 1)
+                        break
 
-                if "driver=" not in conn_str:
+                if has_pyodbc and "driver=" not in conn_str:
                     driver = (ConnectionStringBuilder.get_mssql_driver() or "ODBC Driver 17 for SQL Server").replace(" ", "+")
                     separator = "&" if "?" in conn_str else "?"
                     conn_str += f"{separator}driver={driver}&TrustServerCertificate=yes"
@@ -85,13 +107,17 @@ class ConnectionStringBuilder:
             port = port or 3306
             return f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
 
-        elif db_type == 'mssql':
+        elif db_type in ['mssql', 'sqlserver']:
             port = port or 1433
-            driver = (ConnectionStringBuilder.get_mssql_driver() or "ODBC Driver 17 for SQL Server").replace(" ", "+")
-            return (
-                f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}"
-                f"?driver={driver}&TrustServerCertificate=yes"
-            )
+            if ConnectionStringBuilder.has_library('pyodbc'):
+                driver = (ConnectionStringBuilder.get_mssql_driver() or "ODBC Driver 17 for SQL Server").replace(" ", "+")
+                return (
+                    f"mssql+pyodbc://{user}:{password}@{host}:{port}/{dbname}"
+                    f"?driver={driver}&TrustServerCertificate=yes"
+                )
+            else:
+                # Use pytds which is a pure python driver and already in requirements.txt
+                return f"mssql+pytds://{user}:{password}@{host}:{port}/{dbname}"
 
         elif db_type == 'sqlite':
             # Handle in-memory mode
