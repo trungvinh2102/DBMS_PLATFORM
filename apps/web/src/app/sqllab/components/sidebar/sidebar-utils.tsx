@@ -57,14 +57,16 @@ export const formatDBName = (ds: any) => {
     const path = ds.config?.database || ds.databaseName || "";
     if (path.includes("/") || path.includes("\\")) {
       const parts = path.split(/[\\/]/);
-      const filename = parts[parts.length - 1];
+      let filename = parts[parts.length - 1] || "";
+      filename = filename.replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "");
       const dir = parts.slice(0, -1).join("/") + "/";
       return { 
         title: filename || path, 
         subtitle: dir.length > 30 ? "..." + dir.slice(-27) : dir 
       };
     }
-    return { title: path || "Local Database", subtitle: type.toUpperCase() };
+    const title = (path || "Local Database").replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "");
+    return { title, subtitle: type.toUpperCase() };
   }
   
   return { 

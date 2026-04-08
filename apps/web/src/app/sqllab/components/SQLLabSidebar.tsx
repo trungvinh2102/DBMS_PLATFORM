@@ -84,7 +84,25 @@ export function SQLLabSidebar() {
           onSelectItem={lab.setSelectedTable}
         />
 
-        {lab.isRelational && lab.selectedDSType !== "clickhouse" && (
+        {/* Triggers: Supported by SQLite, PostgreSQL, MySQL, MSSQL — NOT by DuckDB, ClickHouse */}
+        {lab.isRelational && !["clickhouse", "duckdb"].includes(lab.selectedDSType) && (
+            <SidebarFolder
+              id="triggers"
+              label="Triggers"
+              icon={<Zap className="h-4 w-4 text-indigo-500" />}
+              items={filteredTriggers}
+              count={filteredTriggers?.length}
+              isExpanded={expandedFolders.includes("triggers")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+        )}
+
+        {/* Events/Functions/Procedures: Only for full RDBMS (PostgreSQL, MySQL, MSSQL) — NOT for SQLite, DuckDB, ClickHouse */}
+        {lab.isRelational && !["clickhouse", "sqlite", "duckdb"].includes(lab.selectedDSType) && (
           <>
             <SidebarFolder
               id="events"
@@ -119,19 +137,6 @@ export function SQLLabSidebar() {
               items={filteredProcedures}
               count={filteredProcedures?.length}
               isExpanded={expandedFolders.includes("procedures")}
-              isLoading={lab.isLoadingTables}
-              searchQuery={searchQuery}
-              selectedItem={lab.selectedTable}
-              onToggle={toggleFolder}
-              onSelectItem={lab.setSelectedTable}
-            />
-            <SidebarFolder
-              id="triggers"
-              label="Triggers"
-              icon={<Zap className="h-4 w-4 text-indigo-500" />}
-              items={filteredTriggers}
-              count={filteredTriggers?.length}
-              isExpanded={expandedFolders.includes("triggers")}
               isLoading={lab.isLoadingTables}
               searchQuery={searchQuery}
               selectedItem={lab.selectedTable}

@@ -61,5 +61,9 @@ export const getSupportedDialect = (d: string): string => {
   if (dd.includes("snowflake")) return "snowflake";
   // Oracle is NOT supported natively, use postgresql as closest approximation after cleaning
   if (dd.includes("oracle")) return "postgresql";
+  // SQLite uses sqlite dialect in node-sql-parser
+  if (dd.includes("sqlite")) return "sqlite";
+  // DuckDB SQL is PostgreSQL-compatible
+  if (dd.includes("duckdb")) return "postgresql";
   return "mysql"; // Default fallback
 };

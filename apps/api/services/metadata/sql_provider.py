@@ -252,7 +252,7 @@ class SqlMetadataProvider:
         return self.service.run_dynamic_query(db_id, _op)
 
     def get_table_ddl(self, db_id: str, schema: str, table: str) -> str:
-        """Constructs a basic CREATE TABLE statement based on column metadata."""
+        """Constructs a CREATE TABLE statement, using native DDL when possible."""
         def _op(conn):
             try:
                 if conn.dialect.name in ['clickhouse', 'clickhousedb']:
@@ -260,10 +260,32 @@ class SqlMetadataProvider:
                     res = conn.execute(text(f"SHOW CREATE TABLE `{target_schema}`.`{table}`")).fetchone()
                     return res[0] if res else ""
                 
-                # Fetch columns for building DDL
+                # SQLite: use native sqlite_master for exact DDL
+                if conn.dialect.name == 'sqlite':
+                    res = conn.execute(text(
+                        "SELECT sql FROM sqlite_master WHERE type IN ('table', 'view') AND name = :name"
+                    ), {"name": table}).fetchone()
+                    return (res[0] + ";") if res and res[0] else f"-- No DDL found for {table}"
+                
+                # DuckDB: use native SHOW CREATE TABLE or duckdb_tables
+                if conn.dialect.name == 'duckdb':
+                    try:
+                        res = conn.execute(text(f'SELECT sql FROM duckdb_tables() WHERE table_name = :name'), {"name": table}).fetchone()
+                        if res and res[0]:
+                            return res[0] + ";"
+                    except Exception:
+                        pass
+                    # Fallback: try information_schema
+                    try:
+                        res = conn.execute(text(f'SHOW CREATE TABLE "{table}"')).fetchone()
+                        if res:
+                            return res[0] if isinstance(res[0], str) else str(res[0])
+                    except Exception:
+                        pass
+                
+                # Generic fallback: build DDL from column metadata
                 cols_data = self.get_columns(db_id, schema, table)
                 
-                # Check for PKs using inspector (more cross-DB compatible than information_schema)
                 try:
                     pks = inspect(conn).get_pk_constraint(table, schema=schema).get("constrained_columns", [])
                 except Exception:
@@ -300,8 +322,12 @@ class SqlMetadataProvider:
     def get_triggers(self, db_id: str, schema: str) -> List[str]:
         """Lists all triggers defined within the schema."""
         def _op(conn):
-            if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
+            if conn.dialect.name in ['clickhouse', 'clickhousedb', 'duckdb']:
                 return []
+            # SQLite stores triggers in sqlite_master
+            if conn.dialect.name == 'sqlite':
+                res = conn.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).fetchall()
+                return [row[0] for row in res]
             query = text("SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema = :s")
             return [row[0] for row in conn.execute(query, {"s": schema})]
         return self.service.run_dynamic_query(db_id, _op)

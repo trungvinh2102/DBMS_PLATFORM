@@ -51,33 +51,39 @@ export function useSQLLabMetadata({
   });
   const views = (viewsQuery.data as any) || [];
 
+  // Derive selected DS type to optimize query fetching
+  const selectedDSType = (dataSources.find((ds: any) => ds.id === selectedDS)?.type || "").toLowerCase();
+  const isFileBased = ["sqlite", "duckdb"].includes(selectedDSType);
+  const isClickHouse = selectedDSType === "clickhouse";
+  const skipFunctionsProcsEvents = isFileBased || isClickHouse;
+
   const functionsQuery = useQuery({
     queryKey: ["functions", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getFunctions(selectedDS, selectedSchema),
-    enabled: !!selectedDS,
+    enabled: !!selectedDS && !skipFunctionsProcsEvents,
   });
-  const functions = (functionsQuery.data as any) || [];
+  const functions = skipFunctionsProcsEvents ? [] : ((functionsQuery.data as any) || []);
 
   const proceduresQuery = useQuery({
     queryKey: ["procedures", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getProcedures(selectedDS, selectedSchema),
-    enabled: !!selectedDS,
+    enabled: !!selectedDS && !skipFunctionsProcsEvents,
   });
-  const procedures = (proceduresQuery.data as any) || [];
+  const procedures = skipFunctionsProcsEvents ? [] : ((proceduresQuery.data as any) || []);
 
   const triggersQuery = useQuery({
     queryKey: ["triggers", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getTriggers(selectedDS, selectedSchema),
-    enabled: !!selectedDS,
+    enabled: !!selectedDS && selectedDSType !== "duckdb" && !isClickHouse,
   });
-  const triggers = (triggersQuery.data as any) || [];
+  const triggers = (selectedDSType === "duckdb" || isClickHouse) ? [] : ((triggersQuery.data as any) || []);
 
   const eventsQuery = useQuery({
     queryKey: ["events", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getEvents(selectedDS, selectedSchema),
-    enabled: !!selectedDS,
+    enabled: !!selectedDS && !skipFunctionsProcsEvents,
   });
-  const events = (eventsQuery.data as any) || [];
+  const events = skipFunctionsProcsEvents ? [] : ((eventsQuery.data as any) || []);
 
   const metadata = {
     views,
@@ -90,13 +96,13 @@ export function useSQLLabMetadata({
   const indexesQuery = useQuery({
     queryKey: ["indexes", selectedDS, selectedSchema, selectedTable],
     queryFn: () => databaseApi.getIndexes(selectedDS, selectedTable!),
-    enabled: !!selectedDS && !!selectedTable,
+    enabled: !!selectedDS && !!selectedTable && selectedDSType !== "duckdb",
   });
 
   const foreignKeysQuery = useQuery({
     queryKey: ["fks", selectedDS, selectedSchema, selectedTable],
     queryFn: () => databaseApi.getForeignKeys(selectedDS, selectedTable!),
-    enabled: !!selectedDS && !!selectedTable,
+    enabled: !!selectedDS && !!selectedTable && selectedDSType !== "duckdb" && selectedDSType !== "clickhouse",
   });
 
   const tableInfoQuery = useQuery({
@@ -109,7 +115,7 @@ export function useSQLLabMetadata({
     queryKey: ["ddl", selectedDS, selectedSchema, selectedTable],
     queryFn: () =>
       databaseApi.getDDL(selectedDS, selectedTable!, selectedSchema),
-    enabled: !!selectedDS && !!selectedTable,
+    enabled: !!selectedDS && !!selectedTable && selectedDSType !== "duckdb",
   });
 
   const allColumnsQuery = useQuery({

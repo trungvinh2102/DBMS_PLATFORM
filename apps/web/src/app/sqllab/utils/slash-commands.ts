@@ -130,6 +130,80 @@ export const SLASH_COMMANDS: SlashCommand[] = [
       return `Audit this SQL query for code quality and best practices. Check for: 1. Naming conventions (aliases). 2. Formatting/Readability. 3. Redundant logic. 4. Dialect-specific optimizations. Provide a score from 1-10 and specific refactor recommendations:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``;
     },
   },
+  {
+    command: "/suggest",
+    description: "Generate query suggestions for your database engine",
+    icon: Wand2,
+    requiresEditorSQL: false,
+    acceptsArgs: true,
+    argsHint: "<topic: analytics, schema, admin>",
+    buildPrompt: (ctx) => {
+      const topic = ctx.args.trim() || "general";
+      const dbType = ctx.databaseType || "unknown";
+      
+      let engineContext = "";
+      if (dbType.includes("sqlite")) {
+        engineContext = `The user is connected to a **SQLite** database. Provide SQLite-specific query examples including:
+- PRAGMA commands (table_info, foreign_key_list, index_list, integrity_check, compile_options)
+- Window functions (available in SQLite 3.25+)
+- JSON functions (json_extract, json_each, json_group_array — SQLite 3.38+)
+- Common Table Expressions (WITH ... AS)
+- Date functions using date(), time(), datetime(), strftime()
+- EXPLAIN QUERY PLAN for performance analysis
+- VACUUM, ANALYZE for maintenance
+Do NOT suggest features SQLite doesn't support: stored procedures, events, user management, PIVOT, or file queries.`;
+      } else if (dbType.includes("duckdb")) {
+        engineContext = `The user is connected to a **DuckDB** database. Provide DuckDB-specific query examples including:
+- SUMMARIZE for quick column profiling
+- PIVOT / UNPIVOT for reshaping data
+- QUALIFY clause for filtering window function results
+- read_csv(), read_parquet(), read_json() for file queries
+- LIST and STRUCT operations
+- String similarity functions (jaro_winkler_similarity, levenshtein)
+- System tables: duckdb_settings(), duckdb_extensions(), duckdb_types()
+- EXPLAIN ANALYZE for performance
+- Advanced window functions and FILTER clause
+DuckDB is an analytical database — emphasize its OLAP strengths.`;
+      } else {
+        engineContext = `The user is connected to a **${dbType}** database. Provide relevant query examples for this engine.`;
+      }
+
+      return `Generate practical SQL query suggestions for the topic: "${topic}".\n\n${engineContext}\n\nProvide 8-12 ready-to-use queries organized by category. Each query should have a brief comment explaining what it does. Format them as SQL code blocks.`;
+    },
+  },
+  {
+    command: "/schema",
+    description: "Explore database structure and relationships",
+    icon: Table2,
+    requiresEditorSQL: false,
+    acceptsArgs: false,
+    buildPrompt: (ctx) => {
+      const dbType = ctx.databaseType || "unknown";
+      let schemaQuery = "";
+      
+      if (dbType.includes("sqlite")) {
+        schemaQuery = `For this **SQLite** database, generate the following introspection queries:
+1. List all tables and views: \`SELECT name, type FROM sqlite_master WHERE type IN ('table','view') ORDER BY type, name;\`
+2. List all triggers: \`SELECT name, tbl_name, sql FROM sqlite_master WHERE type='trigger';\`
+3. List all indexes: \`SELECT name, tbl_name FROM sqlite_master WHERE type='index';\`
+4. For each table, show PRAGMA table_info and PRAGMA foreign_key_list
+5. Database file info: PRAGMA database_list, PRAGMA page_count, PRAGMA page_size
+Explain each query's output and what insights it provides.`;
+      } else if (dbType.includes("duckdb")) {
+        schemaQuery = `For this **DuckDB** database, generate the following introspection queries:
+1. List all tables: \`SELECT * FROM information_schema.tables WHERE table_schema='main';\`
+2. Show columns: \`SELECT * FROM information_schema.columns WHERE table_schema='main';\`
+3. Describe a table: \`DESCRIBE table_name;\`
+4. Use SUMMARIZE for column profiling: \`SUMMARIZE table_name;\`
+5. System info: \`SELECT * FROM duckdb_settings();\` and \`SELECT * FROM duckdb_extensions();\`
+Explain each query's output and what insights it provides.`;
+      } else {
+        schemaQuery = `Generate comprehensive schema exploration queries for this **${dbType}** database.`;
+      }
+
+      return schemaQuery;
+    },
+  },
 ];
 
 /**

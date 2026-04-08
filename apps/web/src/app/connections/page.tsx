@@ -93,7 +93,9 @@ function ConnectionsContent() {
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
                     <BreadcrumbPage className="font-semibold text-slate-900 dark:text-slate-100">
-                      {activeConn.databaseName}
+                      {["sqlite", "duckdb"].includes(activeConn.type) 
+                        ? (activeConn.databaseName || "").replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "") 
+                        : activeConn.databaseName}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>

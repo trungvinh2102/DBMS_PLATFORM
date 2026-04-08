@@ -195,7 +195,7 @@ export function SQLLabToolbar() {
         )}
       />
 
-      {lab.isRelational && lab.selectedDSType !== "clickhouse" && (
+      {lab.isRelational && !["clickhouse", "duckdb"].includes(lab.selectedDSType) && (
         <ToolbarButton
           icon={<LayoutGrid className="h-4 w-4 text-emerald-500" />}
           label="Schema"

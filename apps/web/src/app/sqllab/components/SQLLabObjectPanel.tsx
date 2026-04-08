@@ -81,24 +81,29 @@ export function SQLLabObjectPanel() {
   const monacoTheme = resolvedTheme === "dark" ? "dbms-dark" : "dbms-light";
 
   const isDiagnosticsSupported = ["sqlite", "duckdb"].includes(lab.selectedDSType);
+  const hasTriggerSupport = lab.isRelational && !["clickhouse", "duckdb"].includes(lab.selectedDSType);
+  const hasRelationSupport = lab.isRelational && !["clickhouse", "duckdb"].includes(lab.selectedDSType);
+  const hasIndexSupport = lab.isRelational && lab.selectedDSType !== "duckdb";
+  const hasScriptSupport = lab.isRelational && lab.selectedDSType !== "duckdb";
 
   let availableTabs = [
     "Data",
     "Structure",
     ...(isDiagnosticsSupported ? ["Diagnostics"] : []),
-    "Index",
-    ...(lab.isRelational && lab.selectedDSType !== "clickhouse" ? ["Relation", "Trigger"] : []),
+    ...(hasIndexSupport ? ["Index"] : []),
+    ...(hasRelationSupport ? ["Relation"] : []),
+    ...(hasTriggerSupport ? ["Trigger"] : []),
     "Info",
-    ...(lab.isRelational ? ["Script"] : []),
+    ...(hasScriptSupport ? ["Script"] : []),
   ];
   if (lab.selectedObjectType === "view") {
-    availableTabs = ["Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), "Info", ...(lab.isRelational ? ["Script"] : [])];
+    availableTabs = ["Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), "Info", ...(hasScriptSupport ? ["Script"] : [])];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
       lab.selectedObjectType || "",
     )
   ) {
-    availableTabs = ["Info", ...(lab.isRelational ? ["Script"] : [])];
+    availableTabs = ["Info", ...(hasScriptSupport ? ["Script"] : [])];
   }
 
   const activeTabLower = lab.activeRightTab.toLowerCase();

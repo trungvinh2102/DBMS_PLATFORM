@@ -61,6 +61,10 @@ const SQL_KEYWORDS = [
   "MATERIALIZED", "EPHEMERAL", "ALIAS", "TTL", "SETTINGS", "FORMAT",
   "UNIQ", "UNIQCOMBINED", "UNIQEXACT", "QUANTILES", "GROUPARRAY", "GROUPUNIQARRAY",
   "ARRAYMAP", "ARRAYFILTER", "ARRAYJOIN",
+  // DuckDB Specific
+  "EXCLUDE", "REPLACE", "COLUMNS", "PIVOT", "UNPIVOT", "SUMMARIZE", "ASOF",
+  "INSTALL", "LOAD", "PRAGMA", "ATTACH", "DETACH", "MACRO", "COPY",
+  "read_csv_auto", "read_parquet", "parquet_schema", "read_json_auto"
 ];
 
 
@@ -242,7 +246,24 @@ export const registerSqlAutocomplete = (
         }
       }
 
+      const duckdbSnippets = [
+        { label: "read_csv_auto", insertText: "read_csv_auto('${1:path/to/file.csv}')" },
+        { label: "read_parquet", insertText: "read_parquet('${1:path/to/file.parquet}')" },
+        { label: "read_json_auto", insertText: "read_json_auto('${1:path/to/file.json}')" },
+        { label: "parquet_schema", insertText: "parquet_schema('${1:path/to/file.parquet}')" },
+        { label: "ATTACH", insertText: "ATTACH '${1:filename.duckdb}' AS ${2:alias};" }
+      ];
+
       const suggestions: any[] = [
+        ...duckdbSnippets.map((snip) => ({
+          label: snip.label,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertTextRules: 4, // InsertAsSnippet
+          insertText: snip.insertText,
+          documentation: "DuckDB Snippet",
+          range: range,
+          sortText: "0",
+        })),
         ...SQL_KEYWORDS.map((keyword) => ({
           label: keyword,
           kind: monaco.languages.CompletionItemKind.Keyword,

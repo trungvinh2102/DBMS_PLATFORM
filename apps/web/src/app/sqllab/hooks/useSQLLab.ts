@@ -113,6 +113,9 @@ export function useSQLLab() {
   // 3. Dependent States/Actions
   const tableDataMutation = useMutation({
     mutationFn: (vars: { databaseId: string; sql: string }) => databaseApi.execute(vars.databaseId, vars.sql),
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to load table data");
+    }
   });
 
   const getSelectedObjectType = useCallback(() => {
@@ -140,7 +143,9 @@ export function useSQLLab() {
       const q = selectedDSType === "mysql" ? "`" : '"';
       const schema = activeTab.selectedSchema;
       const table = ui.selectedTable;
-      const fullTableName = schema && schema !== 'public' ? `${q}${schema}${q}.${q}${table}${q}` : `${q}${table}${q}`;
+      
+      const quotedSchema = schema ? schema.split('.').map((s: string) => `${q}${s}${q}`).join('.') : '';
+      const fullTableName = schema && schema !== 'public' ? `${quotedSchema}.${q}${table}${q}` : `${q}${table}${q}`;
       let sql = `SELECT * FROM ${fullTableName} LIMIT ${limit} OFFSET ${offset}`;
       
       if (selectedDSType === "redis") sql = `GET "${ui.selectedTable}"`;
@@ -296,7 +301,8 @@ export function useSQLLab() {
           return `${q}${k}${q} = ${escapedVal}`;
         });
  
-        const fullTableName = schema && schema !== 'public' ? `${q}${schema}${q}.${q}${table}${q}` : `${q}${table}${q}`;
+        const quotedSchema = schema ? schema.split('.').map((s: string) => `${q}${s}${q}`).join('.') : '';
+        const fullTableName = schema && schema !== 'public' ? `${quotedSchema}.${q}${table}${q}` : `${q}${table}${q}`;
         updates.push(`UPDATE ${fullTableName} SET ${setClauses.join(', ')} WHERE ${whereClauses.join(' AND ')};`);
       }
 
@@ -311,7 +317,8 @@ export function useSQLLab() {
           const limit = settings.defaultQueryLimit || 1000;
           const offset = ui.dataOffset || 0;
           const q = selectedDSType === "mysql" ? "`" : '"';
-          const fullTableName = schema && schema !== 'public' ? `${q}${schema}${q}.${q}${table}${q}` : `${q}${table}${q}`;
+          const quotedSchema = schema ? schema.split('.').map((s: string) => `${q}${s}${q}`).join('.') : '';
+          const fullTableName = schema && schema !== 'public' ? `${quotedSchema}.${q}${table}${q}` : `${q}${table}${q}`;
           tableDataMutation.mutate({ 
             databaseId: dsId, 
             sql: selectedDSType === "mongodb" ? `${schema || 'db'}.${table}.find()` : `SELECT * FROM ${fullTableName} LIMIT ${limit} OFFSET ${offset}` 

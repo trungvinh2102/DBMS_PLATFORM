@@ -24,7 +24,7 @@ class SqlExecutor:
             
             # Use appropriate isolation level for write operations if autocommit is requested
             exec_conn = conn
-            if auto_commit and conn.engine.dialect.name not in ['clickhouse', 'clickhousedb']:
+            if auto_commit and conn.engine.dialect.name not in ['clickhouse', 'clickhousedb', 'duckdb']:
                 exec_conn = conn.execution_options(isolation_level="AUTOCOMMIT")
 
             # Dialect-specific session configurations (PostgreSQL statement timeout, etc.)
@@ -36,7 +36,20 @@ class SqlExecutor:
             # Format rows and keys for the response
             if result.returns_rows:
                 keys = list(result.keys())
-                data = [dict(zip(keys, row)) for row in result]
+                import datetime
+                import decimal
+                import uuid
+                
+                def serialize_val(val):
+                    if isinstance(val, (datetime.datetime, datetime.date)):
+                        return val.isoformat()
+                    elif isinstance(val, decimal.Decimal):
+                        return float(val)
+                    elif isinstance(val, uuid.UUID):
+                        return str(val)
+                    return val
+                    
+                data = [{k: serialize_val(v) for k, v in zip(keys, row)} for row in result]
                 return data, keys
             return [], []
                 

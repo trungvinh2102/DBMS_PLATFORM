@@ -138,7 +138,8 @@ export function useConnectionColumns({
         
         if (isFileBased && fullName !== "-" && (fullName.includes("/") || fullName.includes("\\"))) {
           const parts = fullName.split(/[\\/]/);
-          const filename = parts[parts.length - 1];
+          let filename = parts[parts.length - 1] || "";
+          filename = filename.replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "");
           const directory = parts.slice(0, parts.length - 1).join("/");
           
           return (
@@ -158,13 +159,17 @@ export function useConnectionColumns({
           );
         }
 
+        const displayFullName = isFileBased && fullName !== "-" 
+          ? fullName.replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "") 
+          : fullName;
+
         return (
           <div className="flex items-center gap-1">
             <div className="h-4 w-4 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
               <FileText className="h-2 w-2 text-slate-400" />
             </div>
             <span className="text-[13px] font-medium text-slate-900 dark:text-slate-100">
-              {fullName}
+              {displayFullName}
             </span>
           </div>
         );

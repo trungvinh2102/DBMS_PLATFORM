@@ -30,6 +30,10 @@ class ExplainExecutor:
                 explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {explain_sql}"
             elif dialect == 'mysql':
                 explain_sql = f"EXPLAIN FORMAT=JSON {explain_sql}"
+            elif dialect == 'sqlite':
+                explain_sql = f"EXPLAIN QUERY PLAN {explain_sql}"
+            elif dialect == 'duckdb':
+                explain_sql = f"EXPLAIN ANALYZE {explain_sql}"
             else:
                 explain_sql = f"EXPLAIN {explain_sql}"
 
@@ -52,6 +56,26 @@ class ExplainExecutor:
                             return {"plan": json.loads(rows[0][0]), "dialect": dialect}
                         except Exception as e:
                             logger.error(f"Failed to parse MySQL JSON EXPLAIN plan: {e}")
+                
+                # SQLite EXPLAIN QUERY PLAN returns (id, parent, notused, detail)
+                if dialect == 'sqlite' and rows:
+                    tree_nodes = []
+                    for row in rows:
+                        tree_nodes.append({
+                            "id": row[0],
+                            "parent": row[1],
+                            "detail": row[3] if len(row) > 3 else str(row[2]) if len(row) > 2 else str(row)
+                        })
+                    return {"plan": tree_nodes, "dialect": dialect}
+                
+                # DuckDB EXPLAIN ANALYZE returns a text-based plan
+                if dialect == 'duckdb' and rows:
+                    # DuckDB returns a single column with the explain text
+                    plan_lines = []
+                    for row in rows:
+                        line = str(row[0]) if row else ""
+                        plan_lines.append(line)
+                    return {"plan": "\n".join(plan_lines), "dialect": dialect}
                 
                 # Fallback for plain text EXPLAIN
                 keys = list(result.keys())

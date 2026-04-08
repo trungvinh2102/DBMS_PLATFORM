@@ -185,7 +185,11 @@ export function ConnectionConfig({
           </Button>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight">{activeConn.databaseName}</h1>
+              <h1 className="text-xl font-bold tracking-tight">
+                {isFileBased 
+                  ? (activeConn.databaseName || "").replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "") 
+                  : activeConn.databaseName}
+              </h1>
               <Badge className={`${envColor === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/30' : envColor === 'amber' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'} border uppercase text-[10px] font-bold px-2 py-0 h-5`}>
                 {environment}
               </Badge>

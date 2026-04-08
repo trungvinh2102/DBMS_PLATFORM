@@ -62,7 +62,7 @@ export function SQLLabResultPanel({
           >
             Problems
           </TabButton>
-          {!isMongoDB && lab.selectedDSType !== "clickhouse" && (
+          {!isMongoDB && !["clickhouse", "duckdb"].includes(lab.selectedDSType) && (
             <TabButton
               active={effectiveTab === "lineage"}
               onClick={() => lab.setActiveResultTab("lineage")}
