@@ -69,4 +69,4 @@ dist/
 build/
 
 # Sidecars
-apps/desktop/src-tauri/bin/api.env
+apps/desktop/src-tauri/bin/*

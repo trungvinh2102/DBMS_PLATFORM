@@ -236,3 +236,9 @@
   50% { transform: scale(1.2); opacity: 0.25; }
 }
 
+.ai-message pre, 
+.ai-message code {
+  font-size: 10px !important;
+  font-family: var(--font-mono, "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace) !important;
+}
+

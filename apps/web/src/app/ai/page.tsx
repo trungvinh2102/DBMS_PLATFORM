@@ -50,7 +50,7 @@ export default function AIPage() {
               className={`p-3 rounded-lg ${
                 message.role === "user"
                   ? "bg-primary/10 ml-8"
-                  : "bg-secondary/20 mr-8"
+                  : "bg-secondary/20 mr-8 ai-message"
               }`}
             >
               <p className="text-sm font-semibold mb-1">

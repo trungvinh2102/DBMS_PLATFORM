@@ -229,7 +229,7 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, onSuggestio
       <div
         className={cn(
           "flex flex-col gap-2 max-w-[85%] group",
-          message.role === "user" ? "items-end" : "items-start w-full",
+          message.role === "user" ? "items-end" : "items-start w-full ai-message",
         )}
       >
         {/* Reasoning Traceability: Thinking Section */}
@@ -313,7 +313,7 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, onSuggestio
                           customStyle={{
                             margin: "0.8em 0",
                             borderRadius: "10px",
-                            fontSize: "11px",
+                            fontSize: "10px",
                             background: message.role === "user"
                               ? "rgba(0,0,0,0.2)"
                               : isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
@@ -325,7 +325,7 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, onSuggestio
                         </Prism>
                       ) : (
                         <code className={cn(
-                          "px-1.5 py-0.5 rounded bg-black/10 font-mono text-[10px]",
+                          "px-1.5 py-0.5 rounded bg-black/10 font-mono text-[9px]",
                           className
                         )} {...props}>
                           {children}
@@ -439,7 +439,7 @@ export function AIMessage({ message, onExplain, onOptimize, onApply, onSuggestio
                     background: 'transparent',
                     padding: 0,
                     margin: 0,
-                    fontSize: '11.5px',
+                    fontSize: '10px',
                     lineHeight: '1.5',
                     fontFamily: '"JetBrains Mono", "Fira Code", monospace'
                   }}
