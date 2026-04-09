@@ -14,6 +14,7 @@ import {
   SiRedis,
   SiClickhouse,
   SiDuckdb,
+  SiMariadb,
 } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 
@@ -24,6 +25,8 @@ export const getDBIcon = (type: string) => {
   const t = type?.toLowerCase() || "";
   if (t.includes("postgres"))
     return <SiPostgresql className="h-5 w-5 text-blue-500" />;
+  if (t.includes("mariadb"))
+    return <SiMariadb className="h-5 w-5 text-sky-600" />;
   if (t.includes("mysql"))
     return <SiMysql className="h-5 w-5 text-orange-500" />;
   if (t.includes("sqlserver"))

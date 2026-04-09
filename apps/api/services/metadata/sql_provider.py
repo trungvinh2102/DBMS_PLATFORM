@@ -30,6 +30,12 @@ class SqlMetadataProvider:
                     return inspect(conn).get_schema_names()
                 except Exception:
                     return ['main']
+            if conn.dialect.name == 'oracle':
+                # Oracle uses Data Dictionary views — list schemas/users
+                res = conn.execute(text(
+                    "SELECT username FROM ALL_USERS ORDER BY username"
+                ))
+                return [row[0] for row in res]
             return inspect(conn).get_schema_names()
         return self.service.run_dynamic_query(db_id, _op)
 
@@ -73,6 +79,27 @@ class SqlMetadataProvider:
                         result[table_name] = []
                     result[table_name].append({"name": row[1], "type": row[2], "nullable": True})
                 return result
+
+            # Oracle uses ALL_TAB_COLUMNS from the Data Dictionary
+            if conn.dialect.name == 'oracle':
+                query = text("""
+                    SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, NULLABLE
+                    FROM ALL_TAB_COLUMNS
+                    WHERE OWNER = :schema
+                    ORDER BY TABLE_NAME, COLUMN_ID
+                """)
+                res = conn.execute(query, {"schema": schema.upper()})
+                result = {}
+                for row in res:
+                    table_name = row[0]
+                    if table_name not in result:
+                        result[table_name] = []
+                    result[table_name].append({
+                        "name": row[1],
+                        "type": row[2],
+                        "nullable": row[3] == 'Y'
+                    })
+                return result
             
             # Specialized Postgres query for better accuracy - Exclude views ('v', 'm')
             if conn.dialect.name == 'postgresql':
@@ -98,7 +125,7 @@ class SqlMetadataProvider:
                 """)
                 res = conn.execute(query, {"schema": schema})
             elif conn.dialect.name == 'mysql':
-                # For MySQL, join with TABLES to ensure only BASE TABLEs are returned
+                # For MySQL/MariaDB, join with TABLES to ensure only BASE TABLEs are returned
                 query = text("""
                     SELECT c.TABLE_NAME, c.COLUMN_NAME, c.COLUMN_TYPE, c.IS_NULLABLE
                     FROM INFORMATION_SCHEMA.COLUMNS c
@@ -230,7 +257,42 @@ class SqlMetadataProvider:
                     res_count = conn.execute(text(f"SELECT COUNT(*) FROM \"{table}\"")).fetchone()
                     return {"row_count": res_count[0] if res_count else 0, "total_size": "Dynamic"}
 
-                # Postgres fallback (shared with others potentially)
+                if conn.dialect.name == 'oracle':
+                    # Oracle: use ALL_TABLES for row count (from optimizer stats)
+                    query = text("""
+                        SELECT NUM_ROWS FROM ALL_TABLES
+                        WHERE OWNER = :schema AND TABLE_NAME = :table
+                    """)
+                    res = conn.execute(query, {"schema": schema.upper(), "table": table.upper()}).fetchone()
+                    row_count = res[0] if res and res[0] is not None else 0
+                    # Try to get segment size (may require DBA privileges)
+                    try:
+                        size_query = text("""
+                            SELECT BYTES FROM DBA_SEGMENTS
+                            WHERE OWNER = :schema AND SEGMENT_NAME = :table
+                        """)
+                        size_res = conn.execute(size_query, {"schema": schema.upper(), "table": table.upper()}).fetchone()
+                        total_size = f"{size_res[0] / 1024 / 1024:.2f} MB" if size_res and size_res[0] else "N/A"
+                    except Exception:
+                        total_size = "N/A (requires DBA privileges)"
+                    return {"row_count": row_count, "total_size": total_size}
+
+                if conn.dialect.name == 'mysql':
+                    # MySQL/MariaDB: use information_schema for table stats
+                    query = text("""
+                        SELECT DATA_LENGTH + INDEX_LENGTH AS total_bytes, TABLE_ROWS
+                        FROM INFORMATION_SCHEMA.TABLES
+                        WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table
+                    """)
+                    res = conn.execute(query, {"schema": schema, "table": table}).fetchone()
+                    if res:
+                        total_bytes = res[0] or 0
+                        return {
+                            "total_size": f"{total_bytes / 1024 / 1024:.2f} MB",
+                            "row_count": res[1] or 0
+                        }
+
+                # Postgres (default for server-based)
                 query = text("""
                     SELECT
                       pg_size_pretty(pg_total_relation_size(quote_ident(:schema) || '.' || quote_ident(:table))) as total_size,
@@ -283,6 +345,27 @@ class SqlMetadataProvider:
                     except Exception:
                         pass
                 
+                # MySQL/MariaDB: native SHOW CREATE TABLE
+                if conn.dialect.name == 'mysql':
+                    try:
+                        res = conn.execute(text(f"SHOW CREATE TABLE `{schema}`.`{table}`")).fetchone()
+                        if res and len(res) > 1:
+                            return res[1] + ";"
+                    except Exception:
+                        pass
+                
+                # Oracle: use DBMS_METADATA.GET_DDL for native DDL
+                if conn.dialect.name == 'oracle':
+                    try:
+                        res = conn.execute(text(
+                            "SELECT DBMS_METADATA.GET_DDL('TABLE', :table_name, :schema_name) FROM DUAL"
+                        ), {"table_name": table.upper(), "schema_name": schema.upper()}).fetchone()
+                        if res and res[0]:
+                            ddl_text = str(res[0])
+                            return ddl_text if ddl_text.strip().endswith(';') else ddl_text + ';'
+                    except Exception as ddl_err:
+                        logger.debug(f"DBMS_METADATA.GET_DDL failed for {schema}.{table}: {ddl_err}")
+                
                 # Generic fallback: build DDL from column metadata
                 cols_data = self.get_columns(db_id, schema, table)
                 
@@ -306,6 +389,11 @@ class SqlMetadataProvider:
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
                 return []
+            if conn.dialect.name == 'oracle':
+                query = text(
+                    "SELECT OBJECT_NAME FROM ALL_OBJECTS WHERE OWNER = :s AND OBJECT_TYPE = 'FUNCTION' ORDER BY OBJECT_NAME"
+                )
+                return [row[0] for row in conn.execute(query, {"s": schema.upper()})]
             query = text("SELECT routine_name FROM information_schema.routines WHERE routine_schema = :s AND routine_type = 'FUNCTION'")
             return [row[0] for row in conn.execute(query, {"s": schema})]
         return self.service.run_dynamic_query(db_id, _op)
@@ -315,6 +403,11 @@ class SqlMetadataProvider:
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
                 return []
+            if conn.dialect.name == 'oracle':
+                query = text(
+                    "SELECT OBJECT_NAME FROM ALL_OBJECTS WHERE OWNER = :s AND OBJECT_TYPE = 'PROCEDURE' ORDER BY OBJECT_NAME"
+                )
+                return [row[0] for row in conn.execute(query, {"s": schema.upper()})]
             query = text("SELECT routine_name FROM information_schema.routines WHERE routine_schema = :s AND routine_type = 'PROCEDURE'")
             return [row[0] for row in conn.execute(query, {"s": schema})]
         return self.service.run_dynamic_query(db_id, _op)
@@ -328,6 +421,11 @@ class SqlMetadataProvider:
             if conn.dialect.name == 'sqlite':
                 res = conn.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).fetchall()
                 return [row[0] for row in res]
+            if conn.dialect.name == 'oracle':
+                query = text(
+                    "SELECT TRIGGER_NAME FROM ALL_TRIGGERS WHERE OWNER = :s ORDER BY TRIGGER_NAME"
+                )
+                return [row[0] for row in conn.execute(query, {"s": schema.upper()})]
             query = text("SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema = :s")
             return [row[0] for row in conn.execute(query, {"s": schema})]
         return self.service.run_dynamic_query(db_id, _op)
@@ -346,10 +444,44 @@ class SqlMetadataProvider:
         """Retrieves all foreign keys for all tables in a schema using a single query."""
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb', 'sqlite', 'duckdb']:
-                # Lite databases don't support optimized batch FK retrieval via information_schema
+                # These databases don't support optimized batch FK retrieval via information_schema
                 # Force inspector fallback
                 return self._inspector_fk_fallback(conn, schema)
             
+            # Oracle: use ALL_CONSTRAINTS + ALL_CONS_COLUMNS for foreign keys
+            if conn.dialect.name == 'oracle':
+                query = text("""
+                    SELECT
+                        a.TABLE_NAME,
+                        a.CONSTRAINT_NAME,
+                        a_col.COLUMN_NAME,
+                        c_pk.OWNER AS FOREIGN_SCHEMA,
+                        c_pk.TABLE_NAME AS FOREIGN_TABLE,
+                        b_col.COLUMN_NAME AS FOREIGN_COLUMN
+                    FROM
+                        ALL_CONSTRAINTS a
+                    JOIN ALL_CONS_COLUMNS a_col ON a.CONSTRAINT_NAME = a_col.CONSTRAINT_NAME AND a.OWNER = a_col.OWNER
+                    JOIN ALL_CONSTRAINTS c_pk ON a.R_CONSTRAINT_NAME = c_pk.CONSTRAINT_NAME AND a.R_OWNER = c_pk.OWNER
+                    JOIN ALL_CONS_COLUMNS b_col ON c_pk.CONSTRAINT_NAME = b_col.CONSTRAINT_NAME AND c_pk.OWNER = b_col.OWNER
+                        AND a_col.POSITION = b_col.POSITION
+                    WHERE
+                        a.CONSTRAINT_TYPE = 'R'
+                        AND a.OWNER = :schema
+                    ORDER BY a.TABLE_NAME, a.CONSTRAINT_NAME
+                """)
+                res = conn.execute(query, {"schema": schema.upper()})
+                all_fks = []
+                for row in res:
+                    all_fks.append({
+                        "table": row[0],
+                        "constraint": row[1],
+                        "column": row[2],
+                        "foreignSchema": row[3],
+                        "foreignTable": row[4],
+                        "foreignColumn": row[5],
+                    })
+                return all_fks
+
             # Optimized query for Foreign Keys
             if conn.dialect.name == 'postgresql':
                 # Exact columns for Postgres with column aggregation
@@ -385,6 +517,7 @@ class SqlMetadataProvider:
                 """)
                 res = conn.execute(query, {"schema": schema})
             elif conn.dialect.name == 'mysql':
+                # Works for both MySQL and MariaDB (mariadb maps to mysql dialect)
                 query = text("""
                     SELECT 
                         TABLE_NAME, 

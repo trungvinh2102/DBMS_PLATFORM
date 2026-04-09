@@ -50,7 +50,13 @@ class ConnectionStringBuilder:
         Builds or normalizes a connection URI based on the database type and configuration.
         """
         db_type = db_type.lower()
+        use_uri = config.get('useUri', False)
         uri = config.get('uri', '').strip()
+
+        # Only use the provided URI if the user explicitly enabled the Advanced URI mode,
+        # otherwise we want our internal builder to generate the proper driver dialects (e.g. oracle+oracledb://)
+        if uri and use_uri:
+            return uri
 
         # 1. Normalize existing URI if provided
         if uri:
@@ -65,6 +71,18 @@ class ConnectionStringBuilder:
                 conn_str = conn_str.replace('postgresql://', 'postgresql+psycopg2://')
             elif conn_str.startswith('mysql://'):
                 conn_str = conn_str.replace('mysql://', 'mysql+pymysql://')
+            elif conn_str.startswith('mariadb://'):
+                conn_str = conn_str.replace('mariadb://', 'mysql+pymysql://')
+            elif conn_str.startswith('oracle://'):
+                conn_str = conn_str.replace('oracle://', 'oracle+oracledb://')
+                from urllib.parse import urlparse
+                try:
+                    parsed = urlparse(conn_str)
+                    if parsed.path and len(parsed.path) > 1 and not parsed.query:
+                        dbname = parsed.path.lstrip('/')
+                        conn_str = conn_str.replace(parsed.path, f"/?service_name={dbname}")
+                except Exception:
+                    pass
             elif (conn_str.startswith('mssql://') or 
                   conn_str.startswith('ms-sql://') or
                   conn_str.startswith('sqlserver://') or
@@ -154,6 +172,26 @@ class ConnectionStringBuilder:
                 scheme = "clickhousedb"
                 query_params = f"?secure=True" if secure else ""
                 return f"{scheme}://{user}:{password}@{host}:{port}/{dbname}{query_params}"
+
+        elif db_type == 'oracle':
+            port = port or 1521
+            service_name = config.get('serviceName', '')
+            sid = config.get('sid', '')
+            # python-oracledb Thin mode (no Oracle Client required)
+            if service_name:
+                return f"oracle+oracledb://{user}:{password}@{host}:{port}/?service_name={service_name}"
+            elif sid:
+                return f"oracle+oracledb://{user}:{password}@{host}:{port}/{sid}"
+            elif dbname:
+                # Treat database name as service name by default
+                return f"oracle+oracledb://{user}:{password}@{host}:{port}/?service_name={dbname}"
+            else:
+                return f"oracle+oracledb://{user}:{password}@{host}:{port}"
+
+        elif db_type == 'mariadb':
+            # MariaDB uses MySQL wire protocol — PyMySQL works perfectly
+            port = port or 3306
+            return f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
 
         elif db_type == 'redis':
             secure = config.get('secure', False)

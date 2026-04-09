@@ -49,8 +49,12 @@ export function ConnectionForm({
         return "clickhouse://user:password@localhost:8123/database";
       case "redis":
         return "redis://:password@localhost:6379/0";
+      case "oracle":
+        return "oracle://user:password@localhost:1521/XEPDB1";
+      case "mariadb":
+        return "mariadb://user:password@localhost:3306/database";
       default:
-        return "oracle://user:password@localhost:1521/database";
+        return "custom://user:password@localhost:port/database";
     }
   };
 

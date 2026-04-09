@@ -12,6 +12,7 @@ import {
   SiRedis,
   SiSqlite,
   SiDuckdb,
+  SiMariadb,
 } from "react-icons/si";
 import { DiMsqlServer } from "react-icons/di";
 
@@ -23,6 +24,7 @@ export const DB_TYPES = [
     color: "text-blue-600",
   },
   { id: "mysql", name: "MySQL", icon: <SiMysql />, color: "text-blue-500" },
+  { id: "mariadb", name: "MariaDB", icon: <SiMariadb />, color: "text-sky-600" },
   {
     id: "sqlserver",
     name: "SQL Server",
@@ -65,6 +67,7 @@ export const DB_TYPES = [
 export const DEFAULT_PORTS: Record<string, string> = {
   postgres: "5432",
   mysql: "3306",
+  mariadb: "3306",
   sqlserver: "1433",
   oracle: "1521",
   mongodb: "27017",
@@ -78,6 +81,7 @@ export const DEFAULT_PORTS: Record<string, string> = {
 export const DB_URI_PROTOCOLS: Record<string, string> = {
   postgres: "postgresql",
   mysql: "mysql",
+  mariadb: "mysql",
   sqlserver: "sqlserver",
   oracle: "oracle",
   mongodb: "mongodb",

@@ -83,11 +83,14 @@ class BaseDatabaseService:
         db_type = db_type.lower() if db_type else ""
         if db_type == 'sqlserver':
             db_type = 'mssql'
+        # MariaDB uses MySQL protocol under the hood
+        if db_type == 'mariadb':
+            db_type = 'mysql'
 
         if db_type in ['redis', 'mongodb']:
             return None
 
-        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'duckdb']:
+        if db_type not in ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'duckdb', 'oracle']:
             raise Exception(f"Database type '{db_type}' is not supported via SQLAlchemy.")
 
         conn_str = ConnectionStringBuilder.build_uri(db_type, config)

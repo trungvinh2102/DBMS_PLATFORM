@@ -64,7 +64,11 @@ const SQL_KEYWORDS = [
   // DuckDB Specific
   "EXCLUDE", "REPLACE", "COLUMNS", "PIVOT", "UNPIVOT", "SUMMARIZE", "ASOF",
   "INSTALL", "LOAD", "PRAGMA", "ATTACH", "DETACH", "MACRO", "COPY",
-  "read_csv_auto", "read_parquet", "parquet_schema", "read_json_auto"
+  "read_csv_auto", "read_parquet", "parquet_schema", "read_json_auto",
+  // Oracle Specific
+  "DUAL", "ROWNUM", "SYSDATE", "TO_DATE", "TO_CHAR", "TO_NUMBER", "DECODE", "NVL",
+  "NVL2", "COALESCE", "MERGE", "MATCHED", "CONNECT BY", "START WITH", "PRIOR",
+  "VARCHAR2", "NUMBER", "CLOB", "BLOB", "DBMS_OUTPUT.PUT_LINE", "BEGIN", "EXCEPTION"
 ];
 
 
@@ -254,6 +258,18 @@ export const registerSqlAutocomplete = (
         { label: "ATTACH", insertText: "ATTACH '${1:filename.duckdb}' AS ${2:alias};" }
       ];
 
+      const oracleSnippets = [
+        { label: "SELECT FROM DUAL", insertText: "SELECT ${1:*} FROM DUAL;" },
+        { label: "sysdate", insertText: "SYSDATE" },
+        { label: "rownum", insertText: "ROWNUM <= ${1:10}" },
+        { label: "FETCH FIRST", insertText: "FETCH FIRST ${1:10} ROWS ONLY" },
+        { label: "TO_DATE", insertText: "TO_DATE('${1:2024-01-01}', '${2:YYYY-MM-DD}')" },
+        { label: "TO_CHAR", insertText: "TO_CHAR('${1:value}', '${2:format}')" },
+        { label: "CONNECT BY PRIOR", insertText: "START WITH ${1:condition}\nCONNECT BY PRIOR ${2:parent_id} = ${3:id};" },
+        { label: "MERGE INTO", insertText: "MERGE INTO ${1:target_table} t\nUSING ${2:source_table} s\nON (t.${3:id} = s.${4:id})\nWHEN MATCHED THEN\n  UPDATE SET ${5:t.col = s.col}\nWHEN NOT MATCHED THEN\n  INSERT (${6:cols}) VALUES (${7:vals});" },
+        { label: "PL/SQL BLOCK", insertText: "DECLARE\n  ${1:v_var} ${2:VARCHAR2(100)};\nBEGIN\n  ${3:-- logic}\nEXCEPTION\n  WHEN OTHERS THEN\n    DBMS_OUTPUT.PUT_LINE(SQLERRM);\nEND;" }
+      ];
+
       const suggestions: any[] = [
         ...duckdbSnippets.map((snip) => ({
           label: snip.label,
@@ -261,6 +277,15 @@ export const registerSqlAutocomplete = (
           insertTextRules: 4, // InsertAsSnippet
           insertText: snip.insertText,
           documentation: "DuckDB Snippet",
+          range: range,
+          sortText: "0",
+        })),
+        ...oracleSnippets.map((snip) => ({
+          label: snip.label,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertTextRules: 4,
+          insertText: snip.insertText,
+          documentation: "Oracle Snippet",
           range: range,
           sortText: "0",
         })),

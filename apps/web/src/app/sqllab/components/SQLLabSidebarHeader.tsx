@@ -57,7 +57,12 @@ export function SQLLabSidebarHeader({
             <ChevronsUpDown className="h-4 w-4 opacity-20 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-68 ml-2 shadow-2xl rounded-2xl border-muted-foreground/10 bg-background/95 backdrop-blur-md z-[100]">
+        <DropdownMenuContent 
+          side="bottom" 
+          align="start" 
+          sideOffset={8}
+          className="w-68 ml-2 shadow-2xl rounded-2xl border-muted-foreground/10 bg-background/95 backdrop-blur-md z-[100]"
+        >
           {lab.dataSources.map((ds: any) => {
             const formatted = formatDBName(ds);
             return (
@@ -101,7 +106,13 @@ export function SQLLabSidebarHeader({
               />
             </div>
           </SelectTrigger>
-          <SelectContent className="rounded-2xl border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5 z-[101]">
+          <SelectContent 
+            alignItemWithTrigger={false}
+            side="bottom"
+            align="start"
+            sideOffset={8}
+            className="rounded-2xl border-muted-foreground/10 shadow-2xl w-[--radix-select-trigger-width] min-w-64 p-1.5 z-[101]"
+          >
             {lab.schemas.map((s: any) => (
               <SelectItem
                 key={s}

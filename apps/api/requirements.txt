@@ -18,6 +18,9 @@ sqlalchemy-pytds
 # AI
 google-generativeai
 
+# Oracle
+oracledb
+
 # ClickHouse
 clickhouse-connect
 clickhouse-sqlalchemy

@@ -295,8 +295,10 @@ class ConnectionService(BaseDatabaseService):
         """Tests connection using SQLAlchemy engine creation logic."""
         engine = self.create_connection_engine(db_type, config)
         from sqlalchemy import text
+        # Oracle requires FROM DUAL for simple SELECT statements
+        health_query = "SELECT 1 FROM DUAL" if db_type == 'oracle' else "SELECT 1"
         with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+            conn.execute(text(health_query))
         return {"success": True, "message": "Connection successful"}
 
 connection_service = ConnectionService()

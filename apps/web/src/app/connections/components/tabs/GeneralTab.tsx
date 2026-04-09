@@ -20,6 +20,7 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
   const isRedis = dbType === "redis";
   const isSqlite = dbType === "sqlite";
   const isDuckdb = dbType === "duckdb";
+  const isOracle = dbType === "oracle";
   const isFileBased = FILE_BASED_TYPES.includes(dbType || "");
   const useUri = config.useUri || false;
 
@@ -303,13 +304,15 @@ export function GeneralTab({ dbType, config, onChange }: GeneralTabProps) {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Database className="h-3.5 w-3.5 text-muted-foreground" />
-                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">Database Name</Label>
+                <Label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {isOracle ? "Service Name (or SID)" : "Database Name"}
+                </Label>
               </div>
               <Input 
                 value={config.database || ""} 
                 onChange={(e) => onChange("database", e.target.value)} 
                 className="h-10 bg-muted/5 border-border/50 focus:border-primary/50 transition-all font-medium text-sm"
-                placeholder={isMongodb ? "admin" : "default"}
+                placeholder={isMongodb ? "admin" : isOracle ? "ORCL/XEPDB1" : "default"}
               />
             </div>
           )}

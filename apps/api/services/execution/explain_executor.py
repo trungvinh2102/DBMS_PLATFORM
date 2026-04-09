@@ -28,12 +28,20 @@ class ExplainExecutor:
             # Dialect-specific EXPLAIN syntax
             if dialect == 'postgresql':
                 explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {explain_sql}"
-            elif dialect == 'mysql':
+            elif dialect in ['mysql', 'mariadb']:
                 explain_sql = f"EXPLAIN FORMAT=JSON {explain_sql}"
             elif dialect == 'sqlite':
                 explain_sql = f"EXPLAIN QUERY PLAN {explain_sql}"
             elif dialect == 'duckdb':
                 explain_sql = f"EXPLAIN ANALYZE {explain_sql}"
+            elif dialect == 'oracle':
+                # Oracle uses a two-step EXPLAIN PLAN approach
+                conn.execute(text(f"EXPLAIN PLAN FOR {explain_sql}"))
+                result = conn.execute(text(
+                    "SELECT PLAN_TABLE_OUTPUT FROM TABLE(DBMS_XPLAN.DISPLAY('PLAN_TABLE', NULL, 'TYPICAL'))"
+                ))
+                plan_lines = [str(row[0]) for row in result]
+                return {"plan": "\n".join(plan_lines), "dialect": dialect}
             else:
                 explain_sql = f"EXPLAIN {explain_sql}"
 
