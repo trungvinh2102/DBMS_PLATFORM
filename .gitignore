@@ -70,3 +70,9 @@ build/
 
 # Sidecars
 apps/desktop/src-tauri/bin/*
+# Databases
+*.db
+
+# Database samples
+apps/api/database/samples/
+*.db

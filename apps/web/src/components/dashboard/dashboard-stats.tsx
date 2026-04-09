@@ -5,7 +5,7 @@
 
 "use client";
 
-import { Activity, Database, FileCode, BookOpen } from "lucide-react";
+import { Activity, Database, FileCode } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { databaseApi } from "@/lib/api-client";
@@ -107,25 +107,6 @@ export function DashboardStats() {
           <p className="text-xs text-muted-foreground mt-1">
             API Service availability
           </p>
-        </CardContent>
-      </Card>
-      {/* Documentation - Quick Link */}
-      <Card className="rounded-xl shadow-sm hover:shadow-md transition-shadow bg-linear-to-br from-primary/5 to-transparent border-primary/20">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Documentation</CardTitle>
-          <BookOpen className="h-4 w-4 text-primary" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm font-medium pt-1">Learn & Explore</div>
-          <p className="text-xs text-muted-foreground mt-1 mb-3">
-            Guides, API references, and tips.
-          </p>
-          <a
-            href="/docs"
-            className="text-xs bg-primary/10 hover:bg-primary/20 text-primary px-2 py-1 rounded-md transition-colors font-medium inline-block"
-          >
-            Read Docs &rarr;
-          </a>
         </CardContent>
       </Card>
     </div>
