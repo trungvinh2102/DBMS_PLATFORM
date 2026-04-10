@@ -32,6 +32,7 @@ const AIAssistantSidebar = lazy(() => import("./components/AIAssistantSidebar").
 const SaveQueryDialog = lazy(() => import("./components/SaveQueryDialog").then(m => ({ default: m.SaveQueryDialog })));
 const OpenQueryDialog = lazy(() => import("./components/OpenQueryDialog").then(m => ({ default: m.OpenQueryDialog })));
 const SchemaContent = lazy(() => import("./components/SchemaContent").then(m => ({ default: m.SchemaContent })));
+const ImportWizardModal = lazy(() => import("./components/import/ImportWizardModal").then(m => ({ default: m.ImportWizardModal })));
 
 export default function SQLLabPage() {
   return (
@@ -120,6 +121,12 @@ function SQLLabContent() {
           onOpenChange={lab.setIsOpenDialogOpen}
           savedQueries={lab.savedQueries}
           onSelect={lab.handleSelectSavedQuery}
+        />
+        <ImportWizardModal
+          open={lab.isImportWizardOpen}
+          onOpenChange={lab.setIsImportWizardOpen}
+          databaseId={lab.selectedDS}
+          schemaName={lab.selectedSchema}
         />
       </Suspense>
     </div>

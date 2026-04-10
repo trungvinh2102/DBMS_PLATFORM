@@ -179,6 +179,14 @@ export const databaseApi = {
     req(api.get("database/saved-queries", { params: { databaseId, userId } })),
   getSavedQueries: (databaseId: string, userId: string) =>
     req(api.get("database/saved-queries", { params: { databaseId, userId } })),
+
+  // Import
+  import: (formData: FormData) => req(api.post("database/import", formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })),
+  getImportStatus: (jobId: string) => req(api.get(`database/import/status/${jobId}`)),
 };
 
 export const authApi = {

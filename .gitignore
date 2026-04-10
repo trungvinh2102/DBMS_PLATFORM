@@ -76,3 +76,5 @@ apps/desktop/src-tauri/bin/*
 # Database samples
 apps/api/database/samples/
 *.db
+
+bin/

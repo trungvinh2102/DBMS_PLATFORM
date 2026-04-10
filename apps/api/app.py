@@ -64,6 +64,7 @@ from routes.user import user_bp
 from routes.ai import ai_bp
 from routes.ai_config import ai_config_bp
 from routes.dashboard_routes import dashboard_bp
+from routes.import_routes import import_bp
 
 # Explicit imports to help PyInstaller find them
 import models.metadata
@@ -160,6 +161,7 @@ def create_app():
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(ai_config_bp, url_prefix='/api/ai-config')
     app.register_blueprint(dashboard_bp, url_prefix='/api/database/dashboard')
+    app.register_blueprint(import_bp, url_prefix='/api/database')
 
     # Run automated setup
     setup_database(app)
@@ -225,3 +227,4 @@ if __name__ == '__main__':
     debug = str(os.environ.get('DEBUG', 'False')).lower() == 'true'
     
     app.run(host=host, port=port, debug=debug)
+

@@ -34,3 +34,7 @@ duckdb-engine
 redis
 cloudinary
 psutil
+pandas
+pyarrow
+fastparquet
+openpyxl

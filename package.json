@@ -13,9 +13,7 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo -F web dev",
-    "dev:desktop": "turbo run dev --filter=desktop",
-    "desktop:dist": "powershell -ExecutionPolicy Bypass -File build-backend.ps1 -Target gnu && export RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu && export PATH=\"/c/ProgramData/mingw64/mingw64/bin:$PATH\" && turbo run build --filter=desktop -- --target x86_64-pc-windows-gnu",
-
+    "desktop:dist": "powershell -ExecutionPolicy Bypass -File build-backend.ps1 -Target gnu && export RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu && export PATH=\"C:\\ProgramData\\mingw64\\mingw64\\bin:$PATH\" && turbo run build --filter=desktop -- --target x86_64-pc-windows-gnu",
     "build": "turbo build",
     "start": "turbo start",
 

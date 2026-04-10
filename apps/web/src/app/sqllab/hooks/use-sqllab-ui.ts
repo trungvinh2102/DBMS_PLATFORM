@@ -22,6 +22,7 @@ export function useSQLLabUI() {
 
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState<boolean>(false);
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState<boolean>(false);
+  const [isImportWizardOpen, setIsImportWizardOpen] = useState<boolean>(false);
   const [fixSQLError, setFixSQLError] = useState<string | null>(null);
   const [queryLimit, setQueryLimit] = useState<number>(1000);
 
@@ -65,6 +66,8 @@ export function useSQLLabUI() {
     setIsSaveDialogOpen,
     isOpenDialogOpen,
     setIsOpenDialogOpen,
+    isImportWizardOpen,
+    setIsImportWizardOpen,
     fixSQLError,
     setFixSQLError,
     queryLimit,

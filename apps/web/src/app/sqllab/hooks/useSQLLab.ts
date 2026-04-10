@@ -213,7 +213,7 @@ export function useSQLLab() {
     },
     handleFormat: () => handleFormat(activeTab.sql, (s: string) => updateActiveTab({ sql: s })),
     handleStop,
-    handleImport: () => actions.handleImport((s) => updateActiveTab({ sql: s })),
+    handleImport: () => ui.setIsImportWizardOpen(true),
     handleExport: () => actions.handleExport(activeTab.sql, activeTab.selectedDS),
     handleRollback: () => { handleRun("ROLLBACK;"); toast.info("Rollback command sent"); },
     handleSaveConfirmed: async (name: string, desc?: string) => {
