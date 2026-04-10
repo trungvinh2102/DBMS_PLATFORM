@@ -87,17 +87,17 @@ export function SQLLabObjectPanel() {
   const hasScriptSupport = lab.isRelational && lab.selectedDSType !== "duckdb";
 
   let availableTabs = [
+    "Info",
     "Data",
     "Structure",
     ...(isDiagnosticsSupported ? ["Diagnostics"] : []),
     ...(hasIndexSupport ? ["Index"] : []),
     ...(hasRelationSupport ? ["Relation"] : []),
     ...(hasTriggerSupport ? ["Trigger"] : []),
-    "Info",
     ...(hasScriptSupport ? ["Script"] : []),
   ];
   if (lab.selectedObjectType === "view") {
-    availableTabs = ["Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), "Info", ...(hasScriptSupport ? ["Script"] : [])];
+    availableTabs = ["Info", "Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), ...(hasScriptSupport ? ["Script"] : [])];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
       lab.selectedObjectType || "",
