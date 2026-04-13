@@ -31,7 +31,7 @@ Set-Location $API_DIR
 
 # Build with PyInstaller
 Write-Host "[2/4] Running PyInstaller..." -ForegroundColor Yellow
-$SPEC_FILE = "api-$TARGET_TRIPLE.spec"
+$SPEC_FILE = "specs/api-$TARGET_TRIPLE.spec"
 
 if (Test-Path $SPEC_FILE) {
     Write-Host "Using existing spec file: $SPEC_FILE"

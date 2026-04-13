@@ -8,7 +8,7 @@ a = Analysis(
     ['desktop_app.py'],
     pathex=[],
     binaries=[],
-    datas=[('apps/api/dist/api.exe', '.'), ('apps/web/out', 'out')],
+    datas=[('../../../apps/api/dist/api.exe', '.'), ('../../../apps/web/out', 'out')],
     hiddenimports=['typing_extensions'],
     hookspath=[],
     hooksconfig={},

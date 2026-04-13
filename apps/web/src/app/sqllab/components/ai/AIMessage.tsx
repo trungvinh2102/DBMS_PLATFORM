@@ -79,6 +79,7 @@ export function AIMessage({
   }, [message.thought, message.sql, showThought]);
 
   const getStatus = useCallback(() => {
+    if (message.content?.startsWith("Error:")) return null;
     if (!message.content && message.thought && !message.sql) return "Thinking...";
     if (message.thought && message.sql && !message.content) return "Generating SQL...";
     if (message.sql && !message.content) return "Finalizing...";
@@ -87,8 +88,9 @@ export function AIMessage({
 
   const status = getStatus();
   const { score, cleaned } = extractConfidence(message.content || "", message.confidence);
+  const isError = message.content?.startsWith("Error:");
   const hasTextContent = cleaned.trim().length > 0 && !cleaned.includes("Crafting the SQL");
-  const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation);
+  const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation) || isError;
 
   const handleFeedback = async (rating: 1 | -1) => {
     setFeedbackRating(rating);
@@ -160,7 +162,7 @@ export function AIMessage({
             showThought={showThought}
             onToggle={() => setShowThought(!showThought)}
             isDark={isDark}
-            isGeneratingSQL={!message.sql}
+            isGeneratingSQL={!message.sql && !isError && !message.content}
           />
         )}
 

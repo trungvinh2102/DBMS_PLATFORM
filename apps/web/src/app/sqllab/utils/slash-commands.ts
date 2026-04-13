@@ -164,11 +164,31 @@ Do NOT suggest features SQLite doesn't support: stored procedures, events, user 
 - EXPLAIN ANALYZE for performance
 - Advanced window functions and FILTER clause
 DuckDB is an analytical database — emphasize its OLAP strengths.`;
+      } else if (dbType.includes("clickhouse")) {
+        engineContext = `The user is connected to a **ClickHouse** database. Provide ClickHouse-specific query examples including:
+- Specific engines: MergeTree, SummingMergeTree, ReplacingMergeTree
+- Columnar-specific functions: any(), groupUniqArray(), argMax(), argMin()
+- Array functions: arrayMap, arrayFilter, arrayJoin
+- Dictionary lookups
+- Sample and Final clauses
+- EXPLAIN plan analysis
+- System tables: system.parts, system.processes, system.mutations
+ClickHouse is a column-oriented OLAP database — focus on high-speed aggregation and large-scale data analysis.`;
+      } else if (dbType.includes("mongodb")) {
+        engineContext = `The user is connected to a **MongoDB** (NoSQL) database. Since this tool primarily generates SQL, please generate **MongoDB Query Language (MQL)** instead within \`\`\`json blocks.
+Provide MongoDB-specific examples:
+- aggregate pipeline examples ($match, $group, $project, $lookup, $unwind)
+- find() with complex filters
+- updateMany() / deleteMany() examples
+- Create indexes (createIndex)
+- Explain query (explain())
+- Cursor methods (limit, sort, skip)
+Note: Use JSON format for MQL queries.`;
       } else {
         engineContext = `The user is connected to a **${dbType}** database. Provide relevant query examples for this engine.`;
       }
 
-      return `Generate practical SQL query suggestions for the topic: "${topic}".\n\n${engineContext}\n\nProvide 8-12 ready-to-use queries organized by category. Each query should have a brief comment explaining what it does. Format them as SQL code blocks.`;
+      return `Generate practical database query suggestions for the topic: "${topic}".\n\n${engineContext}\n\nProvide 8-12 ready-to-use queries organized by category. Each query should have a brief comment explaining what it does. Format them as code blocks (SQL or JSON for MQL).`;
     },
   },
   {
@@ -197,6 +217,22 @@ Explain each query's output and what insights it provides.`;
 4. Use SUMMARIZE for column profiling: \`SUMMARIZE table_name;\`
 5. System info: \`SELECT * FROM duckdb_settings();\` and \`SELECT * FROM duckdb_extensions();\`
 Explain each query's output and what insights it provides.`;
+      } else if (dbType.includes("clickhouse")) {
+        schemaQuery = `For this **ClickHouse** database, generate the following introspection queries:
+1. List all tables and engines: \`SELECT name, engine, partition_key FROM system.tables WHERE database = currentDatabase();\`
+2. Show columns and types: \`SELECT name, type, default_expression FROM system.columns WHERE table = 'your_table';\`
+3. Check table sizes: \`SELECT table, formatReadableSize(sum(data_compressed_bytes)) AS size FROM system.parts WHERE active GROUP BY table;\`
+4. List dictionaries: \`SELECT * FROM system.dictionaries;\`
+5. Show parts and partitions: \`SELECT partition, name, active FROM system.parts WHERE table = 'your_table' ORDER BY partition;\`
+Explain each query's output and what insights it provides.`;
+      } else if (dbType.includes("mongodb")) {
+        schemaQuery = `For this **MongoDB** database, explain how to explore the schema using MQL:
+1. List collections: \`db.getCollectionNames()\`
+2. Stats for a collection: \`db.collection.stats()\`
+3. Sample a document to see structure: \`db.collection.findOne()\`
+4. List indexes: \`db.collection.getIndexes()\`
+5. Analyze schema (using aggregation): \`db.collection.aggregate([ { $sample: { size: 100 } }, { $project: { keys: { $objectToArray: "$$ROOT" } } }, { $unwind: "$keys" }, { $group: { _id: "$keys.k", types: { $addToSet: { $type: "$keys.v" } } } } ])\`
+Explain how MongoDB's schemaless nature works and how these commands help understand the data.`;
       } else {
         schemaQuery = `Generate comprehensive schema exploration queries for this **${dbType}** database.`;
       }

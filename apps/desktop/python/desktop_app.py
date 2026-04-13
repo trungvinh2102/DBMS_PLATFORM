@@ -42,7 +42,7 @@ if __name__ == '__main__':
     if getattr(sys, 'frozen', False):
         frontend_dir = os.path.join(sys._MEIPASS, "out")
     else:
-        frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "apps/web/out")
+        frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../apps/web/out")
     
     # 2. Chạy Frontend Server trong luồng riêng
     t = threading.Thread(target=start_frontend_server, args=(frontend_dir,))
