@@ -15,10 +15,10 @@ This project includes localized scripts for easy startup:
 
 The desktop app is built with **Tauri** and includes an embedded Python API sidecar for offline capabilities.
 
-### 📥 [Download Installer Directly (v1.0.0)](https://github.com/trungvinh2102/DBMS_PLATFORM/releases/download/1.0.0/DBMS.Platform_1.0.0_x64_en-US.msi)
+### 📥 [Download Installer Directly (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/1.0.0/QurioDB_1.0.0_x64_en-US.msi)
 
 > [!TIP]
-> This link points to the current stable release. To download the very latest official version, visit the [Releases Page](https://github.com/trungvinh2102/DBMS_PLATFORM/releases).
+> This link points to the current stable release. To download the very latest official version, visit the [Releases Page](https://github.com/trungvinh2102/QurioDB/releases).
 
 ### 🏗️ Build from Source
 
@@ -57,22 +57,26 @@ pip install -r apps/api/requirements.txt
 
 ### 3. Database Setup
 
-The platform uses **SQLite** automatically for its internal system metadata. 
+The platform uses **SQLite** automatically for its internal system metadata.
 
 #### A. Zero-Config Startup
+
 When you run the app for the first time, it will automatically create a local database file:
+
 - **Windows**: `%APPDATA%\QurioDB\quriodb.db`
 - **Linux/macOS**: `~/.quriodb/quriodb.db`
 
 No external database installation (like Docker or Postgres) is required for the application to function.
 
 #### B. Initialize & Seed (Optional)
+
 The system initializes tables on first run. If you want to seed default data:
+
 1. **Seed Admin User**:
    ```bash
    python apps/api/scripts/seed.py
    ```
-   *Default Admin: `admin` / `password123`*
+   _Default Admin: `admin` / `password123`_
 
 ### 4. Running in Development
 
@@ -109,4 +113,5 @@ To customize the API target, use the `NEXT_PUBLIC_API_URL` environment variable 
 Internal Development - QurioDB Team.
 
 ---
-*QurioDB Team - v1.0.0*
+
+_QurioDB Team - v1.0.0_
