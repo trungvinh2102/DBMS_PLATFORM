@@ -18,7 +18,7 @@ DISABLE_AUTH = str(os.getenv("DISABLE_AUTH", "false")).lower() == "true"
 # Mock Admin user for DISABLE_AUTH mode
 MOCK_ADMIN = {
     'userId': 'desktop-admin-id',
-    'email': 'admin@dbms.local',
+    'email': 'admin@quriodb.local',
     'role': 'Admin',
     'username': 'admin'
 }

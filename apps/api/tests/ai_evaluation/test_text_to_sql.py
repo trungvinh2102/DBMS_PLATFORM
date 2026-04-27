@@ -26,7 +26,7 @@ from sqlalchemy import text
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# TEST CASES: Run this against your internal dbms_platform DB
+# TEST CASES: Run this against your internal quriodb DB
 TEST_CASES = [
     {
         "name": "User Count",

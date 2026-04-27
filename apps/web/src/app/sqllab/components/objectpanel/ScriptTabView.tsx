@@ -30,7 +30,7 @@ export function ScriptTabView({ tableDDL, monacoTheme }: any) {
             <Editor
               height="100%"
               language="sql"
-              theme={monacoTheme === "dbms-dark" ? "vs-dark" : "vs"}
+              theme={monacoTheme === "quriodb-dark" ? "vs-dark" : "vs"}
               value={tableDDL}
               beforeMount={(monaco) => {
                 defineThemes(monaco);

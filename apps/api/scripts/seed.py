@@ -58,7 +58,7 @@ def seed():
 
         # ── 2. Seed Admin User ─────────────────────────────────────────
         logger.info("Seeding Admin User...")
-        admin_email = "admin@dbms.local"
+        admin_email = "admin@quriodb.local"
         admin_password = "password123"
 
         admin_role = session.query(Role).filter(Role.name == "Admin").first()

@@ -2,7 +2,7 @@
 ai_service.py
 
 Specialized AI service delegator that coordinates multiple AI strategies
-(SQL tasks, Agents, Semantic Context) for the DBMS Platform.
+(SQL tasks, Agents, Semantic Context) for QurioDB.
 """
 import logging
 from typing import Dict, Any, Optional

@@ -28,7 +28,7 @@ class UserService:
         if user_id == "desktop-admin-id":
             return {
                 "id": "desktop-admin-id",
-                "email": "admin@dbms.local",
+                "email": "admin@quriodb.local",
                 "username": "admin",
                 "name": "Local Desktop Admin",
                 "avatarUrl": None,
@@ -69,7 +69,7 @@ class UserService:
                     try:
                         upload_result = cloudinary.uploader.upload(
                             avatar_data,
-                            folder="dbms_platform/avatars",
+                            folder="quriodb/avatars",
                             public_id=f"user_{user_id}_{uuid.uuid4().hex[:8]}",
                             overwrite=True,
                             resource_type="image"

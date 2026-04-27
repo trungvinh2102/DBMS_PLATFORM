@@ -78,7 +78,7 @@ export function SQLLabObjectPanel() {
   const lab = useSQLLabContext();
   const [structureSearch, setStructureSearch] = useState("");
   const { resolvedTheme } = useTheme();
-  const monacoTheme = resolvedTheme === "dark" ? "dbms-dark" : "dbms-light";
+  const monacoTheme = resolvedTheme === "dark" ? "quriodb-dark" : "quriodb-light";
 
   const isDiagnosticsSupported = ["sqlite", "duckdb"].includes(lab.selectedDSType);
   const hasTriggerSupport = lab.isRelational && !["clickhouse", "duckdb"].includes(lab.selectedDSType);

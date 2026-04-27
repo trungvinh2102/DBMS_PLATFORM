@@ -12,7 +12,7 @@ export const defineThemes = (monaco: Monaco) => {
   
   try {
     // Light theme
-    monaco.editor.defineTheme("dbms-light", {
+    monaco.editor.defineTheme("quriodb-light", {
       base: "vs",
       inherit: true,
       rules: [
@@ -42,7 +42,7 @@ export const defineThemes = (monaco: Monaco) => {
     });
 
     // Dark theme
-    monaco.editor.defineTheme("dbms-dark", {
+    monaco.editor.defineTheme("quriodb-dark", {
       base: "vs-dark",
       inherit: true,
       rules: [

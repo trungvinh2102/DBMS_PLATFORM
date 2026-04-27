@@ -29,9 +29,9 @@ describe("Header", () => {
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
-  it("renders DBMS branding", () => {
+  it("renders QurioDB branding", () => {
     render(<Header />);
-    expect(screen.getByText("DBMS")).toBeInTheDocument();
+    expect(screen.getByText("QurioDB")).toBeInTheDocument();
   });
 
   it("renders user avatar when logged in", async () => {

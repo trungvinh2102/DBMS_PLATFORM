@@ -1,7 +1,7 @@
 /**
  * @file desktop-config.test.ts
  * @description Tests validating the Tauri desktop configuration files
- * are correctly structured for building the DBMS Platform desktop app.
+ * are correctly structured for building the QurioDB desktop app.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -26,8 +26,8 @@ describe('Desktop Configuration', () => {
 
     it('should have correct product metadata', () => {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(config.productName).toBe('DBMS-Platform');
-      expect(config.identifier).toBe('com.dbms.platform');
+      expect(config.productName).toBe('QurioDB Desktop');
+      expect(config.identifier).toBe('com.quriodb.desktop');
       expect(config.version).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
@@ -61,7 +61,7 @@ describe('Desktop Configuration', () => {
       expect(window.width).toBeGreaterThanOrEqual(960);
       expect(window.height).toBeGreaterThanOrEqual(600);
       expect(window.resizable).toBe(true);
-      expect(window.title).toBe('DBMS Platform');
+      expect(window.title).toBe('QurioDB');
     });
 
     it('should not bundle docker-compose (desktop should not require Docker)', () => {
@@ -109,7 +109,7 @@ describe('Desktop Configuration', () => {
   });
 
   describe('Icons', () => {
-    it('should have the system DBMS Platform icon (not default Tauri icon)', () => {
+    it('should have the system QurioDB icon (not default Tauri icon)', () => {
       const iconPath = path.join(SRC_TAURI, 'icons', 'icon.ico');
       expect(fs.existsSync(iconPath)).toBe(true);
 

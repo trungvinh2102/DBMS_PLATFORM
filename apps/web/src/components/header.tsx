@@ -102,9 +102,9 @@ export function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="flex h-14 items-center px-4 gap-4">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <img src="/logo.png" alt="DBMS Platform" className="size-8 object-contain" />
-          <div className="hidden md:block flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">DBMS</span>
+          <img src="/logo.png" alt="QurioDB" className="size-8 object-contain" />
+          <div className="flex flex-col">
+            <span className="truncate font-semibold">QurioDB</span>
           </div>
         </Link>
 

@@ -240,18 +240,18 @@ def init_engine():
         
         # Use user home directory to ensure both Web and Desktop see the same data
         # and always have write permissions.
-        data_dir = Path.home() / '.dbms_platform'
+        data_dir = Path.home() / '.quriodb'
             
         try:
             data_dir.mkdir(parents=True, exist_ok=True)
-            db_path = (data_dir / 'dbms_platform.db').resolve()
+            db_path = (data_dir / 'quriodb.db').resolve()
             # On Windows, we must ensure forward slashes for the URL to be valid
             db_path_str = str(db_path).replace("\\", "/")
             url = f"sqlite:///{db_path_str}"
             print(f"Backend: Zero-Setup SQLite enabled at: {db_path_str}")
         except Exception as e:
             print(f"Backend Warning: Could not use home directory ({e}), falling back to relative path.")
-            url = "sqlite:///dbms_platform.db" 
+            url = "sqlite:///quriodb.db" 
 
     print(f"Backend: Data source initialized successfully.")
     

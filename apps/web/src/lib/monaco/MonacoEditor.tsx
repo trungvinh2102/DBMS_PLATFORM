@@ -123,7 +123,7 @@ export function SQLEditor({
   useEffect(() => {
     if (monacoRef.current) {
       monacoRef.current.editor.setTheme(
-        currentTheme === "dark" ? "dbms-dark" : "dbms-light",
+        currentTheme === "dark" ? "quriodb-dark" : "quriodb-light",
       );
     }
   }, [currentTheme]);
@@ -184,7 +184,7 @@ export function SQLEditor({
 
       defineThemes(monaco);
       monaco.editor.setTheme(
-        currentTheme === "dark" ? "dbms-dark" : "dbms-light",
+        currentTheme === "dark" ? "quriodb-dark" : "quriodb-light",
       );
 
       // Clean up previously registered autocomplete providers

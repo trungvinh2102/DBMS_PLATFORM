@@ -1,9 +1,9 @@
 {
   "name": "desktop",
   "version": "1.0.0",
-  "description": "Desktop app for DBMS Platform",
+  "description": "Desktop app for QurioDB",
   "main": "main.js",
-  "author": "DBMS Platform Team",
+  "author": "QurioDB Team",
   "private": true,
   "scripts": {
     "dev": "tauri dev",

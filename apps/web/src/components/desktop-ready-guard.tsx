@@ -122,7 +122,7 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            DBMS Platform
+            QurioDB
           </motion.h1>
 
           <motion.div

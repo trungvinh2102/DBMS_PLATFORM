@@ -1,5 +1,6 @@
 import os
 import uuid
+import tempfile
 from flask import Blueprint, request, jsonify
 from services.import_service import import_service
 from utils.auth_middleware import login_required
@@ -7,9 +8,9 @@ from werkzeug.utils import secure_filename
 
 import_bp = Blueprint('import', __name__)
 
-UPLOAD_FOLDER = 'temp_uploads'
+UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'quriodb_uploads')
 if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @import_bp.route('/import', methods=['POST'])
 @login_required

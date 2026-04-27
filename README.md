@@ -1,4 +1,4 @@
-# DBMS Platform
+# QurioDB
 
 A modern, high-performance Database Management System platform built with a ReactJS frontend, Flask backend, and cross-platform Desktop support.
 
@@ -61,8 +61,8 @@ The platform uses **SQLite** automatically for its internal system metadata.
 
 #### A. Zero-Config Startup
 When you run the app for the first time, it will automatically create a local database file:
-- **Windows**: `%APPDATA%\DBMSPlatform\dbms_platform.db`
-- **Linux/macOS**: `~/.dbms_platform/dbms_platform.db`
+- **Windows**: `%APPDATA%\QurioDB\quriodb.db`
+- **Linux/macOS**: `~/.quriodb/quriodb.db`
 
 No external database installation (like Docker or Postgres) is required for the application to function.
 
@@ -106,7 +106,7 @@ To customize the API target, use the `NEXT_PUBLIC_API_URL` environment variable 
 
 ## 📄 License
 
-Internal Development - DBMS Platform Team.
+Internal Development - QurioDB Team.
 
 ---
-*DBMS Platform Team - v0.1.2*
+*QurioDB Team - v1.0.0*

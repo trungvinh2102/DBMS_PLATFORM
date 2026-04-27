@@ -1,7 +1,7 @@
 """
 analytics_service.py
 High-performance analytical service powered by DuckDB.
-Provides sub-second aggregations for the DBMS Dashboard.
+Provides sub-second aggregations for the QurioDB Dashboard.
 """
 
 import duckdb

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DBMS_Platform",
+  "productName": "QurioDB",
   "version": "1.0.0",
-  "identifier": "com.dbms.platform",
+  "identifier": "com.quriodb.app",
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:3001",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "DBMS Platform",
+        "title": "QurioDB",
         "width": 1280,
         "height": 800,
         "minWidth": 960,

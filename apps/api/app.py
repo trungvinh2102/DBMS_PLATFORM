@@ -106,7 +106,7 @@ def setup_database(app):
                         hashed_pw = auth_service.get_password_hash("password123")
                         admin_user = User(
                             id=str(uuid.uuid4()),
-                            email="admin@dbms.local",
+                            email="admin@quriodb.local",
                             username="admin",
                             password=hashed_pw,
                             name="System Admin",

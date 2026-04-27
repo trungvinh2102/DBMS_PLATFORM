@@ -1,6 +1,6 @@
-# DBMS Platform - Desktop Build Guide
+# QurioDB - Desktop Build Guide
 
-This directory contains the **Tauri 2** desktop wrapper for the DBMS Platform. It bundles the Vite/React frontend and the Python Flask backend into a standalone Windows installer (.exe).
+This directory contains the **Tauri 2** desktop wrapper for the QurioDB. It bundles the Vite/React frontend and the Python Flask backend into a standalone Windows installer (.exe).
 
 ## 🏛 Architecture
 
@@ -87,8 +87,8 @@ After a successful build, you can find the installers here:
 
 - **Sidecars**: Configured in `tauri.conf.json` under `bundle.externalBin`.
 - **Resources**: The `.env` file is included via the `bundle.resources` array.
-- **SQLite Database**: Database hệ thống được lưu tại `%APPDATA%\DBMSPlatform\dbms_platform.db`. Để app cài đặt có dữ liệu mới nhất, bạn cần copy file DB từ môi trường dev vào đường dẫn này.
-- **Icon**: The desktop app uses the system's DBMS Platform logo. Icons are managed in `src-tauri/icons/`.
+- **SQLite Database**: Database hệ thống được lưu tại `%APPDATA%\QurioDB\quriodb.db`. Để app cài đặt có dữ liệu mới nhất, bạn cần copy file DB từ môi trường dev vào đường dẫn này.
+- **Icon**: The desktop app uses the system's QurioDB logo. Icons are managed in `src-tauri/icons/`.
 
 ## 🔴 Xử lý sự cố (Troubleshooting)
 
@@ -122,4 +122,4 @@ If you make any changes to the Python code in `apps/api/`, those changes **will 
 
 ---
 
-_DBMS Platform Team - v1.0.0_
+_QurioDB Team - v1.0.0_
