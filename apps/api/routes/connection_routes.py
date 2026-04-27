@@ -4,95 +4,81 @@ connection_routes.py
 API routes for database connection management (CRUD).
 """
 
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Depends, HTTPException, Body
+from typing import Dict, Any, Optional
+from pydantic import BaseModel
 from services.connection import connection_service
-from utils.auth_middleware import login_required, admin_required
+from utils.auth_middleware import get_current_user, get_admin_user
 
-connection_bp = Blueprint('connection', __name__)
+connection_bp = APIRouter(dependencies=[Depends(get_current_user)])
 
-@connection_bp.before_request
-@login_required
-def require_auth():
-    """Ensure all connection routes require authentication."""
-    pass
+class DeleteDatabaseRequest(BaseModel):
+    id: str
 
-@connection_bp.route('/list', methods=['GET'])
+class ConnectLocalRequest(BaseModel):
+    path: str
+    type: str
+    name: Optional[str] = None
+
+@connection_bp.get('/list')
 def list_databases():
     """Returns a list of all database connections configured in the system."""
     try:
         dbs = connection_service.list_databases()
-        return jsonify(dbs)
+        return dbs
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@connection_bp.route('/create', methods=['POST'])
-@admin_required
-def create_database():
+@connection_bp.post('/create', dependencies=[Depends(get_admin_user)])
+def create_database(data: Dict[str, Any] = Body(...)):
     """Registers a new database connection into the system."""
-    data = request.json
-    if not data:
-        return jsonify({'error': 'Missing request body'}), 400
     try:
         result = connection_service.create_database(data)
-        return jsonify(result)
+        return result
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@connection_bp.route('/update', methods=['POST'])
-@admin_required
-def update_database():
+@connection_bp.post('/update', dependencies=[Depends(get_admin_user)])
+def update_database(data: Dict[str, Any] = Body(...)):
     """Updates an existing database connection configuration."""
-    data = request.json
-    if not data or 'id' not in data:
-        return jsonify({'error': 'Database ID required'}), 400
+    if 'id' not in data:
+        raise HTTPException(status_code=400, detail='Database ID required')
     try:
         result = connection_service.update_database(data['id'], data)
-        return jsonify(result)
+        return result
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@connection_bp.route('/delete', methods=['POST'])
-@admin_required
-def delete_database():
+@connection_bp.post('/delete', dependencies=[Depends(get_admin_user)])
+def delete_database(data: DeleteDatabaseRequest):
     """Removes a database connection and its associated history records."""
-    data = request.json
-    if not data or 'id' not in data:
-        return jsonify({'error': 'Database ID required'}), 400
     try:
-        connection_service.delete_database(data['id'])
-        return jsonify({'success': True})
+        connection_service.delete_database(data.id)
+        return {'success': True}
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@connection_bp.route('/test', methods=['POST'])
-@admin_required
-def test_connection():
+@connection_bp.post('/test', dependencies=[Depends(get_admin_user)])
+def test_connection(data: Dict[str, Any] = Body(...)):
     """Executes a connectivity test for the provided connection configuration."""
-    data = request.json
-    if not data:
-        return jsonify({'error': 'Missing request body'}), 400
     try:
         result = connection_service.test_connection(data)
-        return jsonify(result)
+        return result
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@connection_bp.route('/connect-local', methods=['POST'])
-def connect_local():
+@connection_bp.post('/connect-local')
+def connect_local(data: ConnectLocalRequest):
     """Connects to a local SQLite or DuckDB file."""
-    data = request.json
-    if not data or 'path' not in data or 'type' not in data:
-        return jsonify({'error': 'path and type (sqlite/duckdb) are required'}), 400
-    
     from services.local_db_service import local_db_service
     try:
         result = local_db_service.connect_external_file(
-            path=data['path'],
-            db_type=data['type'],
-            name=data.get('name')
+            path=data.path,
+            db_type=data.type,
+            name=data.name
         )
-        return jsonify(result)
+        return result
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))

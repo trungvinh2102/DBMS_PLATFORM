@@ -1,12 +1,13 @@
 
-flask
-flask-cors
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
 sqlalchemy
 psycopg2-binary
 python-dotenv
 cryptography
 pytest
-pytest-flask
 pytest-mock
 # Auth
 pyjwt

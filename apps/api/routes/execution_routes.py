@@ -4,86 +4,74 @@ execution_routes.py
 API routes for query execution, history management, and saved queries.
 """
 
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Depends, HTTPException, Body
+from typing import Dict, Any, Optional
+from pydantic import BaseModel
 from services.execution import execution_service
-from utils.auth_middleware import login_required
+from utils.auth_middleware import get_current_user
 
-execution_bp = Blueprint('execution', __name__)
+execution_bp = APIRouter(dependencies=[Depends(get_current_user)])
 
-@execution_bp.before_request
-@login_required
-def require_auth():
-    """Ensure all execution-related routes require authentication."""
-    pass
+class ExecuteQueryRequest(BaseModel):
+    databaseId: str
+    sql: str
+    autoCommit: bool = True
+    limit: int = 1000
 
-@execution_bp.route('/execute', methods=['POST'])
-def execute_query():
+class ExplainQueryRequest(BaseModel):
+    databaseId: str
+    sql: str
+
+class SaveQueryRequest(BaseModel):
+    sql: str
+    name: str
+    databaseId: str
+    description: Optional[str] = None
+    userId: Optional[str] = None
+
+@execution_bp.post('/execute')
+def execute_query(data: ExecuteQueryRequest):
     """Executes a SQL/MQL query against the specified database instance."""
-    data = request.json
-    if not data:
-        return jsonify({'error': 'Missing request body'}), 400
-    db_id = data.get('databaseId')
-    sql = data.get('sql')
-    if not db_id or not sql:
-        return jsonify({'error': 'databaseId and sql are both required'}), 400
-
-    auto_commit = data.get('autoCommit', True)
-    limit = data.get('limit', 1000)
     try:
-        result = execution_service.execute_query(db_id, sql, auto_commit, limit)
-        return jsonify(result)
+        result = execution_service.execute_query(data.databaseId, data.sql, data.autoCommit, data.limit)
+        return result
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@execution_bp.route('/explain', methods=['POST'])
-def explain_query():
+@execution_bp.post('/explain')
+def explain_query(data: ExplainQueryRequest):
     """Generates an EXPLAIN plan for a given query and returns performance metrics."""
-    data = request.json
-    if not data:
-        return jsonify({'error': 'Missing request body'}), 400
-    db_id = data.get('databaseId')
-    sql = data.get('sql')
-    if not db_id or not sql:
-        return jsonify({'error': 'databaseId and sql are both required'}), 400
-
     try:
-        result = execution_service.get_explain_plan(db_id, sql)
-        return jsonify(result)
+        result = execution_service.get_explain_plan(data.databaseId, data.sql)
+        return result
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@execution_bp.route('/history', methods=['GET'])
-def get_history():
+@execution_bp.get('/history')
+def get_history(databaseId: Optional[str] = None):
     """Retrieves previous query execution history for the given user/database."""
-    db_id = request.args.get('databaseId')
     try:
-        history = execution_service.get_query_history(db_id)
-        return jsonify(history)
+        history = execution_service.get_query_history(databaseId)
+        return history
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@execution_bp.route('/save-query', methods=['POST'])
-def save_query():
+@execution_bp.post('/save-query')
+def save_query(data: SaveQueryRequest):
     """Saves a SQL query with a custom label for reuse or future reference."""
-    data = request.json
-    required = ('sql', 'name', 'databaseId')
-    if not data or not all(k in data for k in required):
-        return jsonify({'error': 'Missing required fields: sql, name, databaseId'}), 400
     try:
-        result = execution_service.save_query(data)
-        return jsonify(result)
+        result = execution_service.save_query(data.model_dump(exclude_none=True))
+        return result
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@execution_bp.route('/saved-queries', methods=['GET'])
-def list_saved_queries():
+@execution_bp.get('/saved-queries')
+def list_saved_queries(databaseId: Optional[str] = None, userId: Optional[str] = None):
     """Lists all saved queries filtered by database or user."""
-    db_id = request.args.get('databaseId')
-    user_id = request.args.get('userId')
     try:
-        queries = execution_service.list_saved_queries(db_id, user_id)
-        return jsonify(queries)
+        queries = execution_service.list_saved_queries(databaseId, userId)
+        return queries
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))

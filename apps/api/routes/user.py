@@ -1,62 +1,54 @@
-
 """
 backend/routes/user.py
 """
-from flask import Blueprint, request, jsonify, g
+from fastapi import APIRouter, Depends, HTTPException, Body
+from typing import Dict, Any
+from pydantic import BaseModel
 from services.user_service import user_service
-from utils.auth_middleware import login_required, admin_required
+from utils.auth_middleware import get_current_user
 
-user_bp = Blueprint('user', __name__)
+user_bp = APIRouter()
 
-@user_bp.route('/me', methods=['GET'])
-@login_required
-def get_me():
+class PasswordChangeRequest(BaseModel):
+    oldPassword: str
+    newPassword: str
+
+@user_bp.get('/me')
+def get_me(current_user: dict = Depends(get_current_user)):
     try:
-        profile = user_service.get_profile(g.user['userId'])
-        return jsonify(profile)
+        profile = user_service.get_profile(current_user['userId'])
+        return profile
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@user_bp.route('/profile', methods=['POST'])
-@login_required
-def update_profile():
-    data = request.json
+@user_bp.post('/profile')
+def update_profile(data: Dict[str, Any] = Body(...), current_user: dict = Depends(get_current_user)):
     try:
-        res = user_service.update_profile(g.user['userId'], data)
-        return jsonify(res)
+        res = user_service.update_profile(current_user['userId'], data)
+        return res
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@user_bp.route('/change-password', methods=['POST'])
-@login_required
-def change_password():
-    data = request.json
+@user_bp.post('/change-password')
+def change_password(data: PasswordChangeRequest, current_user: dict = Depends(get_current_user)):
     try:
-        old_password = data.get('oldPassword')
-        new_password = data.get('newPassword')
-        if not old_password or not new_password:
-            return jsonify({'error': 'Old and new passwords are required'}), 400
-            
-        res = user_service.change_password(g.user['userId'], old_password, new_password)
-        return jsonify(res)
+        res = user_service.change_password(current_user['userId'], data.oldPassword, data.newPassword)
+        return res
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@user_bp.route('/settings', methods=['GET'])
-@login_required
-def get_settings():
+@user_bp.get('/settings')
+def get_settings(current_user: dict = Depends(get_current_user)):
     try:
-        settings = user_service.get_settings(g.user['userId'])
-        return jsonify(settings)
+        settings = user_service.get_settings(current_user['userId'])
+        return settings
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@user_bp.route('/settings', methods=['POST'])
-@login_required
-def update_settings():
-    data = request.json
+@user_bp.post('/settings')
+def update_settings(data: Dict[str, Any] = Body(...), current_user: dict = Depends(get_current_user)):
     try:
-        user_service.update_settings(g.user['userId'], data)
-        return jsonify({'success': True})
+        user_service.update_settings(current_user['userId'], data)
+        return {'success': True}
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))

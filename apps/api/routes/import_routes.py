@@ -1,65 +1,64 @@
 import os
 import uuid
 import tempfile
-from flask import Blueprint, request, jsonify
+import json
+import shutil
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from typing import Optional
 from services.import_service import import_service
-from utils.auth_middleware import login_required
-from werkzeug.utils import secure_filename
+from utils.auth_middleware import get_current_user
 
-import_bp = Blueprint('import', __name__)
+import_bp = APIRouter()
 
 UPLOAD_FOLDER = os.path.join(tempfile.gettempdir(), 'quriodb_uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-@import_bp.route('/import', methods=['POST'])
-@login_required
-def import_data():
+@import_bp.post('/import')
+async def import_data(
+    file: UploadFile = File(...),
+    databaseId: str = Form(...),
+    tableName: str = Form(...),
+    schemaName: str = Form("public"),
+    format: str = Form("csv"),
+    mapping: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Endpoint to trigger a data import job.
     Expects multipart/form-data.
     """
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+    if not file.filename:
+        raise HTTPException(status_code=400, detail='No selected file')
 
-    database_id = request.form.get('databaseId')
-    table_name = request.form.get('tableName')
-    schema_name = request.form.get('schemaName', 'public')
-    file_format = request.form.get('format', 'csv')
-    mapping_str = request.form.get('mapping') # JSON string
+    if not databaseId or not tableName:
+        raise HTTPException(status_code=400, detail='databaseId and tableName are required')
 
-    if not database_id or not table_name:
-        return jsonify({'error': 'databaseId and tableName are required'}), 400
-
-    import json
-    mapping = json.loads(mapping_str) if mapping_str else None
+    mapping_obj = json.loads(mapping) if mapping else None
 
     # Save file temporarily
-    filename = secure_filename(f"{uuid.uuid4()}_{file.filename}")
+    filename = f"{uuid.uuid4()}_{file.filename.replace('/', '_').replace(chr(92), '_')}"
     file_path = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(file_path)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
     try:
         result = import_service.start_import(
-            database_id=database_id,
-            table_name=table_name,
-            schema_name=schema_name,
+            database_id=databaseId,
+            table_name=tableName,
+            schema_name=schemaName,
             file_path=file_path,
-            format=file_format,
-            mapping=mapping
+            format=format,
+            mapping=mapping_obj
         )
-        return jsonify(result)
+        return result
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
-@import_bp.route('/import/status/<job_id>', methods=['GET'])
-@login_required
-def get_import_status(job_id):
+@import_bp.get('/import/status/{job_id}')
+def get_import_status(job_id: str, current_user: dict = Depends(get_current_user)):
     status = import_service.get_job_status(job_id)
     if not status:
-        return jsonify({'error': 'Job not found'}), 404
-    return jsonify(status)
+        raise HTTPException(status_code=404, detail='Job not found')
+    return status

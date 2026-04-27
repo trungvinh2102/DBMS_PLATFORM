@@ -4,229 +4,159 @@ metadata_routes.py
 API routes for database schema and object discovery (metadata).
 """
 
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 from services.metadata import metadata_service
-from utils.auth_middleware import login_required
+from utils.auth_middleware import get_current_user
 
-metadata_bp = Blueprint('metadata', __name__)
+metadata_bp = APIRouter(dependencies=[Depends(get_current_user)])
 
-@metadata_bp.before_request
-@login_required
-def require_auth():
-    """Ensure all metadata discovery routes require authentication."""
-    pass
-
-@metadata_bp.route('/schemas', methods=['GET'])
-def get_schemas():
+@metadata_bp.get('/schemas')
+def get_schemas(databaseId: str):
     """Retrieves all schema names from the specified database."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
     try:
-        schemas = metadata_service.get_schemas(db_id)
-        return jsonify(schemas)
+        schemas = metadata_service.get_schemas(databaseId)
+        return schemas
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/tables', methods=['GET'])
-def get_tables():
+@metadata_bp.get('/tables')
+def get_tables(databaseId: str, schema: str = "public"):
     """Retrieves all table names within a specific schema."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        tables = metadata_service.get_tables(db_id, schema)
-        return jsonify(tables)
+        tables = metadata_service.get_tables(databaseId, schema)
+        return tables
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/columns', methods=['GET'])
-def get_columns():
+@metadata_bp.get('/columns')
+def get_columns(databaseId: str, table: str, schema: str = "public"):
     """Fetches column details (name, type, indices) for a given table."""
-    db_id = request.args.get('databaseId')
-    table = request.args.get('table')
-    if not db_id or not table:
-        return jsonify({'error': 'databaseId and table are both required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        columns = metadata_service.get_columns(db_id, schema, table)
-        return jsonify(columns)
+        columns = metadata_service.get_columns(databaseId, schema, table)
+        return columns
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/all-columns', methods=['GET'])
-def get_all_columns():
+@metadata_bp.get('/all-columns')
+def get_all_columns(databaseId: str, schema: str = "public"):
     """Returns columns for all tables in the entire schema, for schema visualization."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        all_columns = metadata_service.get_all_columns(db_id, schema)
-        return jsonify(all_columns)
+        all_columns = metadata_service.get_all_columns(databaseId, schema)
+        return all_columns
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/ddl', methods=['GET'])
-def get_ddl():
+@metadata_bp.get('/ddl')
+def get_ddl(databaseId: str, table: str, schema: str = "public"):
     """Generates the CREATE TABLE DDL statement for the requested table."""
-    db_id = request.args.get('databaseId')
-    table = request.args.get('table')
-    if not db_id or not table:
-        return jsonify({'error': 'databaseId and table are both required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        ddl = metadata_service.get_table_ddl(db_id, schema, table)
-        return jsonify(ddl)
+        ddl = metadata_service.get_table_ddl(databaseId, schema, table)
+        return ddl
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/views', methods=['GET'])
-def get_views():
+@metadata_bp.get('/views')
+def get_views(databaseId: str, schema: str = "public"):
     """Retrieves all defined database views within a specific schema."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        views = metadata_service.get_views(db_id, schema)
-        return jsonify(views)
+        views = metadata_service.get_views(databaseId, schema)
+        return views
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/functions', methods=['GET'])
-def get_functions():
+@metadata_bp.get('/functions')
+def get_functions(databaseId: str, schema: str = "public"):
     """Retrieves all stored functions within a specific schema."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        functions = metadata_service.get_functions(db_id, schema)
-        return jsonify(functions)
+        functions = metadata_service.get_functions(databaseId, schema)
+        return functions
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/procedures', methods=['GET'])
-def get_procedures():
+@metadata_bp.get('/procedures')
+def get_procedures(databaseId: str, schema: str = "public"):
     """Retrieves all stored procedures within a specific schema."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        procedures = metadata_service.get_procedures(db_id, schema)
-        return jsonify(procedures)
+        procedures = metadata_service.get_procedures(databaseId, schema)
+        return procedures
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/triggers', methods=['GET'])
-def get_triggers():
+@metadata_bp.get('/triggers')
+def get_triggers(databaseId: str, schema: str = "public"):
     """Retrieves all triggers defined on tables within a specific schema."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        triggers = metadata_service.get_triggers(db_id, schema)
-        return jsonify(triggers)
+        triggers = metadata_service.get_triggers(databaseId, schema)
+        return triggers
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/events', methods=['GET'])
-def get_events():
+@metadata_bp.get('/events')
+def get_events(databaseId: str, schema: str = "public"):
     """Retrieves scheduled database events within a specific schema."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        events = metadata_service.get_events(db_id, schema)
-        return jsonify(events)
+        events = metadata_service.get_events(databaseId, schema)
+        return events
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/all-foreign-keys', methods=['GET'])
-def get_all_foreign_keys():
+@metadata_bp.get('/all-foreign-keys')
+def get_all_foreign_keys(databaseId: str, schema: str = "public"):
     """Returns all foreign keys for the entire schema, for schema visualization."""
-    db_id = request.args.get('databaseId')
-    if not db_id:
-        return jsonify({'error': 'databaseId required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        fks = metadata_service.get_all_foreign_keys(db_id, schema)
-        return jsonify(fks)
+        fks = metadata_service.get_all_foreign_keys(databaseId, schema)
+        return fks
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/indexes', methods=['GET'])
-def get_indexes():
+@metadata_bp.get('/indexes')
+def get_indexes(databaseId: str, table: str, schema: str = "public"):
     """Retrieves all indices (primary, unique, secondary) for a given table."""
-    db_id = request.args.get('databaseId')
-    table = request.args.get('table')
-    if not db_id or not table:
-        return jsonify({'error': 'databaseId and table are both required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        indexes = metadata_service.get_indexes(db_id, schema, table)
-        return jsonify(indexes)
+        indexes = metadata_service.get_indexes(databaseId, schema, table)
+        return indexes
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/foreign-keys', methods=['GET'])
-def get_foreign_keys():
+@metadata_bp.get('/foreign-keys')
+def get_foreign_keys(databaseId: str, table: str, schema: str = "public"):
     """Retrieves foreign key constraints defined specifically for a given table."""
-    db_id = request.args.get('databaseId')
-    table = request.args.get('table')
-    if not db_id or not table:
-        return jsonify({'error': 'databaseId and table are both required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        fks = metadata_service.get_foreign_keys(db_id, schema, table)
-        return jsonify(fks)
+        fks = metadata_service.get_foreign_keys(databaseId, schema, table)
+        return fks
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/table-info', methods=['GET'])
-def get_table_info():
+@metadata_bp.get('/table-info')
+def get_table_info(databaseId: str, table: str, schema: str = "public"):
     """Retrieves metadata statistics and size estimate for a given table."""
-    db_id = request.args.get('databaseId')
-    table = request.args.get('table')
-    if not db_id or not table:
-        return jsonify({'error': 'databaseId and table are both required'}), 400
-    schema = request.args.get('schema', 'public')
     try:
-        info = metadata_service.get_table_info(db_id, schema, table)
-        return jsonify(info)
+        info = metadata_service.get_table_info(databaseId, schema, table)
+        return info
     except Exception as e:
         status = 404 if "not found" in str(e).lower() else 500
-        return jsonify({'error': str(e)}), status
+        raise HTTPException(status_code=status, detail=str(e))
 
-@metadata_bp.route('/diagnostics', methods=['GET'])
-def get_diagnostics():
+@metadata_bp.get('/diagnostics')
+def get_diagnostics(databaseId: str, table: str):
     """Retrieves advanced statistical profiling (histograms) for a table."""
-    db_id = request.args.get('databaseId')
-    table = request.args.get('table')
-    if not db_id or not table:
-        return jsonify({'error': 'databaseId and table are both required'}), 400
-    
     from services.local_db_service import local_db_service
     try:
-        diagnostics = local_db_service.get_diagnostics(db_id, table)
-        return jsonify(diagnostics)
+        diagnostics = local_db_service.get_diagnostics(databaseId, table)
+        return diagnostics
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))

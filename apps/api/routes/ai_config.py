@@ -1,33 +1,34 @@
-from flask import Blueprint, request, jsonify, g
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from typing import Dict, Any, Optional
+from pydantic import BaseModel
 from models.metadata import UserAIConfig, SessionLocal
-from utils.auth_middleware import login_required
+from utils.auth_middleware import get_current_user
 import uuid
 from cryptography.fernet import Fernet
 import os
 
-ai_config_bp = Blueprint('ai_config', __name__)
+ai_config_bp = APIRouter(dependencies=[Depends(get_current_user)])
 
-# Master key for encryption. In production, this must be a fixed key in .env
 MASTER_KEY = (os.getenv("ENCRYPTION_KEY") or "").strip() or None
 if not MASTER_KEY:
-    # Fallback to a generated one (not recommended for production persistence)
     MASTER_KEY = "dummy_encryption_key_for_development_only_123"
-    # Fernet keys must be 32 url-safe base64-encoded bytes
     import base64
     MASTER_KEY = base64.urlsafe_b64encode(MASTER_KEY.encode().ljust(32)[:32]).decode()
 
 cipher = Fernet(MASTER_KEY.encode())
 
-@ai_config_bp.route('/get', methods=['GET'])
-@login_required
-def get_config():
-    user_id = g.user.get('userId')
-    reveal = request.args.get('reveal', 'false').lower() == 'true'
+class SaveConfigRequest(BaseModel):
+    apiKey: str
+    provider: str = "Google"
+
+@ai_config_bp.get('/get')
+def get_config(reveal: bool = False, current_user: dict = Depends(get_current_user)):
+    user_id = current_user.get('userId')
     session = SessionLocal()
     try:
         config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
         if not config:
-            return jsonify({'apiKey': None, 'provider': 'Google'})
+            return {'apiKey': None, 'provider': 'Google'}
         
         api_key = '********'
         if reveal and config.apiKey:
@@ -36,34 +37,31 @@ def get_config():
             except:
                 api_key = 'decryption_error'
                 
-        return jsonify({
+        return {
             'apiKey': api_key,
             'provider': config.provider
-        })
+        }
     finally:
         session.close()
 
-@ai_config_bp.route('/save', methods=['POST'])
-@login_required
-def save_config():
-    user_id = g.user.get('userId')
-    data = request.json
-    api_key = data.get('apiKey')
-    provider = data.get('provider', 'Google')
+@ai_config_bp.post('/save')
+def save_config(data: SaveConfigRequest, current_user: dict = Depends(get_current_user)):
+    user_id = current_user.get('userId')
+    api_key = data.apiKey
+    provider = data.provider
     
     if not api_key:
-        return jsonify({'error': 'API Key is required'}), 400
+        raise HTTPException(status_code=400, detail='API Key is required')
         
     session = SessionLocal()
     try:
-        # If user sent '********', it means they didn't change it, only other settings
         if api_key == '********':
             config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
             if config:
                 config.provider = provider
                 session.commit()
-                return jsonify({'message': 'Config updated successfully'})
-            return jsonify({'error': 'No existing config to update'}), 400
+                return {'message': 'Config updated successfully'}
+            raise HTTPException(status_code=400, detail='No existing config to update')
 
         encrypted_key = cipher.encrypt(api_key.encode()).decode()
         
@@ -80,10 +78,13 @@ def save_config():
             )
             session.add(config)
         session.commit()
-        return jsonify({'message': 'Config saved successfully'})
+        return {'message': 'Config saved successfully'}
+    except HTTPException:
+        session.rollback()
+        raise
     except Exception as e:
         session.rollback()
-        return jsonify({'error': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         session.close()
 

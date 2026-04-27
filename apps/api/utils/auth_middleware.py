@@ -1,10 +1,9 @@
-
 """
 backend/utils/auth_middleware.py
-Middleware for verifying JWT tokens.
+Middleware for verifying JWT tokens in FastAPI.
 """
-from functools import wraps
-from flask import request, jsonify, g
+from fastapi import Request, HTTPException, Security, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 import os
 from models.metadata import User, SessionLocal
@@ -23,67 +22,46 @@ MOCK_ADMIN = {
     'username': 'admin'
 }
 
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if request.method == 'OPTIONS':
-            return f(*args, **kwargs)
+security = HTTPBearer(auto_error=False)
+
+def get_current_user(request: Request, auth: HTTPAuthorizationCredentials = Security(security)):
+    if DISABLE_AUTH:
+        return MOCK_ADMIN
+        
+    token = None
+    if auth:
+        token = auth.credentials
+    if not token:
+        token = request.cookies.get('auth_token')
+        
+    if not token:
+        raise HTTPException(status_code=401, detail='Token is missing')
+        
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get('userId')
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
             
-        # Bypass check if auth is disabled
-        if DISABLE_AUTH:
-            g.user = MOCK_ADMIN
-            return f(*args, **kwargs)
+        session = SessionLocal()
+        if not session:
+            raise HTTPException(status_code=500, detail="Database connection failed")
             
-        token = None
-        # Priority 1: Check Authorization Header
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            if auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-        
-        # Priority 2: Check Cookie
-        if not token:
-            token = request.cookies.get('auth_token')
-        
-        if not token:
-            return jsonify({'message': 'Token is missing'}), 401
-        
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id = payload.get('userId')
-            if not user_id:
-                raise Exception("Invalid token payload")
-                
-            # Verify user exists in database
-            session = SessionLocal()
-            try:
-                user = session.query(User).filter(User.id == user_id).first()
-                if not user:
-                    return jsonify({'message': 'User no longer exists'}), 401
-                g.user = payload # {userId, email, role}
-            finally:
-                if session:
-                    session.close()
-                
-        except Exception as e:
-            return jsonify({'message': f'Token is invalid: {str(e)}'}), 401
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                raise HTTPException(status_code=401, detail='User no longer exists')
+            return payload # {userId, email, role}
+        finally:
+            session.close()
+            
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f'Token is invalid: {str(e)}')
+
+def get_admin_user(current_user: dict = Depends(get_current_user)):
+    if DISABLE_AUTH:
+        return current_user
         
-        return f(*args, **kwargs)
-    return decorated
-
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if request.method == 'OPTIONS':
-            return f(*args, **kwargs)
-            
-        # Bypass check if auth is disabled
-        if DISABLE_AUTH:
-            g.user = MOCK_ADMIN
-            return f(*args, **kwargs)
-            
-        if not g.user or g.user.get('role') != 'Admin':
-            return jsonify({'message': 'Admin access required'}), 403
-        return f(*args, **kwargs)
-    return decorated
-
+    if not current_user or current_user.get('role') != 'Admin':
+        raise HTTPException(status_code=403, detail='Admin access required')
+    return current_user
