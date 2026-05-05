@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { BrainCircuit, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIMessage, Message } from "./AIMessage";
@@ -69,25 +69,7 @@ export const AIChatMessages = ({
               style={{ transform: `translateY(${vMsg.start}px)` }}
             >
               <div className="pb-6">
-                {isLastTyping ? (
-                  <div className="relative overflow-hidden bg-muted/20 p-6 rounded-3xl border border-dashed border-primary/20 flex flex-col items-center gap-4 transition-all duration-1000">
-                    <div className="absolute inset-0 glass-orb" />
-                    <div className="relative z-10 flex items-center justify-center">
-                      <BrainCircuit className="h-8 w-8 text-primary animate-pulse" />
-                      <Sparkles className="h-4 w-4 text-primary absolute -top-1 -right-1 animate-bounce" />
-                    </div>
-                    <div className="relative z-10 flex flex-col items-center gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary/80 animate-pulse">
-                        Synthesizing Intelligence
-                      </span>
-                      <div className="flex gap-1">
-                        {[0, 1, 2].map((i) => (
-                          <div key={i} className="w-1 h-1 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: `${i * 0.2}s` }} />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ) : m ? (
+                {m ? (
                   <AIMessage
                     message={m}
                     onExplain={onExplain}

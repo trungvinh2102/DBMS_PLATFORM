@@ -5,6 +5,8 @@ Specialized AI service delegator that coordinates multiple AI strategies
 (SQL tasks, Agents, Semantic Context) for QurioDB.
 """
 import logging
+import json
+import google.generativeai as genai
 from typing import Dict, Any, Optional
 
 from .ai.sql import SqlAIService
@@ -47,7 +49,6 @@ class AIService(SqlAIService, AgentAIService):
         
         prompt = f"PREFIX:\n{prefix}\n\nSUFFIX:\n{suffix}\n\nCOMPLETION:"
         try:
-            import google.generativeai as genai
             model = genai.GenerativeModel(
                 model_name=model_id or "gemini-2.5-flash",
                 system_instruction=system_instruction,
@@ -70,8 +71,7 @@ class AIService(SqlAIService, AgentAIService):
     # --- Streaming Logic ---
 
     def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None, conv_id: Optional[str] = None):
-        """Streams responses for chat interfaces."""
-        import google.generativeai as genai
+        """Streams responses for chat interfaces using SSE events."""
         system_prompt = "You are the Supreme SQL Architect."
         if db_id:
             context = self._format_schema_context(db_id, schema, intent=prompt)
@@ -81,12 +81,49 @@ class AIService(SqlAIService, AgentAIService):
         messages = self._context_mgr.build_context(conv_id, prompt) if conv_id else [{'role': 'user', 'parts': [{'text': prompt}]}]
         
         try:
-            model = genai.GenerativeModel(model_name=model_id or "gemini-2.5-flash", system_instruction=system_prompt)
+            model = genai.GenerativeModel(model_name=model_id or "gemini-2.0-flash", system_instruction=system_prompt)
+            
+            # State tracker for event types
+            current_event = "thinking"
+            
             for chunk in model.generate_content(messages, stream=True):
-                if chunk.text: yield chunk.text
+                if not chunk.candidates:
+                    continue
+                
+                for part in chunk.candidates[0].content.parts:
+                    # 1. Handle native thinking (for models like Gemini 2.0 Flash Thinking)
+                    if hasattr(part, 'thought') and part.thought:
+                        yield "thinking", part.thought
+                        continue
+
+                    # 2. Handle native function/tool calls
+                    if part.function_call:
+                        args = {k: v for k, v in part.function_call.args.items()}
+                        yield "tool_call", json.dumps({
+                            "name": part.function_call.name,
+                            "args": args
+                        })
+                        continue
+
+                    # 3. Handle standard text chunks
+                    if part.text:
+                        text = part.text
+                        
+                        # Simple state machine to switch events based on markers
+                        if "<thinking>" in text:
+                            current_event = "thinking"
+                        elif "<confidence>" in text:
+                            current_event = "confidence"
+                        elif "```sql" in text:
+                            current_event = "sql"
+                        elif "### ANALYSIS" in text:
+                            current_event = "analysis"
+                        
+                        yield current_event, text
+
         except Exception as e:
             logger.error(f"Streaming failed: {e}")
-            yield f"AI Error: {str(e)}"
+            yield "error", str(e)
 
 # Singleton Instance
 ai_service = AIService()

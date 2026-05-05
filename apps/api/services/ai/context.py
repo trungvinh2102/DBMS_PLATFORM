@@ -128,7 +128,10 @@ class SchemaContextService:
         """Fetches up to 3 sample rows."""
         try:
             quote = '`' if db_type == 'mysql' else '"'
-            ref = f"{quote}{schema}{quote}.{quote}{table}{quote}"
+            if schema:
+                ref = f"{quote}{schema}{quote}.{quote}{table}{quote}"
+            else:
+                ref = f"{quote}{table}{quote}"
             res = conn.execute(text(f"SELECT * FROM {ref} LIMIT 3"))
             return {"columns": list(res.keys()), "rows": [list(r) for r in res.fetchall()]}
         except Exception as e:

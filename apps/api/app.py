@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
+import json
 import logging
 import sys
 import threading
@@ -118,9 +119,24 @@ def setup_database():
                 session.rollback()
                 session.close()
 
+class UnicodeJSONResponse(JSONResponse):
+    def render(self, content: any) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
 def create_app():
     """Application factory for FastAPI."""
-    app = FastAPI(title="QurioDB API", description="FastAPI Backend for QurioDB")
+    app = FastAPI(
+        title="QurioDB API",
+        description="Next-generation SQL/NoSQL Analytics Platform",
+        version="2.0.0",
+        default_response_class=UnicodeJSONResponse
+    )
     
     origins = [
         "tauri://localhost", 

@@ -39,11 +39,14 @@ class SqlMetadataProvider:
             return inspect(conn).get_schema_names()
         return self.service.run_dynamic_query(db_id, _op)
 
-    def get_tables(self, db_id: str, schema: str) -> List[str]:
+    def get_tables(self, db_id: str, schema: Optional[str]) -> List[str]:
         """Lists all table names within a specific schema."""
+        if schema is None:
+            schema = 'public' if self.service.run_dynamic_query(db_id, lambda c: c.dialect.name) == 'postgresql' else None
+            
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                target_schema = 'default' if schema == 'public' else schema
+                target_schema = 'default' if (schema == 'public' or schema is None) else schema
                 # Filter out views from table list for ClickHouse
                 res = conn.execute(text(f"SELECT name FROM system.tables WHERE database = :schema AND engine NOT LIKE '%View'"), {"schema": target_schema})
                 return [row[0] for row in res]
@@ -54,17 +57,21 @@ class SqlMetadataProvider:
         """Lists all defined views within a schema."""
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                target_schema = 'default' if schema == 'public' else schema
+                target_schema = 'default' if (schema == 'public' or schema is None) else schema
                 res = conn.execute(text(f"SELECT name FROM system.tables WHERE database = :schema AND engine LIKE '%View'"), {"schema": target_schema})
                 return [row[0] for row in res]
             return inspect(conn).get_view_names(schema=schema)
         return self.service.run_dynamic_query(db_id, _op)
 
-    def get_all_columns(self, db_id: str, schema: str) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_columns(self, db_id: str, schema: Optional[str]) -> Dict[str, List[Dict[str, Any]]]:
         """Retrieves columns for all tables and views in a schema using a single query."""
+        if schema is None:
+            db_type = self.service.run_dynamic_query(db_id, lambda c: c.dialect.name)
+            schema = 'public' if db_type == 'postgresql' else None
+
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                target_schema = 'default' if schema == 'public' else schema
+                target_schema = 'default' if (schema == 'public' or schema is None) else schema
                 # Filter out columns belonging to views
                 res = conn.execute(text(f"""
                     SELECT table, name, type 
@@ -173,7 +180,7 @@ class SqlMetadataProvider:
         """Reflects column names and types for a specific table."""
         def _op(conn):
             if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                target_schema = 'default' if schema == 'public' else schema
+                target_schema = 'default' if (schema == 'public' or schema is None) else schema
                 res = conn.execute(text(f"DESCRIBE TABLE `{target_schema}`.`{table}`"))
                 return [{"name": row[0], "type": row[1], "nullable": True} for row in res]
             
@@ -232,7 +239,7 @@ class SqlMetadataProvider:
         def _op(conn):
             try:
                 if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                    target_schema = 'default' if schema == 'public' else schema
+                    target_schema = 'default' if (schema == 'public' or schema is None) else schema
                     query = text(f"SELECT sum(bytes_on_disk), count() FROM system.parts WHERE database = :schema AND table = :table AND active")
                     res = conn.execute(query, {"schema": target_schema, "table": table}).fetchone()
                     if res:
@@ -318,7 +325,7 @@ class SqlMetadataProvider:
         def _op(conn):
             try:
                 if conn.dialect.name in ['clickhouse', 'clickhousedb']:
-                    target_schema = 'default' if schema == 'public' else schema
+                    target_schema = 'default' if (schema == 'public' or schema is None) else schema
                     res = conn.execute(text(f"SHOW CREATE TABLE `{target_schema}`.`{table}`")).fetchone()
                     return res[0] if res else ""
                 
@@ -379,7 +386,9 @@ class SqlMetadataProvider:
                 if pks:
                     lines.append(f"  PRIMARY KEY ({pk_cols})")
                 
-                return f'CREATE TABLE "{schema}"."{table}" (\n' + ",\n".join(lines) + "\n);"
+                if schema:
+                    return f'CREATE TABLE "{schema}"."{table}" (\n' + ",\n".join(lines) + "\n);"
+                return f'CREATE TABLE "{table}" (\n' + ",\n".join(lines) + "\n);"
             except Exception as e:
                 return f"-- Failed to generate DDL: {e}"
         return self.service.run_dynamic_query(db_id, _op)

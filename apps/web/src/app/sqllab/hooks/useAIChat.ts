@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from "react";
-import { aiApi } from "@/lib/api-client";
+import { aiApi } from "../../../lib/api-client";
 import { toast } from "sonner";
 import { Message } from "../components/ai/AIMessage";
 
@@ -52,14 +52,25 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let analysis = "";
 
     // Extract Thinking Section
-    const thoughtMatch = text.match(/<thinking>([\s\S]*?)<\/thinking>/);
+    const thoughtMatch = text.match(/<thinking>([\s\S]*?)<\/thinking>/i);
     if (thoughtMatch) {
-      thought = thoughtMatch[1].trim();
-      content = content.replace(thoughtMatch[0], "").trim();
+      const tagIndex = text.toLowerCase().indexOf("<thinking>");
+      const preTag = text.substring(0, tagIndex).trim();
+      thought = [preTag, thoughtMatch[1].trim()].filter(Boolean).join("\n\n");
+      
+      // Content is everything after the closing tag
+      const closingTag = "</thinking>";
+      const closingIndex = text.toLowerCase().indexOf(closingTag);
+      content = text.substring(closingIndex + closingTag.length).trim();
     } else {
-      const partialThought = text.match(/<thinking>([\s\S]*)/);
+      const partialThought = text.match(/<thinking>([\s\S]*)/i);
       if (partialThought) {
-        thought = partialThought[1].trim();
+        const tagIndex = text.toLowerCase().indexOf("<thinking>");
+        const preTag = text.substring(0, tagIndex).trim();
+        
+        // Ensure thought is at least a space so UI status logic treats it as present
+        const thoughtContent = partialThought[1].trim();
+        thought = [preTag, thoughtContent].filter(Boolean).join("\n\n") || " "; 
         content = "";
       }
     }
@@ -177,7 +188,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const initialAssistantMsg: Message = {
       id: assistantMsgId,
       role: "assistant",
-      content: "Brainstorming SQL strategy...",
+      content: "",
       isActionable: true,
     };
 
@@ -193,12 +204,22 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           modelId: selectedModel,
           conversationId: conversationId || undefined,
         },
-        (chunk) => {
+        (chunk, event) => {
           fullContent += chunk;
           
+          // Debugging: Monitor event flow
+          if (event && event !== 'message') {
+            console.log(`[AI Event: ${event}]`, chunk);
+          }
+
           // Parse the accumulating content to update specific fields (thinking, sql, etc.)
           const parsed = parseMessageContent({ role: "assistant", content: fullContent });
           
+          // Log parsing results to see if 'thought' is being extracted
+          if (parsed.thought) {
+            console.log(`[Extracted Thought]: ${parsed.thought.substring(0, 30)}...`);
+          }
+
           setMessages(prev => prev.map(m =>
             m.id === assistantMsgId ? {
               ...m,

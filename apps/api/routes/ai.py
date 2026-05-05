@@ -23,7 +23,7 @@ class AddModelRequest(BaseModel):
 class GenerateSqlRequest(BaseModel):
     prompt: str
     databaseId: str
-    schema_name: str = 'public'
+    schema_name: Optional[str] = None
     modelId: Optional[str] = None
 
 class ExplainSqlRequest(BaseModel):
@@ -33,19 +33,19 @@ class ExplainSqlRequest(BaseModel):
 class OptimizeSqlRequest(BaseModel):
     sql: str
     databaseId: str
-    schema_name: str = 'public'
+    schema_name: Optional[str] = None
     modelId: Optional[str] = None
 
 class FixSqlRequest(BaseModel):
     sql: str
     error: str
     databaseId: str
-    schema_name: str = 'public'
+    schema_name: Optional[str] = None
     modelId: Optional[str] = None
 
 class CompleteSqlRequest(BaseModel):
     databaseId: str
-    schema_name: str = 'public'
+    schema_name: Optional[str] = None
     prefix: str = ''
     suffix: str = ''
     modelId: Optional[str] = None
@@ -53,7 +53,7 @@ class CompleteSqlRequest(BaseModel):
 class ExecuteAgentRequest(BaseModel):
     prompt: str
     databaseId: str
-    schema_name: str = 'public'
+    schema_name: Optional[str] = None
     conversationId: Optional[str] = None
     modelId: Optional[str] = None
 
@@ -61,7 +61,7 @@ class StreamChatRequest(BaseModel):
     text: Optional[str] = None
     messages: Optional[List[Dict[str, str]]] = None
     databaseId: str
-    schema_name: str = 'public'
+    schema_name: Optional[str] = None
     conversationId: Optional[str] = None
     modelId: Optional[str] = None
 
@@ -295,7 +295,8 @@ def stream_chat(data: StreamChatRequest, current_user: dict = Depends(get_curren
     def generate():
         full_response = ""
         try:
-            for chunk in ai_service.stream_generate_response(
+            import json
+            for event, chunk in ai_service.stream_generate_response(
                 last_message, 
                 db_id=db_id, 
                 schema=data.schema_name, 
@@ -305,18 +306,20 @@ def stream_chat(data: StreamChatRequest, current_user: dict = Depends(get_curren
                 conv_id=conv_id
             ):
                 full_response += chunk
-                yield chunk
+                # JSON-encode chunk to safely handle newlines and special characters in SSE
+                encoded_chunk = json.dumps(chunk)
+                yield f"event: {event}\ndata: {encoded_chunk}\n\n"
             
             if full_response:
                 ai_service._save_chat("assistant", full_response, user_id, db_id, conv_id=conv_id)
         except Exception as e:
             error_msg = f"Error: {str(e)}"
             ai_service._save_chat("assistant", error_msg, user_id, db_id, conv_id=conv_id)
-            yield error_msg
+            yield f"event: error\ndata: {json.dumps(error_msg)}\n\n"
 
     return StreamingResponse(
         generate(), 
-        media_type='text/plain', 
+        media_type='text/event-stream', 
         headers={
             'X-Conversation-Id': conv_id,
             'Cache-Control': 'no-cache, no-store, must-revalidate',

@@ -4,7 +4,7 @@
  */
 
 import axios from "axios";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "../hooks/use-auth";
 
 const getBaseURL = () => {
     // Priority 1: Environment variable set at build time (Vite)
@@ -220,7 +220,7 @@ export const aiApi = {
   getConversationMessages: (id: string) => req(api.get(`ai/conversations/${id}`)),
   updateConversation: (id: string, data: any) => req(api.put(`ai/conversations/${id}`, data)),
   deleteConversation: (id: string) => req(api.delete(`ai/conversations/${id}`)),
-  streamChat: async (data: any, onChunk: (chunk: string) => void, onHeaders?: (headers: Headers) => void) => {
+  streamChat: async (data: any, onChunk: (chunk: string, event?: string) => void, onHeaders?: (headers: Headers) => void) => {
     const token = useAuth.getState().token;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -264,11 +264,46 @@ export const aiApi = {
     const decoder = new TextDecoder();
     if (!reader) return;
 
+    let buffer = "";
+    let currentEvent = "message";
+
+    const processPart = (part: string) => {
+      const lines = part.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.substring(7).trim();
+        } else if (line.startsWith("data: ")) {
+          let content = line.substring(6);
+          if (content === "[DONE]") return;
+          
+          try {
+            content = JSON.parse(content);
+          } catch (e) { /* fallback */ }
+          
+          onChunk(content, currentEvent); 
+        }
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      onChunk(chunk);
+      
+      if (done) {
+        // Process any remaining data in buffer
+        if (buffer.trim()) {
+          processPart(buffer);
+        }
+        break;
+      }
+      
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+
+      for (const part of parts) {
+        processPart(part);
+        currentEvent = "message"; // Reset to default after each full event block
+      }
     }
   },
   submitFeedback: (data: { messageId: string; rating: 1 | -1; correction?: string; conversationId?: string }) =>

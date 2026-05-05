@@ -80,9 +80,16 @@ export function AIMessage({
 
   const getStatus = useCallback(() => {
     if (message.content?.startsWith("Error:")) return null;
-    if (!message.content && message.thought && !message.sql) return "Thinking...";
-    if (message.thought && message.sql && !message.content) return "Generating SQL...";
-    if (message.sql && !message.content) return "Finalizing...";
+    
+    // If we have any final results, we don't need a status anymore
+    if (message.sql || (message.content && !message.content.includes("Thinking"))) return null;
+
+    // If we have thought process (even if currently empty string during stream)
+    if (message.thought !== undefined && !message.sql) return "Thinking...";
+    
+    // Initial state
+    if (!message.content && !message.thought && !message.sql) return "Brainstorming SQL strategy...";
+    
     return null;
   }, [message]);
 
@@ -187,7 +194,7 @@ export function AIMessage({
                     </span>
                   ) }
                 </div>
-                {score > 0 && <ConfidenceBadge score={score} />}
+                {score > 0 && !status && <ConfidenceBadge score={score} />}
               </div>
             )}
 

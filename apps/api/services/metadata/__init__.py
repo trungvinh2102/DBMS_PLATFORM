@@ -46,7 +46,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_tables(self, database_id: str, schema: str = 'public') -> List[str]:
+    def get_tables(self, database_id: str, schema: Optional[str] = None) -> List[str]:
         """Lists all table or collection names within a specific schema or database."""
         session = SessionLocal()
         try:
@@ -63,7 +63,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_views(self, database_id: str, schema: str = 'public') -> List[str]:
+    def get_views(self, database_id: str, schema: Optional[str] = None) -> List[str]:
         """Lists all defined views within a given schema."""
         session = SessionLocal()
         try:
@@ -80,7 +80,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_columns(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
+    def get_columns(self, database_id: str, schema: Optional[str], table: str) -> List[Dict[str, Any]]:
         """Retrieves or infers column details for a specific table or collection."""
         session = SessionLocal()
         try:
@@ -97,7 +97,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_all_columns(self, database_id: str, schema: str) -> Dict[str, List[Dict[str, Any]]]:
+    def get_all_columns(self, database_id: str, schema: Optional[str]) -> Dict[str, List[Dict[str, Any]]]:
         """Retrieves columns for all tables and views in a schema, optimized for performance."""
         session = SessionLocal()
         try:
@@ -128,7 +128,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_indexes(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
+    def get_indexes(self, database_id: str, schema: Optional[str], table: str) -> List[Dict[str, Any]]:
         """Lists all defined indices for the specified table or collection."""
         session = SessionLocal()
         try:
@@ -145,7 +145,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_foreign_keys(self, database_id: str, schema: str, table: str) -> List[Dict[str, Any]]:
+    def get_foreign_keys(self, database_id: str, schema: Optional[str], table: str) -> List[Dict[str, Any]]:
         """Retrieves foreign key constraints defined for a given table."""
         session = SessionLocal()
         try:
@@ -160,7 +160,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_table_info(self, database_id: str, schema: str, table: str) -> Dict[str, Any]:
+    def get_table_info(self, database_id: str, schema: Optional[str], table: str) -> Dict[str, Any]:
         """Retrieves size estimates and row count details for a given table."""
         session = SessionLocal()
         try:
@@ -177,7 +177,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_table_ddl(self, database_id: str, schema: str, table: str) -> str:
+    def get_table_ddl(self, database_id: str, schema: Optional[str], table: str) -> str:
         """Retrieves or generates the CREATE TABLE DDL for the specified object."""
         session = SessionLocal()
         try:
@@ -196,7 +196,7 @@ class MetadataService(BaseDatabaseService):
 
     # --- SQL specific methods still using text queries directly for simplicity ---
 
-    def get_functions(self, database_id: str, schema: str = 'public') -> List[str]:
+    def get_functions(self, database_id: str, schema: Optional[str] = None) -> List[str]:
         """Lists all database functions defined in the schema."""
         session = SessionLocal()
         try:
@@ -211,7 +211,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_procedures(self, database_id: str, schema: str = 'public') -> List[str]:
+    def get_procedures(self, database_id: str, schema: Optional[str] = None) -> List[str]:
         """Lists all database procedures defined in the schema."""
         session = SessionLocal()
         try:
@@ -226,7 +226,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_triggers(self, database_id: str, schema: str = 'public') -> List[str]:
+    def get_triggers(self, database_id: str, schema: Optional[str] = None) -> List[str]:
         """Lists all triggers defined within the schema."""
         session = SessionLocal()
         try:
@@ -241,7 +241,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_events(self, database_id: str, schema: str = 'public') -> List[str]:
+    def get_events(self, database_id: str, schema: Optional[str] = None) -> List[str]:
         """Lists all scheduled database events (MySQL Specific)."""
         session = SessionLocal()
         try:
@@ -256,7 +256,7 @@ class MetadataService(BaseDatabaseService):
             if session:
                 session.close()
 
-    def get_all_foreign_keys(self, database_id: str, schema: str = 'public') -> List[Dict[str, Any]]:
+    def get_all_foreign_keys(self, database_id: str, schema: Optional[str] = None) -> List[Dict[str, Any]]:
         """Retrieves foreign key constraints for all tables in the schema."""
         session = SessionLocal()
         try:

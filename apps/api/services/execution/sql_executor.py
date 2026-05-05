@@ -41,12 +41,19 @@ class SqlExecutor:
                 import uuid
                 
                 def serialize_val(val):
-                    if isinstance(val, (datetime.datetime, datetime.date)):
+                    if val is None:
+                        return None
+                    if isinstance(val, (datetime.datetime, datetime.date, datetime.time)):
                         return val.isoformat()
-                    elif isinstance(val, decimal.Decimal):
+                    if isinstance(val, decimal.Decimal):
                         return float(val)
-                    elif isinstance(val, uuid.UUID):
+                    if isinstance(val, uuid.UUID):
                         return str(val)
+                    if isinstance(val, (bytes, bytearray)):
+                        try:
+                            return val.decode('utf-8')
+                        except Exception:
+                            return f"<binary data: {len(val)} bytes>"
                     return val
                     
                 data = [{k: serialize_val(v) for k, v in zip(keys, row)} for row in result]
