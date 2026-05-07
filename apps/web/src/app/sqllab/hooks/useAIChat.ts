@@ -51,27 +51,22 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let sql = "";
     let analysis = "";
 
-    // Extract ALL Thinking and Tool Call Sections in order
+    // Extract all thinking and tool call sections, then group them by type
     const steps: AIStep[] = [];
+    const thinkingContent: string[] = [];
+    const toolActions: string[] = [];
 
     // Regular expression to find both thinking and tool_call tags
     const stepRegex = /<(thinking|tool_call)(?:\s+name="([^"]*)")?(?:\s+intent="([^"]*)")?(?:\s+\/>|>([\s\S]*?)<\/\1>)/gi;
     let stepMatch;
 
     while ((stepMatch = stepRegex.exec(text)) !== null) {
-      const [fullMatch, type, name, intent, innerContent] = stepMatch;
+      const [_, type, name, intent, innerContent] = stepMatch;
       if (type === "thinking") {
-        const lines = (innerContent || "").split(/\n+/).filter(l => l.trim());
-        lines.forEach((line: string) => {
-          steps.push({ type: "thinking", content: line.trim() });
-        });
+        const content = (innerContent || "").trim();
+        if (content) thinkingContent.push(content);
       } else if (type === "tool_call") {
-        steps.push({
-          type: "tool_call",
-          content: intent || `Action: ${name}`,
-          name: name,
-          args: { intent }
-        });
+        toolActions.push(intent || `Action: ${name}`);
       }
     }
 
@@ -79,17 +74,29 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const partialThoughtRegex = /<thinking>([\s\S]*)$/i;
     const partialMatch = text.match(partialThoughtRegex);
     if (partialMatch && !text.includes("</thinking>", partialMatch.index)) {
-      const partialLines = partialMatch[1].split(/\n+/).filter((l: string) => l.trim());
-      partialLines.forEach((line: string) => {
-        steps.push({ type: "thinking", content: line.trim() });
+      const content = partialMatch[1].trim();
+      if (content) thinkingContent.push(content);
+    }
+
+    // 1. Consolidated Reasoning Step
+    if (thinkingContent.length > 0 || (partialMatch && !text.includes("</thinking>", partialMatch.index))) {
+      steps.push({
+        type: "thinking",
+        content: thinkingContent.join("\n\n") || "Analyzing..."
+      });
+    }
+
+    // 2. Consolidated Tool Step
+    if (toolActions.length > 0) {
+      steps.push({
+        type: "tool_call",
+        content: toolActions.join("\n"),
+        name: "Actions"
       });
     }
 
     // Extract the final thought text for historical reference (joined)
-    thought = steps
-      .filter(s => s.type === "thinking")
-      .map(s => s.content)
-      .join("\n\n") || (partialMatch ? " " : "");
+    thought = thinkingContent.join("\n\n");
 
     // Clean content by removing all thinking and tool_call blocks
     // We use a more aggressive approach to catch dangling tags or mismatched blocks
@@ -101,18 +108,6 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       .replace(/thinking>/gi, "")         // Remove common malformed remnants
       .replace(/<\/thinking/gi, "")
       .trim();
-
-    // Deduplicate identical consecutive steps and remove empty ones
-    const uniqueSteps: AIStep[] = [];
-    steps.forEach(step => {
-      const trimmedContent = step.content.replace(/<thinking>|<\/thinking>/gi, '').trim();
-      if (!trimmedContent) return; // Skip empty steps
-
-      const last = uniqueSteps[uniqueSteps.length - 1];
-      if (!last || last.content !== step.content || last.type !== step.type) {
-        uniqueSteps.push(step);
-      }
-    });
 
     // Extract SQL Block
     const sqlMatch = content.match(/```sql\n([\s\S]*?)\n```/);
@@ -138,7 +133,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       content = "";
     }
 
-    return { content, thought, sql, analysis, steps: uniqueSteps };
+    return { content, thought, sql, analysis, steps };
   }, []);
 
   const addAssistantMessage = useCallback((content: string, sql?: string, explanation?: string, isActionable = true) => {
