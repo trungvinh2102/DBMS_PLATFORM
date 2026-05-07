@@ -1,11 +1,12 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Check } from "lucide-react";
 import { useTheme } from "next-themes";
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { userApi } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettingsStore } from "@/stores/use-settings-store";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,9 +15,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 export function ModeToggle() {
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -41,8 +43,13 @@ export function ModeToggle() {
     },
   });
 
+  const store = useSettingsStore();
+
   const handleSetTheme = (newTheme: string) => {
     setTheme(newTheme);
+    // Sync local store so UI components (like settings page) update immediately
+    store.setTheme(newTheme as any);
+
     // Only sync if user is logged in and we have loaded current settings
     // (to avoid overwriting other settings with a partial update)
     if (user && settings !== undefined) {
@@ -52,6 +59,12 @@ export function ModeToggle() {
     }
   };
 
+  const THEMES = [
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+    { value: "system", label: "System" },
+  ];
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="outline" size="icon" />}>
@@ -59,25 +72,20 @@ export function ModeToggle() {
         <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         <span className="sr-only">Toggle theme</span>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="p-1.5 focus:outline-none">
-        <DropdownMenuItem
-          onClick={() => handleSetTheme("light")}
-          className="px-3 py-2 cursor-pointer transition-colors"
-        >
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => handleSetTheme("dark")}
-          className="px-3 py-2 cursor-pointer transition-colors"
-        >
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => handleSetTheme("system")}
-          className="px-3 py-2 cursor-pointer transition-colors"
-        >
-          System
-        </DropdownMenuItem>
+      <DropdownMenuContent align="end" className="p-1.5 focus:outline-none min-w-[120px]">
+        {THEMES.map((t) => (
+          <DropdownMenuItem
+            key={t.value}
+            onClick={() => handleSetTheme(t.value)}
+            className={cn(
+              "px-3 py-2 cursor-pointer transition-colors flex items-center justify-between gap-2",
+              theme === t.value && "bg-muted font-semibold"
+            )}
+          >
+            {t.label}
+            {theme === t.value && <Check className="h-3.5 w-3.5" />}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

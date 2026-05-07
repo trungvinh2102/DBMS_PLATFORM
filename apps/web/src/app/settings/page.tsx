@@ -44,6 +44,9 @@ const DataSettings = lazy(() => import("./components/DataSettings").then((m) => 
 const AccountSettings = lazy(() => import("./components/AccountSettings").then((m) => ({ default: m.AccountSettings })));
 const AISettings = lazy(() => import("./components/AISettings").then((m) => ({ default: m.AISettings })));
 
+// Keep track of initialization across mounts within the same session
+let hasSyncedWithServer = false;
+
 function SettingsContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "general";
@@ -73,7 +76,6 @@ function SettingsContent() {
     onError: (err: any) => toast.error(`Save failed: ${err.message}`),
   });
 
-  const initialized = useRef(false);
 
   // Sync shop settings to store
   const syncSettingsToStore = useCallback((data: Partial<SettingsState>) => {
@@ -85,9 +87,9 @@ function SettingsContent() {
   }, [setNextTheme]);
 
   useEffect(() => {
-    if (dbSettings && !initialized.current) {
+    if (dbSettings && !hasSyncedWithServer) {
       syncSettingsToStore(dbSettings);
-      initialized.current = true;
+      hasSyncedWithServer = true;
     }
   }, [dbSettings, syncSettingsToStore]);
 

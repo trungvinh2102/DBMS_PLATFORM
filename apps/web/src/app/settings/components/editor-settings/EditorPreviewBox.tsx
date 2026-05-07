@@ -5,12 +5,16 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
 
 interface EditorPreviewBoxProps {
   settings: any;
 }
 
 export function EditorPreviewBox({ settings }: EditorPreviewBoxProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
   return (
     <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm border border-border/30">
       <div className="p-2 border-b border-border/30 bg-muted/30 flex items-center gap-2">
@@ -26,8 +30,8 @@ export function EditorPreviewBox({ settings }: EditorPreviewBoxProps) {
       <CardContent className="p-0">
         <div 
           className={cn(
-            "p-8 font-mono relative overflow-hidden transition-all duration-300",
-            "bg-[#0d1117] text-[#c9d1d9]" 
+            "p-8 font-mono relative overflow-hidden transition-all duration-300 min-h-[240px]",
+            isDark ? "bg-[#0d1117] text-[#c9d1d9]" : "bg-white text-[#24292e]"
           )}
           style={{
             fontSize: `${settings.editorFontSize}px`,
@@ -56,13 +60,13 @@ export function EditorPreviewBox({ settings }: EditorPreviewBoxProps) {
             )}
             {/* SQL Content with syntax colors */}
             <div className="space-y-0.5 whitespace-pre">
-              <div><span className="text-[#ff7b72]">SELECT</span></div>
+              <div><span style={{ color: isDark ? "#ff7b72" : "#d73a49" }}>SELECT</span></div>
               <div style={{ marginLeft: settings.editorTabSize * 8 }}>e.employee_id,</div>
               <div style={{ marginLeft: settings.editorTabSize * 8 }}>e.first_name,</div>
               <div style={{ marginLeft: settings.editorTabSize * 8 }}>d.department_name</div>
-              <div><span className="text-[#ff7b72]">FROM</span> employees e</div>
-              <div><span className="text-[#ff7b72]">JOIN</span> departments d <span className="text-[#ff7b72]">ON</span> e.dept_id = d.id</div>
-              <div><span className="text-[#ff7b72]">WHERE</span> e.salary {">"} <span className="text-[#a5d6ff]">50000</span>;</div>
+              <div><span style={{ color: isDark ? "#ff7b72" : "#d73a49" }}>FROM</span> employees e</div>
+              <div><span style={{ color: isDark ? "#ff7b72" : "#d73a49" }}>JOIN</span> departments d <span style={{ color: isDark ? "#ff7b72" : "#d73a49" }}>ON</span> e.dept_id = d.id</div>
+              <div><span style={{ color: isDark ? "#ff7b72" : "#d73a49" }}>WHERE</span> e.salary {">"} <span style={{ color: isDark ? "#a5d6ff" : "#005cc5" }}>50000</span>;</div>
             </div>
           </div>
         </div>
