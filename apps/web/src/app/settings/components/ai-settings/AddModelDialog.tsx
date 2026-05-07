@@ -49,54 +49,59 @@ export function AddModelDialog({
           </Button>
         }
       />
-      <DialogContent className="glass border-border/50 max-w-lg p-0 overflow-hidden rounded-[2rem]">
-        <div className="p-8 space-y-6">
+      <DialogContent className="border-border/50 sm:max-w-[800px] p-0 overflow-hidden rounded-2xl shadow-2xl">
+        <div className="p-10 space-y-8">
           <div className="space-y-2">
-            <DialogTitle className="text-2xl font-black tracking-tighter">Register New Model</DialogTitle>
-            <DialogDescription className="text-xs uppercase tracking-widest font-bold text-cyan-500/70">Inject custom capability into system</DialogDescription>
+            <DialogTitle className="text-3xl font-bold">Register New Model</DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
+              Add a custom AI model to the system by providing its engine details.
+            </DialogDescription>
           </div>
 
-          <div className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Alias Name</label>
-                <Input
-                  placeholder="e.g. Gemini 1.5 Pro"
-                  className="rounded-2xl bg-muted/20 border-border/40 h-11"
-                  value={newModel.name}
-                  onChange={e => setNewModel({ ...newModel, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Engine ID</label>
-                <Input
-                  placeholder="gemini-1.5-pro"
-                  className="rounded-2xl bg-muted/20 border-border/40 h-11 font-mono text-sm"
-                  value={newModel.modelId}
-                  onChange={e => setNewModel({ ...newModel, modelId: e.target.value })}
-                />
-              </div>
+          <div className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground ml-1">Alias Name</label>
+              <Input
+                placeholder="e.g. Gemini 1.5 Pro"
+                className="rounded-xl bg-muted/20 border-border/40 h-12 text-base px-4"
+                value={newModel.name}
+                onChange={e => setNewModel({ ...newModel, name: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Core Capability</label>
+              <label className="text-sm font-semibold text-foreground ml-1">Engine ID</label>
+              <Input
+                placeholder="gemini-1.5-pro"
+                className="rounded-xl bg-muted/20 border-border/40 h-12 font-mono text-base px-4"
+                value={newModel.modelId}
+                onChange={e => setNewModel({ ...newModel, modelId: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-foreground ml-1">Core Capability</label>
               <Input
                 placeholder="Describe model specialized reasoning..."
-                className="rounded-2xl bg-muted/20 border-border/40 h-11"
+                className="rounded-xl bg-muted/20 border-border/40 h-12 text-base px-4"
                 value={newModel.description}
                 onChange={e => setNewModel({ ...newModel, description: e.target.value })}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Architecture</label>
+              <label className="text-sm font-semibold text-foreground ml-1">Provider</label>
               <Select value={newModel.provider} onValueChange={v => setNewModel({ ...newModel, provider: v || "" })}>
-                <SelectTrigger className="rounded-2xl bg-muted/20 border-border/40 h-11 transition-all hover:bg-muted/30">
-                  <SelectValue />
+                <SelectTrigger className="w-full rounded-xl bg-muted/20 border-border/40 h-12 text-base px-4 transition-all hover:bg-muted/30">
+                  <SelectValue placeholder="Select Provider" />
                 </SelectTrigger>
-                <SelectContent className="glass">
-                  <SelectItem value="Google">Google Generative AI</SelectItem>
-                  <SelectItem value="OpenAI" disabled>OpenAI Stack</SelectItem>
+                <SelectContent 
+                  side="bottom" 
+                  alignItemWithTrigger={false} 
+                  className="rounded-xl border-border/50"
+                >
+                  <SelectItem value="Google" className="text-base py-3 px-4">Google</SelectItem>
+                  <SelectItem value="OpenAI" disabled className="text-base py-3 px-4">OpenAI</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -104,9 +109,9 @@ export function AddModelDialog({
         </div>
 
         <div className="flex items-center justify-end p-6 bg-muted/30 border-t border-border/40 gap-3">
-          <Button variant="ghost" className="rounded-xl font-bold" onClick={() => setIsOpen(false)}>Abort</Button>
-          <Button className="rounded-xl px-10 bg-cyan-600 hover:bg-cyan-700 font-bold shadow-lg shadow-cyan-500/20" onClick={onAdd} disabled={isAdding}>
-            {isAdding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+          <Button variant="ghost" className="rounded-xl font-semibold h-11 px-6 text-base" onClick={() => setIsOpen(false)}>Abort</Button>
+          <Button className="rounded-xl px-10 h-11 bg-primary hover:bg-primary/90 font-bold text-base shadow-xl" onClick={onAdd} disabled={isAdding}>
+            {isAdding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <PlusCircle className="h-4 w-4 mr-2" />}
             Register Model
           </Button>
         </div>
