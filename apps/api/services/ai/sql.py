@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 
 from .base import BaseAIService
 from .context import schema_context_service
+from .feedback_context import feedback_context_service
 from ..prompts import (
     get_sql_generation_prompt,
     get_sql_explanation_prompt,
@@ -21,11 +22,15 @@ class SqlAIService(BaseAIService):
     """Specialized in standard Text-to-SQL tasks."""
 
     def generate_sql(self, prompt: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
-        """Generates a SQL query using RAG-based context pruning."""
+        """Generates a SQL query using RAG-based context pruning and few-shot feedback."""
         self._save_chat("user", prompt, user_id, db_id)
         
         context = schema_context_service.format_schema_context(db_id, schema, intent=prompt)
-        system_prompt = get_sql_generation_prompt(context)
+        feedback = ""
+        if user_id:
+            feedback = feedback_context_service.get_feedback_context(db_id, user_id)
+            
+        system_prompt = get_sql_generation_prompt(context, feedback_context=feedback)
         
         response = self._generate_response(f"{system_prompt}\n\nUser Intent: {prompt}", model_id=model_id, user_id=user_id)
         if not response or response.startswith("AI Error:"):

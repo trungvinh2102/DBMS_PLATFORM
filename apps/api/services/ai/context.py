@@ -64,8 +64,11 @@ class SchemaContextService:
             # Format DDL
             table_def = self._build_table_ddl(table, columns, all_fks)
             
-            # Fetch sample rows
-            samples = db_service.run_dynamic_query(db_id, lambda conn: self._get_samples(conn, table, schema, db_type))
+            # Fetch sample rows (Limit to first 5 tables to improve speed)
+            samples = None
+            if count < 5:
+                samples = db_service.run_dynamic_query(db_id, lambda conn: self._get_samples(conn, table, schema, db_type))
+            
             if samples and samples.get("rows"):
                 table_def.append("-- SAMPLE DATA (3 rows):")
                 table_def.append(f"-- Columns: {', '.join(samples['columns'])}")

@@ -176,24 +176,31 @@ export function AIAssistantSidebar() {
     }
   };
 
-  const AIActions = {
-    onExplain: async (s: string) => {
-      setIsTyping(true);
-      try {
-        const res = await aiApi.explainSQL({ sql: s, modelId: selectedModel });
-        addAssistantMessage(res.explanation);
-      } finally { setIsTyping(false); }
-    },
-    onOptimize: async (s: string) => {
-      setIsTyping(true);
-      try {
-        const res = await aiApi.optimizeSQL({ sql: s, databaseId: lab.selectedDS, schema: lab.selectedSchema, modelId: selectedModel });
-        addAssistantMessage("Here is an optimized version:", res.sql || res.result);
-      } finally { setIsTyping(false); }
-    },
-    onApply: (sql: string) => lab.setSql(sql),
-    onSuggestionClick: (suggestion: string) => _handleSend(suggestion)
-  };
+  const handleExplain = useCallback(async (s: string) => {
+    setIsTyping(true);
+    try {
+      const res = await aiApi.explainSQL({ sql: s, modelId: selectedModel });
+      addAssistantMessage(res.explanation);
+    } finally { setIsTyping(false); }
+  }, [selectedModel, addAssistantMessage, setIsTyping]);
+
+  const handleOptimize = useCallback(async (s: string) => {
+    setIsTyping(true);
+    try {
+      const res = await aiApi.optimizeSQL({ sql: s, databaseId: lab.selectedDS, schema: lab.selectedSchema, modelId: selectedModel });
+      addAssistantMessage("Here is an optimized version:", res.sql || res.result);
+    } finally { setIsTyping(false); }
+  }, [lab.selectedDS, lab.selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
+
+  const handleApply = useCallback((sql: string) => lab.setSql(sql), [lab.setSql]);
+  const handleSuggestionClick = useCallback((suggestion: string) => _handleSend(suggestion), [_handleSend]);
+
+  const AIActions = React.useMemo(() => ({
+    onExplain: handleExplain,
+    onOptimize: handleOptimize,
+    onApply: handleApply,
+    onSuggestionClick: handleSuggestionClick
+  }), [handleExplain, handleOptimize, handleApply, handleSuggestionClick]);
 
   if (!lab.showAISidebar) return null;
 

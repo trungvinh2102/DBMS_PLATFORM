@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 from .ai.sql import SqlAIService
 from .ai.agent import AgentAIService
 from .ai.context import schema_context_service
+from .ai.feedback_context import feedback_context_service
 
 logger = logging.getLogger(__name__)
 
@@ -72,57 +73,43 @@ class AIService(SqlAIService, AgentAIService):
 
     def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None, conv_id: Optional[str] = None):
         """Streams responses for chat interfaces using SSE events."""
-        system_prompt = "You are the Supreme SQL Architect."
+        # Yield clean text. Frontend will handle wrapping for the UI steps.
+        yield "thinking", "Initializing context..."
+        
+        system_prompt = "You are the Supreme SQL Architect. Use English for reasoning steps but respond in the user's language."
         if db_id:
+            yield "thinking", "Analyzing schema..."
+            
+            # Yield tool call metadata as JSON
+            yield "tool_call", json.dumps({"name": "SchemaContextLoader", "args": {"databaseId": db_id, "intent": "Nạp thông tin database"}})
+            
             context = self._format_schema_context(db_id, schema, intent=prompt)
+            
+            # Fetch feedback context if user_id is available
+            feedback = ""
+            if user_id:
+                yield "thinking", "Learning from your feedback..."
+                feedback = feedback_context_service.get_feedback_context(db_id, user_id)
+
             from .prompts import get_sql_generation_prompt
-            system_prompt = get_sql_generation_prompt(context)
+            system_prompt = get_sql_generation_prompt(context, feedback_context=feedback)
+            yield "thinking", "Sẵn sàng."
+        else:
+            yield "thinking", "Khởi tạo xong."
 
         messages = self._context_mgr.build_context(conv_id, prompt) if conv_id else [{'role': 'user', 'parts': [{'text': prompt}]}]
         
         try:
             model = genai.GenerativeModel(model_name=model_id or "gemini-2.0-flash", system_instruction=system_prompt)
-            
-            # State tracker for event types
-            current_event = "thinking"
-            
             for chunk in model.generate_content(messages, stream=True):
-                if not chunk.candidates:
-                    continue
-                
+                if not chunk.candidates: continue
                 for part in chunk.candidates[0].content.parts:
-                    # 1. Handle native thinking (for models like Gemini 2.0 Flash Thinking)
                     if hasattr(part, 'thought') and part.thought:
+                        # Clean thought text from AI
                         yield "thinking", part.thought
-                        continue
-
-                    # 2. Handle native function/tool calls
-                    if part.function_call:
-                        args = {k: v for k, v in part.function_call.args.items()}
-                        yield "tool_call", json.dumps({
-                            "name": part.function_call.name,
-                            "args": args
-                        })
-                        continue
-
-                    # 3. Handle standard text chunks
-                    if part.text:
-                        text = part.text
-                        
-                        # Simple state machine to switch events based on markers
-                        if "<thinking>" in text:
-                            current_event = "thinking"
-                        elif "<confidence>" in text:
-                            current_event = "confidence"
-                        elif "```sql" in text:
-                            current_event = "sql"
-                        elif "### ANALYSIS" in text:
-                            current_event = "analysis"
-                        
-                        yield current_event, text
-
+                    elif hasattr(part, 'text') and part.text:
+                        yield "message", part.text
         except Exception as e:
-            logger.error(f"Streaming failed: {e}")
             yield "error", str(e)
 
 # Singleton Instance
