@@ -11,7 +11,7 @@ interface ConfidenceBadgeProps {
   score: number;
 }
 
-export const ConfidenceBadge = ({ score }: ConfidenceBadgeProps) => (
+export const ConfidenceBadge = React.memo(({ score }: ConfidenceBadgeProps) => (
   <div className={cn(
     "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold border",
     score >= 4 
@@ -21,4 +21,4 @@ export const ConfidenceBadge = ({ score }: ConfidenceBadgeProps) => (
     <Sparkles className="h-2.5 w-2.5" />
     {score * 20}% Confidence
   </div>
-);
+));

@@ -24,7 +24,7 @@ interface SQLBlockProps {
   onApply: (sql: string) => void;
 }
 
-export const SQLBlock = ({ 
+export const SQLBlock = React.memo(({ 
   sql, 
   isDark, 
   onCopy, 
@@ -120,4 +120,4 @@ export const SQLBlock = ({
       </Button>
     </div>
   </div>
-);
+));

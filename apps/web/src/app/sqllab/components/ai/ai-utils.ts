@@ -24,6 +24,10 @@ export const extractConfidence = (content: string, msgConfidence?: number) => {
 
   const match = content.match(/<confidence>([1-5])<\/confidence>/i);
   const score = match ? parseInt(match[1]) : 4; // Default to 4 if not found
-  const cleaned = content.replace(/<confidence>[1-5]<\/confidence>/gi, "").trim();
+  const cleaned = content
+    .replace(/<confidence>[1-5]<\/confidence>/gi, "")
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<thinking>[\s\S]*/gi, "")
+    .trim();
   return { score, cleaned };
 };

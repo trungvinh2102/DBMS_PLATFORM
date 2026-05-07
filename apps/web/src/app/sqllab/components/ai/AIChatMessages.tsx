@@ -7,7 +7,8 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AIMessage, Message } from "./AIMessage";
+import { AIMessage } from "./AIMessage";
+import { Message } from "./types";
 
 interface AIChatMessagesProps {
   messages: Message[];

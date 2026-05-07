@@ -6,7 +6,7 @@
 import { useState, useCallback } from "react";
 import { aiApi } from "../../../lib/api-client";
 import { toast } from "sonner";
-import { Message } from "../components/ai/AIMessage";
+import { Message, AIStep } from "../components/ai/types";
 
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -20,7 +20,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     if (message.role === "user") return { content: message.content };
 
     let text = message.content.trim();
-    
+
     // 1. Check if content is JSON (New Agent format)
     if (text.startsWith("{") && (text.endsWith("}") || text.includes("}"))) {
       try {
@@ -28,7 +28,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         const lastBrace = text.lastIndexOf("}");
         const jsonStr = text.substring(0, lastBrace + 1);
         const data = JSON.parse(jsonStr);
-        
+
         return {
           content: data.summary || data.content || "",
           explanation: data.explanation || "",
@@ -51,29 +51,68 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let sql = "";
     let analysis = "";
 
-    // Extract Thinking Section
-    const thoughtMatch = text.match(/<thinking>([\s\S]*?)<\/thinking>/i);
-    if (thoughtMatch) {
-      const tagIndex = text.toLowerCase().indexOf("<thinking>");
-      const preTag = text.substring(0, tagIndex).trim();
-      thought = [preTag, thoughtMatch[1].trim()].filter(Boolean).join("\n\n");
-      
-      // Content is everything after the closing tag
-      const closingTag = "</thinking>";
-      const closingIndex = text.toLowerCase().indexOf(closingTag);
-      content = text.substring(closingIndex + closingTag.length).trim();
-    } else {
-      const partialThought = text.match(/<thinking>([\s\S]*)/i);
-      if (partialThought) {
-        const tagIndex = text.toLowerCase().indexOf("<thinking>");
-        const preTag = text.substring(0, tagIndex).trim();
-        
-        // Ensure thought is at least a space so UI status logic treats it as present
-        const thoughtContent = partialThought[1].trim();
-        thought = [preTag, thoughtContent].filter(Boolean).join("\n\n") || " "; 
-        content = "";
+    // Extract ALL Thinking and Tool Call Sections in order
+    const steps: AIStep[] = [];
+
+    // Regular expression to find both thinking and tool_call tags
+    const stepRegex = /<(thinking|tool_call)(?:\s+name="([^"]*)")?(?:\s+intent="([^"]*)")?(?:\s+\/>|>([\s\S]*?)<\/\1>)/gi;
+    let stepMatch;
+
+    while ((stepMatch = stepRegex.exec(text)) !== null) {
+      const [fullMatch, type, name, intent, innerContent] = stepMatch;
+      if (type === "thinking") {
+        const lines = (innerContent || "").split(/\n+/).filter(l => l.trim());
+        lines.forEach((line: string) => {
+          steps.push({ type: "thinking", content: line.trim() });
+        });
+      } else if (type === "tool_call") {
+        steps.push({
+          type: "tool_call",
+          content: intent || `Action: ${name}`,
+          name: name,
+          args: { intent }
+        });
       }
     }
+
+    // Handle partial thinking block at the end of the stream
+    const partialThoughtRegex = /<thinking>([\s\S]*)$/i;
+    const partialMatch = text.match(partialThoughtRegex);
+    if (partialMatch && !text.includes("</thinking>", partialMatch.index)) {
+      const partialLines = partialMatch[1].split(/\n+/).filter((l: string) => l.trim());
+      partialLines.forEach((line: string) => {
+        steps.push({ type: "thinking", content: line.trim() });
+      });
+    }
+
+    // Extract the final thought text for historical reference (joined)
+    thought = steps
+      .filter(s => s.type === "thinking")
+      .map(s => s.content)
+      .join("\n\n") || (partialMatch ? " " : "");
+
+    // Clean content by removing all thinking and tool_call blocks
+    // We use a more aggressive approach to catch dangling tags or mismatched blocks
+    content = text
+      .replace(/<(thinking|tool_call)[\s\S]*?(?:<\/\1>|\/>)/gi, "") // Remove balanced blocks
+      .replace(/<thinking>[\s\S]*/gi, "") // Remove any unclosed opening tag and everything after
+      .replace(/<\/thinking>/gi, "")      // Remove any dangling closing tags
+      .replace(/<tool_call[^>]*\/>/gi, "") // Remove any standalone tool tags
+      .replace(/thinking>/gi, "")         // Remove common malformed remnants
+      .replace(/<\/thinking/gi, "")
+      .trim();
+
+    // Deduplicate identical consecutive steps and remove empty ones
+    const uniqueSteps: AIStep[] = [];
+    steps.forEach(step => {
+      const trimmedContent = step.content.replace(/<thinking>|<\/thinking>/gi, '').trim();
+      if (!trimmedContent) return; // Skip empty steps
+
+      const last = uniqueSteps[uniqueSteps.length - 1];
+      if (!last || last.content !== step.content || last.type !== step.type) {
+        uniqueSteps.push(step);
+      }
+    });
 
     // Extract SQL Block
     const sqlMatch = content.match(/```sql\n([\s\S]*?)\n```/);
@@ -99,7 +138,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       content = "";
     }
 
-    return { content, thought, sql, analysis };
+    return { content, thought, sql, analysis, steps: uniqueSteps };
   }, []);
 
   const addAssistantMessage = useCallback((content: string, sql?: string, explanation?: string, isActionable = true) => {
@@ -205,28 +244,56 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           conversationId: conversationId || undefined,
         },
         (chunk, event) => {
-          fullContent += chunk;
-          
-          // Debugging: Monitor event flow
-          if (event && event !== 'message') {
-            console.log(`[AI Event: ${event}]`, chunk);
+          // Internal state tracking for structured history
+          const lastOpen = fullContent.lastIndexOf("<thinking>");
+          const lastClose = fullContent.lastIndexOf("</thinking>");
+          const isInsideThinking = lastOpen > lastClose;
+
+          if (event === "thinking") {
+            if (!isInsideThinking) {
+              fullContent += `<thinking>${chunk}`;
+            } else {
+              fullContent += chunk;
+            }
+          } else if (event === "tool_call") {
+            // Ensure any open thinking is closed before tool metadata
+            if (isInsideThinking) {
+              fullContent += "</thinking>";
+            }
+            try {
+              const toolData = typeof chunk === "string" ? JSON.parse(chunk) : chunk;
+              const intent = toolData.args?.intent || toolData.name;
+              fullContent += `<tool_call name="${toolData.name}" intent="${intent}" />`;
+            } catch (e) {
+              fullContent += `<tool_call name="unknown" intent="Invoking tool..." />`;
+            }
+          } else if (event !== "error") {
+            // For other events (message, sql, confidence, etc.), do NOT force-close thinking.
+            // The backend may switch event types before the closing </thinking> tag is emitted.
+            // We let fullContent accumulate and the parser handles the tags naturally.
+            fullContent += chunk;
           }
 
-          // Parse the accumulating content to update specific fields (thinking, sql, etc.)
+          // Parse the accumulating content to extract steps, sql, content, etc.
           const parsed = parseMessageContent({ role: "assistant", content: fullContent });
-          
-          // Log parsing results to see if 'thought' is being extracted
-          if (parsed.thought) {
-            console.log(`[Extracted Thought]: ${parsed.thought.substring(0, 30)}...`);
-          }
 
-          setMessages(prev => prev.map(m =>
-            m.id === assistantMsgId ? {
+          setMessages(prev => prev.map(m => {
+            if (m.id !== assistantMsgId) return m;
+
+            if (event === "error") {
+              return {
+                ...m,
+                content: `Error: ${chunk}`,
+                isActionable: false
+              };
+            }
+
+            return {
               ...m,
               ...parsed,
               isActionable: true
-            } : m
-          ));
+            };
+          }));
         },
         (headers) => {
           const cid = headers.get("X-Conversation-Id");

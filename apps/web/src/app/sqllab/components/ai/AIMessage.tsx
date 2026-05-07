@@ -1,17 +1,19 @@
 /**
  * @file AIMessage.tsx
- * @description Renders individual chat messages within the AI Assistant. 
- * Provides a structured layout for reasoning, text, SQL, and data previews.
+ * @description Main message orchestrator that handles different types of AI and User responses.
+ * Follows SRP by delegating rendering of specialized sections to sub-components.
  */
 
-import React, { useState, useEffect, Suspense, useCallback } from "react";
-import { FileSearch, ArrowRight, MessageSquare, User, BrainCircuit } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { FileSearch, MessageSquare, User, BrainCircuit } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
 import { aiApi } from "@/lib/api-client";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+// Types
+import { Message } from "./types";
 
 // Sub-components
 import { DataTablePreview } from "./DataTablePreview";
@@ -19,30 +21,11 @@ import { SQLBlock } from "./SQLBlock";
 import { ReasoningSection } from "./ReasoningSection";
 import { FeedbackSection } from "./FeedbackSection";
 import { ConfidenceBadge } from "./ConfidenceBadge";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+import { SuggestionList } from "./SuggestionList";
+
+// Utils
 import { extractConfidence } from "./ai-utils";
-
-// Lazy-loaded heavy components
-const ReactMarkdown = React.lazy(() => import('react-markdown'));
-const Prism = React.lazy(() => import('react-syntax-highlighter').then(m => ({ default: m.Prism })));
-
-// Prism Styles
-import vscDarkPlus from 'react-syntax-highlighter/dist/cjs/styles/prism/vsc-dark-plus';
-import oneLight from 'react-syntax-highlighter/dist/cjs/styles/prism/one-light';
-
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  sql?: string;
-  explanation?: string;
-  thought?: string;
-  analysis?: string;
-  confidence?: number;
-  columns?: string[];
-  data?: any[];
-  isActionable?: boolean;
-  suggestions?: string[];
-}
 
 interface AIMessageProps {
   message: Message;
@@ -53,56 +36,54 @@ interface AIMessageProps {
   conversationId?: string | null;
 }
 
-export function AIMessage({ 
-  message, 
-  onExplain, 
-  onOptimize, 
-  onApply, 
-  onSuggestionClick, 
-  conversationId 
-}: AIMessageProps) {
-  const [showThought, setShowThought] = useState(false);
-  const [copied, setCopied] = useState(false);
+const AIMessageComponent = ({
+  message,
+  onExplain,
+  onOptimize,
+  onApply,
+  onSuggestionClick,
+  conversationId
+}: AIMessageProps) => {
+  const [isThoughtVisible, setIsThoughtVisible] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
-  const [showCorrection, setShowCorrection] = useState(false);
+  const [shouldShowCorrection, setShouldShowCorrection] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  
+  const [isFeedbackSubmitted, setIsFeedbackSubmitted] = useState(false);
+
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
   // Auto-expand reasoning when it starts streaming without final results
   useEffect(() => {
-    if (message.thought && !message.sql && !showThought) {
-      setShowThought(true);
+    if (message.thought && !message.sql && !isThoughtVisible) {
+      setIsThoughtVisible(true);
     }
-  }, [message.thought, message.sql, showThought]);
+  }, [message.thought, message.sql, isThoughtVisible]);
 
-  const getStatus = useCallback(() => {
+  const status = useMemo(() => {
     if (message.content?.startsWith("Error:")) return null;
-    
-    // If we have any final results, we don't need a status anymore
     if (message.sql || (message.content && !message.content.includes("Thinking"))) return null;
-
-    // If we have thought process (even if currently empty string during stream)
-    if (message.thought !== undefined && !message.sql) return "Thinking...";
-    
-    // Initial state
     if (!message.content && !message.thought && !message.sql) return "Brainstorming SQL strategy...";
-    
     return null;
-  }, [message]);
+  }, [message.content, message.thought, message.sql]);
 
-  const status = getStatus();
-  const { score, cleaned } = extractConfidence(message.content || "", message.confidence);
+  const { score, cleaned } = useMemo(() => 
+    extractConfidence(message.content || "", message.confidence), 
+    [message.content, message.confidence]
+  );
+
   const isError = message.content?.startsWith("Error:");
-  const hasTextContent = cleaned.trim().length > 0 && !cleaned.includes("Crafting the SQL");
+  const hasTextContent = cleaned.trim().length > 0 &&
+    !cleaned.includes("Crafting the SQL") &&
+    !cleaned.includes("<thinking>");
+  
   const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation) || isError;
 
-  const handleFeedback = async (rating: 1 | -1) => {
+  const handleFeedback = useCallback(async (rating: 1 | -1) => {
     setFeedbackRating(rating);
     if (rating === -1) {
-      setShowCorrection(true);
+      setShouldShowCorrection(true);
       return;
     }
     try {
@@ -111,14 +92,14 @@ export function AIMessage({
         rating,
         conversationId: conversationId || undefined,
       });
-      setFeedbackSubmitted(true);
+      setIsFeedbackSubmitted(true);
       toast.success("Thanks for the feedback!");
     } catch {
       toast.error("Failed to save feedback");
     }
-  };
+  }, [message.id, conversationId]);
 
-  const handleSubmitCorrection = async () => {
+  const handleSubmitCorrection = useCallback(async () => {
     try {
       await aiApi.submitFeedback({
         messageId: message.id,
@@ -126,22 +107,22 @@ export function AIMessage({
         correction: correctionText,
         conversationId: conversationId || undefined,
       });
-      setFeedbackSubmitted(true);
-      setShowCorrection(false);
+      setIsFeedbackSubmitted(true);
+      setShouldShowCorrection(false);
       toast.success("Feedback saved — we'll improve!");
     } catch {
       toast.error("Failed to save feedback");
     }
-  };
+  }, [message.id, conversationId, correctionText]);
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     if (message.sql) {
       navigator.clipboard.writeText(message.sql);
-      setCopied(true);
+      setIsCopied(true);
       toast.success('SQL copied to clipboard');
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setIsCopied(false), 2000);
     }
-  };
+  }, [message.sql]);
 
   return (
     <div className={cn(
@@ -163,11 +144,12 @@ export function AIMessage({
         message.role === "user" ? "items-end" : "items-start w-full ai-message",
       )}>
         {/* 1. Reasoning Section (Assistant only) */}
-        {message.role === "assistant" && message.thought && (
-          <ReasoningSection 
+        {message.role === "assistant" && (message.thought || (message.steps && message.steps.length > 0)) && (
+          <ReasoningSection
             thought={message.thought}
-            showThought={showThought}
-            onToggle={() => setShowThought(!showThought)}
+            steps={message.steps}
+            showThought={isThoughtVisible}
+            onToggle={() => setIsThoughtVisible(!isThoughtVisible)}
             isDark={isDark}
             isGeneratingSQL={!message.sql && !isError && !message.content}
           />
@@ -177,7 +159,7 @@ export function AIMessage({
         {(showPrimaryBubble || message.role === "user") && (
           <div className={cn(
             "p-4 rounded-3xl text-[12px] leading-relaxed transition-all relative w-full",
-            message.role === "user" 
+            message.role === "user"
               ? "bg-primary text-primary-foreground rounded-tr-none shadow-lg w-fit ml-auto"
               : isDark ? "glass-v2 border border-white/5" : "bg-white border border-slate-200 shadow-sm"
           )}>
@@ -192,59 +174,26 @@ export function AIMessage({
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-1.5">
                       <MessageSquare className="h-3 w-3" /> AI Response
                     </span>
-                  ) }
+                  )}
                 </div>
-                {score > 0 && !status && <ConfidenceBadge score={score} />}
+                {message.confidence !== undefined && !status && <ConfidenceBadge score={score} />}
               </div>
             )}
 
-            <div className={cn(
-               message.role === "assistant" ? "prose prose-sm dark:prose-invert max-w-none" : "whitespace-pre-wrap"
-            )}>
-              <Suspense fallback={null}>
-                <ReactMarkdown
-                  components={{
-                    code({ node, className, children, ...props }: any) {
-                      const match = /language-(\w+)/.exec(className || "");
-                      return match ? (
-                        <Prism
-                          style={isDark ? vscDarkPlus : oneLight}
-                          language={match[1]}
-                          PreTag="div"
-                          customStyle={{
-                            margin: "0.8em 0",
-                            borderRadius: "10px",
-                            fontSize: "10px",
-                            background: message.role === "user" 
-                              ? "rgba(0,0,0,0.2)" 
-                              : isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.03)",
-                            border: message.role === "user" ? "1px solid rgba(255,255,255,0.1)" : "none",
-                          }}
-                          {...props}
-                        >
-                          {String(children).replace(/\n$/, "")}
-                        </Prism>
-                      ) : (
-                        <code className={cn(
-                          "px-1.5 py-0.5 rounded font-mono text-[10px]",
-                          message.role === "user" ? "bg-black/20" : "bg-black/5 dark:bg-white/10"
-                        )} {...props}>
-                          {children}
-                        </code>
-                      );
-                    },
-                  }}
-                >
-                  {message.role === "user" ? message.content : (cleaned || message.content)}
-                </ReactMarkdown>
-              </Suspense>
-            </div>
+            <MarkdownRenderer
+              content={message.role === "user" ? message.content : (cleaned || message.content)}
+              isDark={isDark}
+              role={message.role}
+              className={isError ? "text-destructive font-medium" : ""}
+            />
 
             {message.explanation && message.role === "assistant" && (
-              <div className="pt-3 mt-4 border-t border-border/40 text-[11.5px] text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
-                <Suspense fallback={null}>
-                  <ReactMarkdown>{message.explanation}</ReactMarkdown>
-                </Suspense>
+              <div className="pt-3 mt-4 border-t border-border/40 text-[11.5px] text-muted-foreground italic leading-relaxed">
+                <MarkdownRenderer
+                  content={message.explanation}
+                  isDark={isDark}
+                  role="assistant"
+                />
               </div>
             )}
           </div>
@@ -254,11 +203,11 @@ export function AIMessage({
         {message.role === "assistant" && (
           <div className="w-full flex flex-col gap-4 mt-1">
             {message.sql && (
-              <SQLBlock 
+              <SQLBlock
                 sql={message.sql}
                 isDark={isDark}
                 onCopy={handleCopy}
-                copied={copied}
+                copied={isCopied}
                 onExplain={onExplain}
                 onOptimize={onOptimize}
                 onApply={onApply}
@@ -277,11 +226,11 @@ export function AIMessage({
                 <div className="flex items-center gap-2 mb-3 text-primary font-black uppercase tracking-widest text-[10px]">
                   <FileSearch className="h-3.5 w-3.5" /> Detailed Analysis
                 </div>
-                <div className="text-[11.5px] text-muted-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none">
-                  <Suspense fallback={null}>
-                    <ReactMarkdown>{message.analysis}</ReactMarkdown>
-                  </Suspense>
-                </div>
+                <MarkdownRenderer
+                  content={message.analysis}
+                  isDark={isDark}
+                  role="assistant"
+                />
               </div>
             )}
           </div>
@@ -291,10 +240,10 @@ export function AIMessage({
         {message.role === "assistant" && (
           <div className="w-full">
             {message.content && !message.content.startsWith("Error:") && (
-              <FeedbackSection 
-                feedbackSubmitted={feedbackSubmitted}
+              <FeedbackSection
+                feedbackSubmitted={isFeedbackSubmitted}
                 feedbackRating={feedbackRating}
-                showCorrection={showCorrection}
+                showCorrection={shouldShowCorrection}
                 correctionText={correctionText}
                 onRating={handleFeedback}
                 onCorrectionChange={setCorrectionText}
@@ -302,24 +251,16 @@ export function AIMessage({
               />
             )}
 
-            {message.suggestions && message.suggestions.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2 duration-700">
-                {message.suggestions.map((suggestion, i) => (
-                  <button
-                    key={i}
-                    onClick={() => onSuggestionClick?.(suggestion)}
-                    className="px-3 py-1.5 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 text-[10px] font-medium text-primary transition-all hover:scale-105 active:scale-95 flex items-center gap-2 group/sug"
-                  >
-                    <div className="w-1 h-1 bg-primary rounded-full animate-pulse group-hover/sug:animate-bounce" />
-                    {suggestion}
-                    <ArrowRight className="h-2.5 w-2.5 opacity-0 -translate-x-1 group-hover/sug:opacity-100 group-hover/sug:translate-x-0 transition-all" />
-                  </button>
-                ))}
-              </div>
-            )}
+            <SuggestionList
+              suggestions={message.suggestions || []}
+              onSuggestionClick={onSuggestionClick || (() => {})}
+            />
           </div>
         )}
       </div>
     </div>
   );
-}
+};
+
+export const AIMessage = React.memo(AIMessageComponent);
+AIMessage.displayName = "AIMessage";

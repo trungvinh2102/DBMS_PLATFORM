@@ -15,7 +15,7 @@ interface DataTablePreviewProps {
  * DataTablePreview Component
  * Displays the first 5 rows and columns of a dataset to provide a quick glance at AI results.
  */
-export const DataTablePreview = ({ columns, data }: DataTablePreviewProps) => (
+export const DataTablePreview = React.memo(({ columns, data }: DataTablePreviewProps) => (
   <div className="mt-4 p-2.5 rounded-2xl bg-muted/20 border border-primary/10 glass-v2 overflow-hidden">
     <div className="flex items-center gap-2 mb-2 px-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
       <Sparkles className="h-3 w-3" />
@@ -47,4 +47,4 @@ export const DataTablePreview = ({ columns, data }: DataTablePreviewProps) => (
       Showing top 5 of {data.length} records. Open in SQL Lab for full results.
     </div>
   </div>
-);
+));

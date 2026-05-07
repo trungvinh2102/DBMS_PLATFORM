@@ -17,7 +17,7 @@ interface FeedbackSectionProps {
   onSubmitCorrection: () => void;
 }
 
-export const FeedbackSection = ({
+export const FeedbackSection = React.memo(({
   feedbackSubmitted,
   feedbackRating,
   showCorrection,
@@ -85,4 +85,4 @@ export const FeedbackSection = ({
       </div>
     )}
   </div>
-);
+));
