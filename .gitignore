@@ -78,3 +78,8 @@ apps/api/database/samples/
 *.db
 
 bin/
+
+# AI Agents Skill
+skills/
+.agent/
+.codex/
