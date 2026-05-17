@@ -1,0 +1,152 @@
+"""
+startup.py
+
+Database startup helpers for schema creation, local migrations, and default
+seed data used by the FastAPI application.
+"""
+
+import uuid
+
+
+DEFAULT_ROLES = [
+    {"name": "Admin", "description": "Full system access"},
+    {"name": "Creator", "description": "Can create and manage resources"},
+    {"name": "Viewer", "description": "Can view shared resources"},
+    {"name": "Default", "description": "Basic access"},
+]
+
+
+def setup_database():
+    """Ensure the system database is ready with schema and default seeds."""
+    from models.metadata import Base, Role, SessionLocal, User, engine
+
+    if not engine:
+        return
+
+    session = None
+    try:
+        print("Backend: Checking and initializing database schema...")
+        Base.metadata.create_all(engine)
+        migrate_user_ai_configs_for_provider_keys(engine)
+
+        session = SessionLocal()
+        seed_roles(session, Role)
+        seed_default_admin(session, Role, User)
+        session.commit()
+        print("Backend: Database setup complete.")
+    except Exception as exc:
+        print(f"Backend Error: Automated setup failed: {exc}")
+        if session:
+            session.rollback()
+    finally:
+        if session:
+            session.close()
+
+
+def seed_roles(session, role_model):
+    """Create built-in roles when they do not exist yet."""
+    for role_data in DEFAULT_ROLES:
+        if session.query(role_model).filter(role_model.name == role_data["name"]).first():
+            continue
+
+        role_id = "default" if role_data["name"] == "Default" else str(uuid.uuid4())
+        session.add(role_model(id=role_id, **role_data))
+
+
+def seed_default_admin(session, role_model, user_model):
+    """Create the local default admin account for first-run zero setup."""
+    if session.query(user_model).count() > 0:
+        return
+
+    admin_role = session.query(role_model).filter(role_model.name == "Admin").first()
+    if not admin_role:
+        return
+
+    from services.auth_service import auth_service
+
+    admin_user = user_model(
+        id=str(uuid.uuid4()),
+        email="admin@quriodb.local",
+        username="admin",
+        password=auth_service.get_password_hash("password123"),
+        name="System Admin",
+        roleId=admin_role.id,
+    )
+    session.add(admin_user)
+    print("Backend: Default admin user created (admin / password123)")
+
+
+def migrate_user_ai_configs_for_provider_keys(engine):
+    """Allow one encrypted AI key per provider for existing SQLite metadata DBs."""
+    if not engine or engine.dialect.name != "sqlite":
+        return
+
+    with engine.begin() as connection:
+        if not _sqlite_table_exists(connection, "user_ai_configs"):
+            return
+
+        index_columns = _sqlite_unique_index_columns(connection, "user_ai_configs")
+        has_user_only_unique = ["userId"] in index_columns
+        has_user_provider_unique = ["userId", "provider"] in index_columns
+
+        if has_user_only_unique:
+            _rebuild_user_ai_configs_without_user_unique(connection)
+            has_user_provider_unique = False
+
+        if not has_user_provider_unique:
+            connection.exec_driver_sql(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_user_ai_configs_user_provider
+                ON user_ai_configs ("userId", provider)
+                """
+            )
+
+
+def _sqlite_table_exists(connection, table_name: str) -> bool:
+    row = connection.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    return bool(row)
+
+
+def _sqlite_unique_index_columns(connection, table_name: str):
+    columns_by_index = []
+    for index in connection.exec_driver_sql(f"PRAGMA index_list('{table_name}')").fetchall():
+        index_name = index[1]
+        is_unique = bool(index[2])
+        if not is_unique:
+            continue
+
+        columns = [
+            row[2]
+            for row in connection.exec_driver_sql(f"PRAGMA index_info('{index_name}')").fetchall()
+        ]
+        columns_by_index.append(columns)
+    return columns_by_index
+
+
+def _rebuild_user_ai_configs_without_user_unique(connection):
+    connection.exec_driver_sql("ALTER TABLE user_ai_configs RENAME TO user_ai_configs_legacy")
+    connection.exec_driver_sql(
+        """
+        CREATE TABLE user_ai_configs (
+            id VARCHAR NOT NULL,
+            "userId" VARCHAR NOT NULL,
+            "apiKey" VARCHAR NOT NULL,
+            provider VARCHAR,
+            created_on DATETIME,
+            changed_on DATETIME,
+            PRIMARY KEY (id),
+            FOREIGN KEY("userId") REFERENCES users (id) ON DELETE CASCADE
+        )
+        """
+    )
+    connection.exec_driver_sql(
+        """
+        INSERT INTO user_ai_configs (id, "userId", "apiKey", provider, created_on, changed_on)
+        SELECT id, "userId", "apiKey", COALESCE(provider, 'Google'), created_on, changed_on
+        FROM user_ai_configs_legacy
+        """
+    )
+    connection.exec_driver_sql("DROP TABLE user_ai_configs_legacy")

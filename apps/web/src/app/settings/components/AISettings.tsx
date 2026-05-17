@@ -37,8 +37,8 @@ export function AISettings() {
 
   // 1. Fetch AI Config
   const configQuery = useQuery({
-    queryKey: ["ai-config"],
-    queryFn: () => aiApi.getAIConfig(),
+    queryKey: ["ai-config", provider],
+    queryFn: () => aiApi.getAIConfig(false, provider),
   });
 
   // 2. Fetch Available Models
@@ -60,7 +60,8 @@ export function AISettings() {
     mutationFn: (data: { apiKey: string; provider: string }) => aiApi.saveAIConfig(data),
     onSuccess: () => {
       toast.success("AI Configuration saved to ecosystem.");
-      queryClient.invalidateQueries({ queryKey: ["ai-config"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-config", provider] });
+      queryClient.invalidateQueries({ queryKey: ["ai-status"] });
     },
     onError: (err: any) => toast.error(`Sync failed: ${err.message}`),
   });
@@ -113,7 +114,7 @@ export function AISettings() {
 
   // Mutation: Reveal API Key
   const revealKeyMutation = useMutation({
-    mutationFn: () => aiApi.getAIConfig(true),
+    mutationFn: () => aiApi.getAIConfig(true, provider),
     onSuccess: (data) => {
       if (data.apiKey) {
         setApiKey(data.apiKey);

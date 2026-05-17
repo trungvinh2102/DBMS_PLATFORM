@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from typing import Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 from pydantic import BaseModel
 from models.metadata import UserAIConfig, SessionLocal
 from utils.auth_middleware import get_current_user
@@ -21,14 +21,41 @@ class SaveConfigRequest(BaseModel):
     apiKey: str
     provider: str = "Google"
 
+
+def _provider_matches(config_provider: str, requested_provider: str) -> bool:
+    aliases = {
+        "google gemini": "google",
+        "gemini": "google",
+        "open ai": "openai",
+        "claude": "anthropic",
+        "anthripic": "anthropic",
+        "alibaba qwen": "qwen",
+    }
+    config_value = (config_provider or "Google").strip().lower()
+    requested_value = (requested_provider or "Google").strip().lower()
+    return aliases.get(config_value, config_value) == aliases.get(requested_value, requested_value)
+
+
+def _find_config(session, user_id: str, provider: str):
+    configs = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).all()
+    return next((config for config in configs if _provider_matches(config.provider, provider)), None)
+
+
 @ai_config_bp.get('/get')
-def get_config(reveal: bool = False, current_user: dict = Depends(get_current_user)):
+def get_config(
+    reveal: bool = False,
+    provider: Optional[str] = Query(default=None),
+    current_user: dict = Depends(get_current_user),
+):
     user_id = current_user.get('userId')
+    requested_provider = provider or 'Google'
     session = SessionLocal()
     try:
-        config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
+        config = _find_config(session, user_id, requested_provider) if provider else (
+            session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
+        )
         if not config:
-            return {'apiKey': None, 'provider': 'Google'}
+            return {'apiKey': None, 'provider': requested_provider}
         
         api_key = '********'
         if reveal and config.apiKey:
@@ -48,7 +75,7 @@ def get_config(reveal: bool = False, current_user: dict = Depends(get_current_us
 def save_config(data: SaveConfigRequest, current_user: dict = Depends(get_current_user)):
     user_id = current_user.get('userId')
     api_key = data.apiKey
-    provider = data.provider
+    provider = (data.provider or "Google").strip()
     
     if not api_key:
         raise HTTPException(status_code=400, detail='API Key is required')
@@ -56,16 +83,15 @@ def save_config(data: SaveConfigRequest, current_user: dict = Depends(get_curren
     session = SessionLocal()
     try:
         if api_key == '********':
-            config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
+            config = _find_config(session, user_id, provider)
             if config:
-                config.provider = provider
                 session.commit()
                 return {'message': 'Config updated successfully'}
             raise HTTPException(status_code=400, detail='No existing config to update')
 
         encrypted_key = cipher.encrypt(api_key.encode()).decode()
         
-        config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
+        config = _find_config(session, user_id, provider)
         if config:
             config.apiKey = encrypted_key
             config.provider = provider

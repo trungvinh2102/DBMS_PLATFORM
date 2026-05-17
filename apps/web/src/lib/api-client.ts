@@ -207,7 +207,7 @@ export const aiApi = {
   getAIStatus: () => req(api.get("ai/status")),
   getModels: () => req(api.get("ai/models")),
   addModel: (data: any) => req(api.post("ai/models", data)),
-  getAIConfig: (reveal: boolean = false) => req(api.get("ai-config/get", { params: { reveal } })),
+  getAIConfig: (reveal: boolean = false, provider?: string) => req(api.get("ai-config/get", { params: { reveal, provider } })),
   saveAIConfig: (data: any) => req(api.post("ai-config/save", data)),
   generateSQL: (data: any) => req(api.post("ai/generate-sql", data)),
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),

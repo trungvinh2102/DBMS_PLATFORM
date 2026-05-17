@@ -110,15 +110,9 @@ To customize the API target, use the `NEXT_PUBLIC_API_URL` environment variable 
 
 The AI Assistant uses LangChain and LangGraph behind QurioDB's existing chat API. OpenAI is the internal chat-message standard, while Gemini, Anthropic, Qwen, and DeepSeek are resolved through provider adapters.
 
-```powershell
-$env:OPENAI_API_KEY="your-openai-key"
-$env:GEMINI_API_KEY="your-gemini-key"
-$env:ANTHROPIC_API_KEY="your-anthropic-key"
-$env:QWEN_API_KEY="your-qwen-key"
-$env:DEEPSEEK_API_KEY="your-deepseek-key"
-```
+Provider API keys are saved from **Settings -> AI Assistant** into QurioDB's encrypted local metadata database. The backend reads provider keys from the database at runtime, so desktop users do not need to pass AI provider keys through environment variables.
 
-Qwen and DeepSeek use OpenAI-compatible endpoints by default. Override them when needed:
+Qwen and DeepSeek use OpenAI-compatible endpoints by default. Override the endpoint when needed:
 
 ```powershell
 $env:QWEN_BASE_URL="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"

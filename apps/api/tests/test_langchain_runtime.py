@@ -1,11 +1,13 @@
 """
 test_langchain_runtime.py
 
-Regression tests for QurioDB's LangChain provider runtime and OpenAI-compatible
-provider selection.
+Regression tests for QurioDB's LangChain provider runtime, OpenAI-compatible
+provider selection, and provider-safe AI service fallback behavior.
 """
 
-from services.ai.langchain_runtime import infer_provider_from_model_id, langchain_runtime
+import services.ai.langchain_runtime as runtime
+from services.ai.langchain_runtime import get_ai_api_key, infer_provider_from_model_id, langchain_runtime
+from services.ai.base import BaseAIService
 
 
 def test_infer_provider_from_model_id():
@@ -16,12 +18,23 @@ def test_infer_provider_from_model_id():
     assert infer_provider_from_model_id("deepseek-chat") == "deepseek"
 
 
-def test_build_model_for_supported_providers(monkeypatch):
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai")
-    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic")
-    monkeypatch.setenv("QWEN_API_KEY", "test-qwen")
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek")
+def test_build_model_for_supported_providers_uses_db_keys(monkeypatch):
+    for env_name in [
+        "OPENAI_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "GOOGLE_GENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "QWEN_API_KEY",
+        "DASHSCOPE_API_KEY",
+        "DEEPSEEK_API_KEY",
+    ]:
+        monkeypatch.delenv(env_name, raising=False)
+
+    def read_provider_config(provider, user_id=None):
+        return {"api_key": f"test-{provider}", "provider": provider}
+
+    monkeypatch.setattr(runtime, "_read_provider_ai_config", read_provider_config)
 
     cases = [
         ("openai", "gpt-4o-mini", "ChatOpenAI"),
@@ -32,5 +45,99 @@ def test_build_model_for_supported_providers(monkeypatch):
     ]
 
     for provider, model_id, class_name in cases:
-        model = langchain_runtime.build_model(model_id=model_id, provider=provider)
+        model = langchain_runtime.build_model(model_id=model_id, provider=provider, user_id="user-1")
         assert model.__class__.__name__ == class_name
+
+
+def test_get_ai_api_key_does_not_require_env(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    def read_provider_config(provider, user_id=None):
+        assert provider == "openai"
+        assert user_id == "user-1"
+        return {"api_key": "db-openai-key", "provider": "OpenAI"}
+
+    monkeypatch.setattr(runtime, "_read_provider_ai_config", read_provider_config)
+
+    assert get_ai_api_key("user-1", "OpenAI") == "db-openai-key"
+
+
+def test_status_reports_supported_provider_registry():
+    status = langchain_runtime.status()
+
+    assert status["supportedProviders"] == ["openai", "google", "anthropic", "qwen", "deepseek"]
+    assert status["defaultModels"]["openai"] == "gpt-4o-mini"
+    assert status["defaultModels"]["google"] == "gemini-2.5-flash"
+
+
+def test_non_google_langchain_failure_does_not_fallback_to_gemini(monkeypatch):
+    service = BaseAIService()
+
+    def fail_invoke(*args, **kwargs):
+        raise RuntimeError("forced langchain failure")
+
+    def fail_genai():
+        raise AssertionError("Gemini fallback should not run for OpenAI models")
+
+    monkeypatch.setattr(langchain_runtime, "invoke_text", fail_invoke)
+    monkeypatch.setattr(service, "_ensure_genai", fail_genai)
+
+    result = service._generate_response("Generate SQL", model_id="gpt-4o-mini")
+
+    assert result.startswith("AI Error: LangChain generation failed for provider openai")
+
+
+def test_user_ai_config_sqlite_migration_allows_one_key_per_provider():
+    from sqlalchemy import create_engine
+
+    from services.startup import migrate_user_ai_configs_for_provider_keys
+
+    engine = create_engine("sqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE users (
+                id VARCHAR NOT NULL,
+                PRIMARY KEY (id)
+            )
+            """
+        )
+        connection.exec_driver_sql(
+            """
+            CREATE TABLE user_ai_configs (
+                id VARCHAR NOT NULL,
+                "userId" VARCHAR NOT NULL UNIQUE,
+                "apiKey" VARCHAR NOT NULL,
+                provider VARCHAR,
+                created_on DATETIME,
+                changed_on DATETIME,
+                PRIMARY KEY (id),
+                FOREIGN KEY("userId") REFERENCES users (id) ON DELETE CASCADE
+            )
+            """
+        )
+        connection.exec_driver_sql("INSERT INTO users (id) VALUES ('user-1')")
+        connection.exec_driver_sql(
+            """
+            INSERT INTO user_ai_configs (id, "userId", "apiKey", provider)
+            VALUES ('config-1', 'user-1', 'encrypted-google', 'Google')
+            """
+        )
+
+    migrate_user_ai_configs_for_provider_keys(engine)
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            """
+            INSERT INTO user_ai_configs (id, "userId", "apiKey", provider)
+            VALUES ('config-2', 'user-1', 'encrypted-openai', 'OpenAI')
+            """
+        )
+        rows = connection.exec_driver_sql(
+            """
+            SELECT "userId", provider FROM user_ai_configs
+            ORDER BY provider
+            """
+        ).fetchall()
+
+    assert rows == [("user-1", "Google"), ("user-1", "OpenAI")]

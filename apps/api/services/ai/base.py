@@ -4,7 +4,6 @@ base.py
 Base AI service providing shared helper methods for Google GenAI integration,
 message persistence, and response parsing.
 """
-import os
 import re
 import uuid
 import logging
@@ -20,25 +19,30 @@ except ImportError:
 from models.metadata import AIChatMessage, AIGeneratedQuery, UserAIConfig, SessionLocal
 from services.conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
-from .langchain_runtime import langchain_runtime
+from .langchain_runtime import get_ai_api_key, is_google_provider, langchain_runtime
 
 logger = logging.getLogger(__name__)
 
 def _get_system_api_key() -> Optional[str]:
-    """Helper to fetch an active API key, preferring Database > ENV."""
+    """Fetches the Google/Gemini API key from encrypted DB settings."""
+    api_key = get_ai_api_key(provider="google")
+    if api_key:
+        return api_key
+
     session = SessionLocal()
     try:
-        # Get first config
-        conf = session.query(UserAIConfig).first()
-        if conf and conf.apiKey:
-            key = decrypt_key(conf.apiKey)
-            if key: return key
+        config = (
+            session.query(UserAIConfig)
+            .filter(UserAIConfig.provider.in_(["Google", "Google Gemini", "Gemini", "google", "gemini"]))
+            .first()
+        )
+        if config and config.apiKey:
+            return decrypt_key(config.apiKey)
     except Exception as e:
-        logger.warning(f"Failed to load DB key: {e}")
+        logger.warning(f"Failed to load Gemini DB key: {e}")
     finally:
-        if session:
-            session.close()
-    return os.getenv("GOOGLE_API_KEY")
+        session.close()
+    return None
 
 class BaseAIService:
     """Provides foundational AI operations and persistence."""
@@ -60,16 +64,21 @@ class BaseAIService:
         return self._api_configured
 
     def _generate_response(self, combined_prompt: str, model_id: Optional[str] = None, user_id: Optional[str] = None) -> str:
-        """Internal helper to communicate with Gemini through LangChain, with legacy fallback."""
+        """Internal helper to communicate with every supported provider through LangChain."""
+        provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         try:
             return langchain_runtime.invoke_text(
                 system_prompt="You are QurioDB's SQL-focused AI assistant.",
                 prompt=combined_prompt,
                 model_id=model_id,
                 user_id=user_id,
+                provider=provider,
             )
         except Exception as e:
-            logger.warning("LangChain generation failed; falling back to legacy Gemini SDK: %s", e)
+            logger.warning("LangChain generation failed for provider %s: %s", provider, e)
+
+        if not is_google_provider(provider):
+            return f"AI Error: LangChain generation failed for provider {provider}. Configure its API key and model settings."
 
         if not HAS_GENAI:
             return "AI Error: google-generativeai package is not installed"
@@ -82,7 +91,14 @@ class BaseAIService:
             try:
                 from routes.ai_config import decrypt_key
                 session = SessionLocal()
-                config = session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
+                config = (
+                    session.query(UserAIConfig)
+                    .filter(
+                        UserAIConfig.userId == user_id,
+                        UserAIConfig.provider.in_(["Google", "Google Gemini", "Gemini", "google", "gemini"]),
+                    )
+                    .first()
+                )
                 if config and config.apiKey:
                     key = decrypt_key(config.apiKey)
                     if key:

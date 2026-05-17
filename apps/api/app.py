@@ -5,52 +5,77 @@ Main FastAPI application entry point.
 Initializes the app, CORS, and registers routers.
 """
 
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-import os
 import json
 import logging
+import os
 import sys
 import threading
 import time
+
 import psutil
-import platform
 import uvicorn
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load environment variables BEFORE importing routes/services
-# Detect if running as PyInstaller bundle
-if getattr(sys, 'frozen', False):
-    base_path = os.path.dirname(sys.executable)
-else:
-    base_path = os.path.dirname(os.path.abspath(__file__))
-
-# Try loading from executable dir FIRST (for production)
-env_paths = [
-    os.path.join(base_path, '.env'),
-    os.path.join(base_path, 'api.env'),
-    os.path.join(base_path, 'resources', '.env'),
-    os.path.join(base_path, 'resources', 'api.env'),
-    os.path.join(base_path, '_up_', '_up_', 'api', '.env'),
-    os.path.join(base_path, '..', '_up_', '_up_', 'api', '.env'),
-    os.path.abspath('.env'),
-    os.path.abspath('api.env')
+TAURI_ORIGINS = [
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
 ]
-for p in env_paths:
-    if os.path.exists(p):
-        print(f"Backend: Loading configuration from {p}")
-        load_dotenv(dotenv_path=p, override=True)
+LOCAL_DEV_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:1420",
+    "http://127.0.0.1:1420",
+    "http://localhost:1421",
+    "http://127.0.0.1:1421",
+]
+
+
+def load_backend_environment():
+    """Load backend env files before route and service modules are imported."""
+    if getattr(sys, "frozen", False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    env_paths = [
+        os.path.join(base_path, ".env"),
+        os.path.join(base_path, "api.env"),
+        os.path.join(base_path, "resources", ".env"),
+        os.path.join(base_path, "resources", "api.env"),
+        os.path.join(base_path, "_up_", "_up_", "api", ".env"),
+        os.path.join(base_path, "..", "_up_", "_up_", "api", ".env"),
+        os.path.abspath(".env"),
+        os.path.abspath("api.env"),
+    ]
+
+    for env_path in env_paths:
+        if not os.path.exists(env_path):
+            continue
+
+        print(f"Backend: Loading configuration from {env_path}")
+        load_dotenv(dotenv_path=env_path, override=True)
         if not os.getenv("DATABASE_URL"):
             os.environ.pop("DATABASE_URL", None)
-        break
-else:
+        return
+
     os.environ.pop("DATABASE_URL", None)
     load_dotenv()
+
+
+load_backend_environment()
 
 from routes.connection_routes import connection_bp
 from routes.metadata_routes import metadata_bp
@@ -61,63 +86,12 @@ from routes.ai import ai_bp
 from routes.ai_config import ai_config_bp
 from routes.dashboard_routes import dashboard_bp
 from routes.import_routes import import_bp
+from services.startup import setup_database
 
 # Explicit imports to help PyInstaller find them
 import models.metadata
 import services.auth_service
 import passlib.handlers.bcrypt
-from models.metadata import User
-from services.auth_service import auth_service
-import uuid
-
-def setup_database():
-    """Ensure the system database is ready with schema and default seeds (Zero-Setup)."""
-    from models.metadata import Base, engine, Role, User, SessionLocal
-    import uuid
-    
-    if engine:
-        try:
-            print("Backend: Checking and initializing database schema...")
-            Base.metadata.create_all(engine)
-            
-            session = SessionLocal()
-            # 1. Seed Roles
-            roles_data = [
-                {"name": "Admin", "description": "Full system access"},
-                {"name": "Creator", "description": "Can create and manage resources"},
-                {"name": "Viewer", "description": "Can view shared resources"},
-                {"name": "Default", "description": "Basic access"},
-            ]
-            for rd in roles_data:
-                if not session.query(Role).filter(Role.name == rd["name"]).first():
-                    rid = "default" if rd["name"] == "Default" else str(uuid.uuid4())
-                    session.add(Role(id=rid, name=rd["name"], description=rd["description"]))
-            
-            # 2. Seed Default Admin if no users exist
-            if session.query(User).count() == 0:
-                admin_role = session.query(Role).filter(Role.name == "Admin").first()
-                if admin_role:
-                    from services.auth_service import auth_service
-                    hashed_pw = auth_service.get_password_hash("password123")
-                    admin_user = User(
-                        id=str(uuid.uuid4()),
-                        email="admin@quriodb.local",
-                        username="admin",
-                        password=hashed_pw,
-                        name="System Admin",
-                        roleId=admin_role.id
-                    )
-                    session.add(admin_user)
-                    print("Backend: Default admin user created (admin / password123)")
-            
-            session.commit()
-            session.close()
-            print("Backend: Database setup complete.")
-        except Exception as e:
-            print(f"Backend Error: Automated setup failed: {e}")
-            if 'session' in locals():
-                session.rollback()
-                session.close()
 
 class UnicodeJSONResponse(JSONResponse):
     def render(self, content: any) -> bytes:
@@ -138,46 +112,17 @@ def create_app():
         default_response_class=UnicodeJSONResponse
     )
     
-    origins = [
-        "tauri://localhost", 
-        "http://tauri.localhost", 
-        "https://tauri.localhost",
-        "http://localhost:3000", 
-        "http://127.0.0.1:3000",
-        "http://localhost:3001", 
-        "http://127.0.0.1:3001", 
-        "http://localhost:3002", 
-        "http://127.0.0.1:3002",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:1420", 
-        "http://127.0.0.1:1420",
-        "http://localhost:1421",
-        "http://127.0.0.1:1421"
-    ]
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=TAURI_ORIGINS + LOCAL_DEV_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["Authorization"]
     )
 
-    # Run automated setup
     setup_database()
-
-    # Register Routers
-    app.include_router(connection_bp, prefix='/api/database')
-    app.include_router(metadata_bp, prefix='/api/database')
-    app.include_router(execution_bp, prefix='/api/database')
-    app.include_router(auth_bp, prefix='/api/auth')
-    app.include_router(user_bp, prefix='/api/user')
-    app.include_router(ai_bp, prefix='/api/ai')
-    app.include_router(ai_config_bp, prefix='/api/ai-config')
-    app.include_router(dashboard_bp, prefix='/api/database/dashboard')
-    app.include_router(import_bp, prefix='/api/database')
+    register_routers(app)
 
     @app.middleware("http")
     async def log_request_info(request: Request, call_next):
@@ -200,6 +145,19 @@ def create_app():
         )
 
     return app
+
+
+def register_routers(app: FastAPI):
+    """Attach all API routers to their public prefixes."""
+    app.include_router(connection_bp, prefix="/api/database")
+    app.include_router(metadata_bp, prefix="/api/database")
+    app.include_router(execution_bp, prefix="/api/database")
+    app.include_router(auth_bp, prefix="/api/auth")
+    app.include_router(user_bp, prefix="/api/user")
+    app.include_router(ai_bp, prefix="/api/ai")
+    app.include_router(ai_config_bp, prefix="/api/ai-config")
+    app.include_router(dashboard_bp, prefix="/api/database/dashboard")
+    app.include_router(import_bp, prefix="/api/database")
 
 def monitor_parent():
     """

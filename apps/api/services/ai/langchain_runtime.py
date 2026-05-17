@@ -68,15 +68,7 @@ DEFAULT_PROVIDER_MODELS = {
     "qwen": "qwen-plus",
     "deepseek": "deepseek-chat",
 }
-PROVIDER_ENV_KEYS = {
-    "openai": ["OPENAI_API_KEY"],
-    "google": ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENAI_API_KEY"],
-    "gemini": ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GOOGLE_GENAI_API_KEY"],
-    "anthropic": ["ANTHROPIC_API_KEY"],
-    "qwen": ["QWEN_API_KEY", "DASHSCOPE_API_KEY"],
-    "deepseek": ["DEEPSEEK_API_KEY"],
-}
-
+SUPPORTED_PROVIDERS = tuple(DEFAULT_PROVIDER_MODELS.keys())
 
 def _read_user_ai_config(user_id: Optional[str]) -> Dict[str, Optional[str]]:
     """Reads user-scoped provider and API key settings when available."""
@@ -99,22 +91,42 @@ def _read_user_ai_config(user_id: Optional[str]) -> Dict[str, Optional[str]]:
     return {"api_key": None, "provider": None}
 
 
-def _env_api_key(provider: str) -> Optional[str]:
-    """Returns the first configured environment key for a provider."""
-    for env_name in PROVIDER_ENV_KEYS.get(provider.lower(), []):
-        value = os.getenv(env_name)
-        if value:
-            return value
-    return None
+def _read_provider_ai_config(provider: str, user_id: Optional[str] = None) -> Dict[str, Optional[str]]:
+    """Reads the encrypted DB key for the requested provider."""
+    normalized_provider = normalize_provider(provider)
+    session = SessionLocal()
+    try:
+        query = session.query(UserAIConfig)
+        if user_id:
+            query = query.filter(UserAIConfig.userId == user_id)
+
+        configs = query.all()
+        for config in configs:
+            if normalize_provider(config.provider) != normalized_provider:
+                continue
+            return {
+                "api_key": decrypt_key(config.apiKey) if config.apiKey else None,
+                "provider": config.provider,
+            }
+    except Exception as exc:
+        logger.warning("Failed to load %s AI key from DB: %s", normalized_provider, exc)
+    finally:
+        session.close()
+
+    return {"api_key": None, "provider": None}
 
 
 def get_ai_api_key(user_id: Optional[str] = None, provider: Optional[str] = None) -> Optional[str]:
-    """Returns the active provider API key, preferring matching user settings over env vars."""
+    """Returns the active provider API key from encrypted DB settings."""
+    normalized_provider = normalize_provider(provider)
+    provider_config = _read_provider_ai_config(normalized_provider, user_id)
+    if provider_config.get("api_key"):
+        return provider_config["api_key"]
+
     user_config = _read_user_ai_config(user_id)
-    normalized_provider = normalize_provider(provider or user_config.get("provider"))
     if normalize_provider(user_config.get("provider")) == normalized_provider and user_config.get("api_key"):
         return user_config["api_key"]
-    return _env_api_key(normalized_provider)
+    return None
 
 
 def normalize_provider(provider: Optional[str]) -> str:
@@ -129,6 +141,11 @@ def normalize_provider(provider: Optional[str]) -> str:
         "alibaba qwen": "qwen",
     }
     return aliases.get(value, value)
+
+
+def is_google_provider(provider: Optional[str]) -> bool:
+    """Returns true when a provider should use Google's native Gemini fallback."""
+    return normalize_provider(provider) == "google"
 
 
 def infer_provider_from_model_id(model_id: Optional[str]) -> str:
@@ -208,7 +225,7 @@ class LangChainRuntime:
     def status(self, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Reports local AI integration readiness without exposing secrets."""
         providers = {}
-        for provider in ["openai", "google", "anthropic", "qwen", "deepseek"]:
+        for provider in SUPPORTED_PROVIDERS:
             providers[provider] = {"hasApiKey": bool(get_ai_api_key(user_id, provider))}
 
         return {
@@ -216,6 +233,8 @@ class LangChainRuntime:
             "langgraph": HAS_LANGGRAPH,
             "langsmith": HAS_LANGSMITH,
             "anthropic": HAS_ANTHROPIC,
+            "supportedProviders": list(SUPPORTED_PROVIDERS),
+            "defaultModels": DEFAULT_PROVIDER_MODELS,
             "hasApiKey": any(item["hasApiKey"] for item in providers.values()),
             "providers": providers,
             "tracingEnabled": os.getenv("LANGSMITH_TRACING", "").lower() == "true",

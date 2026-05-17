@@ -12,7 +12,7 @@ from .ai.sql import SqlAIService
 from .ai.agent import AgentAIService
 from .ai.context import schema_context_service
 from .ai.feedback_context import feedback_context_service
-from .ai.langchain_runtime import langchain_runtime
+from .ai.langchain_runtime import is_google_provider, langchain_runtime
 from .ai.stream_parser import TaggedResponseStreamParser
 
 try:
@@ -57,19 +57,24 @@ class AIService(SqlAIService, AgentAIService):
         )
         
         prompt = f"PREFIX:\n{prefix}\n\nSUFFIX:\n{suffix}\n\nCOMPLETION:"
+        provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         try:
             completion = langchain_runtime.invoke_text(
                 system_prompt=system_instruction,
                 prompt=prompt,
                 model_id=model_id,
                 user_id=user_id,
+                provider=provider,
                 db_id=db_id,
                 temperature=0.1,
                 max_tokens=128,
             )
             return {"completion": self._clean_sql_code(completion)}
         except Exception as langchain_error:
-            logger.warning("LangChain autocomplete failed; falling back to legacy Gemini SDK: %s", langchain_error)
+            logger.warning("LangChain autocomplete failed for provider %s: %s", provider, langchain_error)
+
+        if not is_google_provider(provider):
+            return {"completion": "", "error": f"LangChain autocomplete failed for provider {provider}"}
 
         try:
             if not HAS_GENAI:
@@ -133,6 +138,7 @@ class AIService(SqlAIService, AgentAIService):
             if conv_id and not langchain_history:
                 langchain_history = self._load_langchain_history(conv_id)
 
+            provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             parser = TaggedResponseStreamParser()
             for chunk in langchain_runtime.stream_text(
                 system_prompt=system_prompt,
@@ -140,6 +146,7 @@ class AIService(SqlAIService, AgentAIService):
                 db_id=db_id,
                 model_id=model_id,
                 user_id=user_id,
+                provider=provider,
                 history=langchain_history,
             ):
                 for event, parsed_chunk in parser.feed(chunk):
@@ -148,7 +155,12 @@ class AIService(SqlAIService, AgentAIService):
                 yield event, parsed_chunk
             return
         except Exception as langchain_error:
-            logger.warning("LangChain streaming failed; falling back to legacy Gemini SDK: %s", langchain_error)
+            logger.warning("LangChain streaming failed: %s", langchain_error)
+
+        provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
+        if not is_google_provider(provider):
+            yield "error", f"LangChain streaming failed for provider {provider}"
+            return
 
         try:
             if not HAS_GENAI:

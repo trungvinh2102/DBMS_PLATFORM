@@ -1,12 +1,17 @@
+"""
+metadata.py
 
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, Text, DateTime, JSON, ForeignKey, Enum
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
-import os
+SQLAlchemy ORM models for QurioDB's local metadata database.
+"""
+
 import datetime
 import enum
-import time
+
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.orm import declarative_base, relationship
+
+from models.database import DATABASE_URL, SessionLocal, engine
 
 Base = declarative_base()
 
@@ -181,9 +186,12 @@ class AIModel(Base):
 
 class UserAIConfig(Base):
     __tablename__ = 'user_ai_configs'
+    __table_args__ = (
+        UniqueConstraint('userId', 'provider', name='uq_user_ai_configs_user_provider'),
+    )
     
     id = Column(String, primary_key=True)
-    userId = Column(String, ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
+    userId = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     apiKey = Column(String, nullable=False) # Should be encrypted
     provider = Column(String, default="Google")
     
@@ -216,70 +224,3 @@ class SchemaEmbedding(Base):
     
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-# Database connection
-import sys
-from dotenv import load_dotenv
-
-def init_engine():
-    # 1. EXTRA HARD UNSET: Ensure no persistent OS env var can overwrite our offline-first goal
-    os.environ.pop("DATABASE_URL", None)
-    
-    # 2. Attempt to load from specific apps/api/.env (highest priority if exists)
-    models_dir = os.path.dirname(os.path.abspath(__file__))
-    api_dir = os.path.dirname(models_dir)
-    api_env = os.path.join(api_dir, '.env')
-    url = None
-    if os.path.exists(api_env):
-        load_dotenv(api_env, override=True)
-        url = os.getenv("DATABASE_URL")
-            
-    # 3. Final check: If still no URL, FORCE SQLite in a guaranteed writable Zero-Setup location
-    if not url or not str(url).strip():
-        from pathlib import Path
-        
-        # Use user home directory to ensure both Web and Desktop see the same data
-        # and always have write permissions.
-        data_dir = Path.home() / '.quriodb'
-            
-        try:
-            data_dir.mkdir(parents=True, exist_ok=True)
-            db_path = (data_dir / 'quriodb.db').resolve()
-            # On Windows, we must ensure forward slashes for the URL to be valid
-            db_path_str = str(db_path).replace("\\", "/")
-            url = f"sqlite:///{db_path_str}"
-            print(f"Backend: Zero-Setup SQLite enabled at: {db_path_str}")
-        except Exception as e:
-            print(f"Backend Warning: Could not use home directory ({e}), falling back to relative path.")
-            url = "sqlite:///quriodb.db" 
-
-    print(f"Backend: Data source initialized successfully.")
-    
-    # Create engine with thread safety for SQLite
-    engine = create_engine(url, connect_args={"check_same_thread": False} if "sqlite" in url else {})
-    
-    # Enable WAL mode for SQLite performance
-    if url.startswith("sqlite"):
-        from sqlalchemy import event
-        @event.listens_for(engine, 'connect')
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.close()
-            
-    return engine, url
-
-# Initialize engine immediately at module level
-try:
-    engine, DATABASE_URL = init_engine()
-except Exception as e:
-    print(f"CRITICAL: Failed to initialize database engine: {e}")
-    engine = None
-    DATABASE_URL = None
-
-def SessionLocal():
-    if engine is None:
-        return None
-    Session = sessionmaker(bind=engine)
-    return Session()
