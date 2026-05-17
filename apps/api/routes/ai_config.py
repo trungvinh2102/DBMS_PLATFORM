@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from pydantic import BaseModel
-from models.metadata import UserAIConfig, SessionLocal
+from models import SessionLocal, UserAIConfig
 from utils.auth_middleware import get_current_user
 import uuid
 from cryptography.fernet import Fernet

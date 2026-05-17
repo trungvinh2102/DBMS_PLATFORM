@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy import text
 
 from services.base_service import BaseDatabaseService
-from models.metadata import SessionLocal
+from models import SessionLocal
 from services.metadata.sql_provider import SqlMetadataProvider
 from services.metadata.mongo_provider import MongoMetadataProvider
 from services.metadata.redis_provider import RedisMetadataProvider

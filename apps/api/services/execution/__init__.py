@@ -11,7 +11,7 @@ import uuid
 import logging
 
 from services.base_service import BaseDatabaseService
-from models.metadata import QueryHistory, SavedQuery, SessionLocal, Db
+from models import Db, QueryHistory, SavedQuery, SessionLocal
 from services.execution.sql_executor import SqlExecutor
 from services.execution.mongo_executor import MongoExecutor
 from services.execution.redis_executor import RedisExecutor

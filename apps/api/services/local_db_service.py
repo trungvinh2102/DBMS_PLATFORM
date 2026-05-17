@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy import text, inspect
 
 from services.base_service import BaseDatabaseService
-from models.metadata import SessionLocal, Db
+from models import Db, SessionLocal
 
 logger = logging.getLogger(__name__)
 

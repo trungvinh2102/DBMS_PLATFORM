@@ -18,7 +18,7 @@ DEFAULT_ROLES = [
 
 def setup_database():
     """Ensure the system database is ready with schema and default seeds."""
-    from models.metadata import Base, Role, SessionLocal, User, engine
+    from models import Base, Role, SessionLocal, User, engine
 
     if not engine:
         return

@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-from models.metadata import Base, engine, DATABASE_URL
+from models import Base, DATABASE_URL, engine
 from sqlalchemy import create_engine, text
 import logging
 

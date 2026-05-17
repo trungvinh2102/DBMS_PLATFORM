@@ -8,7 +8,7 @@ import duckdb
 import logging
 import os
 import pandas as pd
-from models.metadata import engine, SessionLocal, QueryHistory
+from models import QueryHistory, SessionLocal, engine
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)

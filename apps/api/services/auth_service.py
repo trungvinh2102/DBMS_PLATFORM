@@ -9,7 +9,7 @@ import os
 import uuid
 import logging
 from passlib.context import CryptContext
-from models.metadata import User, Role, SessionLocal
+from models import Role, SessionLocal, User
 
 logger = logging.getLogger(__name__)
 

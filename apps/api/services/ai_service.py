@@ -208,7 +208,7 @@ class AIService(SqlAIService, AgentAIService):
     def _load_langchain_history(self, conv_id: str) -> list:
         """Loads compact chat history in LangChain-compatible role/content format."""
         try:
-            from models.metadata import AIChatMessage, SessionLocal
+            from models import AIChatMessage, SessionLocal
 
             session = SessionLocal()
             try:

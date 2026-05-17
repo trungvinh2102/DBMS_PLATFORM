@@ -7,7 +7,7 @@ Safe metadata access helpers for schema retrieval.
 import logging
 from typing import Any, Dict, Iterable, List
 
-from models.metadata import SessionLocal
+from models import SessionLocal
 from services.metadata import metadata_service
 
 logger = logging.getLogger(__name__)

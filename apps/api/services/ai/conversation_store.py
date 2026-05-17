@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 from fastapi import HTTPException
 
-from models.metadata import AIChatMessage, AIConversation, AIFeedback, SessionLocal
+from models import AIChatMessage, AIConversation, AIFeedback, SessionLocal
 
 
 class AIConversationStore:

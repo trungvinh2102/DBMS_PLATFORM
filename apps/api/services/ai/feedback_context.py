@@ -7,7 +7,7 @@ to improve AI performance via few-shot prompting.
 import logging
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-from models.metadata import AIFeedback, AIChatMessage, SessionLocal
+from models import AIChatMessage, AIFeedback, SessionLocal
 
 logger = logging.getLogger(__name__)
 

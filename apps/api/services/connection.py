@@ -10,7 +10,7 @@ import os
 from typing import Dict, Any, List, Optional, Tuple
 
 from services.base_service import BaseDatabaseService
-from models.metadata import Db, SessionLocal, QueryHistory, SavedQuery
+from models import Db, QueryHistory, SavedQuery, SessionLocal
 from utils.common import mask_config, encrypt_uri, decrypt_uri
 from utils.crypto import encrypt, decrypt
 from utils.connection_utils import ConnectionStringBuilder

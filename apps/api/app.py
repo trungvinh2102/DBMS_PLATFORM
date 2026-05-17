@@ -89,7 +89,7 @@ from routes.import_routes import import_bp
 from services.startup import setup_database
 
 # Explicit imports to help PyInstaller find them
-import models.metadata
+import models
 import services.auth_service
 import passlib.handlers.bcrypt
 

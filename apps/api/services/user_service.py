@@ -3,7 +3,7 @@ user_service.py
 
 User service for managing profiles, settings, and preferences.
 """
-from models.metadata import User, UserSetting, SessionLocal
+from models import SessionLocal, User, UserSetting
 import uuid
 import json
 import os

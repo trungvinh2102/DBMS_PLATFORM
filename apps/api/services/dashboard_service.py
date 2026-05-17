@@ -5,7 +5,7 @@ Service for gathering database statistics and metrics.
 
 import logging
 from sqlalchemy import text
-from models.metadata import SessionLocal, Db
+from models import Db, SessionLocal
 import psutil
 import os
 

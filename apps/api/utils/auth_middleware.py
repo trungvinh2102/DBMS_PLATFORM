@@ -6,7 +6,7 @@ from fastapi import Request, HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 import os
-from models.metadata import User, SessionLocal
+from models import SessionLocal, User
 
 SECRET_KEY = os.getenv("JWT_SECRET", "secret")
 ALGORITHM = "HS256"

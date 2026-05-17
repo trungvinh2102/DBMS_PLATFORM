@@ -7,7 +7,7 @@ Specialized executor for Redis commands.
 import shlex
 import logging
 from typing import List, Dict, Any, Tuple
-from models.metadata import SessionLocal
+from models import SessionLocal
 
 logger = logging.getLogger(__name__)
 

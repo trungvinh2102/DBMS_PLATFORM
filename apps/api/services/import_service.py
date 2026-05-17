@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional
 from services.connection import ConnectionService
 from services.loaders.postgres_loader import PostgresLoader
 from services.loaders.sqlalchemy_loader import SQLAlchemyLoader
-from models.metadata import Db, SessionLocal
+from models import Db, SessionLocal
 
 logger = logging.getLogger(__name__)
 

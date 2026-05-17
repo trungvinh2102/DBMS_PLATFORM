@@ -5,7 +5,7 @@ Tests for connection service functionality (CRUD, Test).
 """
 
 from unittest.mock import MagicMock
-from models.metadata import Db, Environment, SSLMode
+from models import Db, Environment, SSLMode
 
 def test_list_databases(client, mock_session):
     """Test listing databases returns masked config."""

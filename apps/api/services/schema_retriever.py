@@ -8,7 +8,7 @@ import uuid
 import logging
 from typing import List, Dict, Optional
 
-from models.metadata import SessionLocal, SchemaEmbedding
+from models import SchemaEmbedding, SessionLocal
 from services.ai.retrieval import TableRetrievalResult
 from services.ai.retrieval.embedding_gateway import GeminiEmbeddingGateway
 from services.ai.retrieval.metadata_source import SchemaMetadataSource

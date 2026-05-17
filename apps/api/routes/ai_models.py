@@ -8,7 +8,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from models.metadata import AIModel, SessionLocal
+from models import AIModel, SessionLocal
 from schemas.ai import AddModelRequest
 from services.ai.langchain_runtime import langchain_runtime
 from utils.auth_middleware import get_current_user

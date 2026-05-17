@@ -8,7 +8,7 @@ import re
 import logging
 from typing import List, Dict, Any, Tuple
 from bson import json_util
-from models.metadata import SessionLocal
+from models import SessionLocal
 
 logger = logging.getLogger(__name__)
 

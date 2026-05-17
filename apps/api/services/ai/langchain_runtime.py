@@ -51,7 +51,7 @@ except ImportError:
     traceable = None
     HAS_LANGSMITH = False
 
-from models.metadata import AIModel, SessionLocal, UserAIConfig
+from models import AIModel, SessionLocal, UserAIConfig
 from routes.ai_config import decrypt_key
 
 logger = logging.getLogger(__name__)

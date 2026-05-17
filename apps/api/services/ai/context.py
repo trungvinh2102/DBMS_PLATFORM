@@ -11,7 +11,7 @@ from typing import Optional, Dict, List, Any
 from datetime import datetime
 from sqlalchemy import text
 
-from models.metadata import SessionLocal
+from models import SessionLocal
 from services.metadata import metadata_service
 from services.base_service import BaseDatabaseService
 from services.schema_retriever import TableRetrievalResult, schema_retriever

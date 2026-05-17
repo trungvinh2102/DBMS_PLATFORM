@@ -13,7 +13,7 @@ Architecture:
 import logging
 from typing import List, Dict, Optional, Any
 
-from models.metadata import AIChatMessage, SessionLocal
+from models import AIChatMessage, SessionLocal
 
 logger = logging.getLogger(__name__)
 

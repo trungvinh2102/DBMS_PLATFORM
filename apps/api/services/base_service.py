@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, pool, event
 import logging
 
-from models.metadata import Db, SessionLocal
+from models import Db, SessionLocal
 from utils.common import decrypt_uri
 from utils.connection_utils import ConnectionStringBuilder
 
@@ -226,4 +226,4 @@ class BaseDatabaseService:
             if connection:
                 connection.close()
             if session:
-                session.close()
+                session.close()

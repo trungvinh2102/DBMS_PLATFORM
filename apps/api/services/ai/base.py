@@ -16,7 +16,7 @@ except ImportError:
     genai = None
     HAS_GENAI = False
 
-from models.metadata import AIChatMessage, AIGeneratedQuery, UserAIConfig, SessionLocal
+from models import AIChatMessage, AIGeneratedQuery, SessionLocal, UserAIConfig
 from services.conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
 from .langchain_runtime import get_ai_api_key, is_google_provider, langchain_runtime
