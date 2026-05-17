@@ -25,12 +25,12 @@ class SqlAIService(BaseAIService):
         """Generates a SQL query using RAG-based context pruning and few-shot feedback."""
         self._save_chat("user", prompt, user_id, db_id)
         
-        context = schema_context_service.format_schema_context(db_id, schema, intent=prompt)
+        context_result = schema_context_service.build_schema_context(db_id, schema, intent=prompt)
         feedback = ""
         if user_id:
             feedback = feedback_context_service.get_feedback_context(db_id, user_id)
             
-        system_prompt = get_sql_generation_prompt(context, feedback_context=feedback)
+        system_prompt = get_sql_generation_prompt(context_result.context, feedback_context=feedback)
         
         response = self._generate_response(f"{system_prompt}\n\nUser Intent: {prompt}", model_id=model_id, user_id=user_id)
         if not response or response.startswith("AI Error:"):
@@ -40,7 +40,7 @@ class SqlAIService(BaseAIService):
         self._save_chat("assistant", str(response), user_id, db_id)
         self._save_generated_query(sql, prompt, "AI Generated Query", user_id, db_id)
         
-        return {"sql": sql}
+        return {"sql": sql, "retrievalTrace": context_result.retrieval_trace}
 
     def explain_sql(self, sql: str, user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Provides a natural language explanation of a SQL query."""
@@ -57,8 +57,8 @@ class SqlAIService(BaseAIService):
     def optimize_sql(self, sql: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Refactors SQL for better performance based on schema context."""
         self._save_chat("user", f"Optimize this SQL: {sql}", user_id, db_id)
-        context = schema_context_service.format_schema_context(db_id, schema, intent=f"Optimize SQL: {sql}")
-        system_prompt = get_sql_optimization_prompt(context)
+        context_result = schema_context_service.build_schema_context(db_id, schema, intent=f"Optimize SQL: {sql}")
+        system_prompt = get_sql_optimization_prompt(context_result.context)
         
         response = self._generate_response(f"{system_prompt}\n\nCURRENT SQL:\n{sql}", model_id=model_id, user_id=user_id)
         if not response or response.startswith("AI Error:"):
@@ -68,13 +68,13 @@ class SqlAIService(BaseAIService):
         self._save_chat("assistant", str(response), user_id, db_id)
         self._save_generated_query(optimized_sql, f"Optimize: {sql}", str(response), user_id, db_id)
 
-        return {"result": str(response), "sql": optimized_sql}
+        return {"result": str(response), "sql": optimized_sql, "retrievalTrace": context_result.retrieval_trace}
 
     def fix_sql(self, sql: str, error: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Analyzes a SQL error and provides a corrected version."""
         self._save_chat("user", f"Fix SQL: {sql}\nError: {error}", user_id, db_id)
-        context = schema_context_service.format_schema_context(db_id, schema, intent=f"Fix SQL: {sql} with error: {error}")
-        system_prompt = get_sql_fix_prompt(error, context)
+        context_result = schema_context_service.build_schema_context(db_id, schema, intent=f"Fix SQL: {sql} with error: {error}")
+        system_prompt = get_sql_fix_prompt(error, context_result.context)
         
         response = self._generate_response(f"{system_prompt}\n\nFAILED SQL:\n{sql}", model_id=model_id, user_id=user_id)
         if not response or response.startswith("AI Error:"):
@@ -84,4 +84,4 @@ class SqlAIService(BaseAIService):
         self._save_chat("assistant", str(response), user_id, db_id)
         self._save_generated_query(fixed_sql, f"Fix: {error}", str(response), user_id, db_id)
 
-        return {"result": str(response), "sql": fixed_sql}
+        return {"result": str(response), "sql": fixed_sql, "retrievalTrace": context_result.retrieval_trace}

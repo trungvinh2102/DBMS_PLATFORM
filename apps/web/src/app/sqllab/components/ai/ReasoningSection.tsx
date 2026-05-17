@@ -5,7 +5,7 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { BrainCircuit, Wrench, CheckCircle2 } from "lucide-react";
+import { BrainCircuit, Wrench, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIStep } from "./types";
 
@@ -32,13 +32,15 @@ export const ReasoningSection = React.memo(({
   return (
     <div className="w-full mb-2">
       <button
+        type="button"
         onClick={onToggle}
         className={cn(
-          "flex items-center gap-2 transition-all py-1.5 px-3 rounded-full border w-fit group/thought shadow-sm",
+          "group/thought flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isDark
             ? "bg-[#111419]/50 border-white/10 text-slate-400 hover:border-primary/40 hover:text-primary"
             : "bg-white border-slate-200 text-slate-500 hover:border-primary/30 hover:text-primary"
         )}
+        aria-expanded={showThought}
       >
         <div className={cn(
           "p-1 rounded-md transition-all duration-500",
@@ -47,7 +49,7 @@ export const ReasoningSection = React.memo(({
           <BrainCircuit className="h-3.5 w-3.5" />
         </div>
         <span className="text-[10.5px] font-black uppercase tracking-widest group-hover/thought:text-primary transition-colors">
-          {showThought ? "Hide Analysis Steps" : "View Analysis Steps"}
+          {showThought ? "Hide Assistant Activity" : "View Assistant Activity"}
         </span>
         {isGeneratingSQL && (
           <div className="ml-2 flex items-center gap-1">
@@ -65,14 +67,18 @@ export const ReasoningSection = React.memo(({
         <div className="min-h-0">
           {hasSteps ? (
             <div className="relative ml-4 pl-6 border-l border-primary/20 flex flex-col gap-3">
-              {steps.map((step, idx) => (
+              {steps.map((step, idx) => {
+                const isActiveStep = step.status === "active" || (idx === steps.length - 1 && isGeneratingSQL);
+
+                return (
                 <div key={idx} className="relative group/step animate-in fade-in slide-in-from-left-2 duration-500">
                   {/* Step Dot/Icon */}
                   <div className={cn(
                     "absolute -left-[31px] top-0.5 w-2.5 h-2.5 rounded-full border-2 bg-background transition-all group-hover/step:scale-125",
-                    step.type === "thinking" ? "border-primary/40" : "border-amber-400/60"
+                    step.type === "thinking" ? "border-primary/40" : "border-amber-400/60",
+                    isActiveStep && "border-primary"
                   )}>
-                    {idx === steps.length - 1 && isGeneratingSQL && (
+                    {isActiveStep && (
                       <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
                     )}
                   </div>
@@ -80,7 +86,7 @@ export const ReasoningSection = React.memo(({
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-2">
                       {step.type === "thinking" ? (
-                        <BrainCircuit className="h-3 w-3 text-primary/60" />
+                        isActiveStep ? <Loader2 className="h-3 w-3 text-primary/70 animate-spin" /> : <BrainCircuit className="h-3 w-3 text-primary/60" />
                       ) : (
                         <Wrench className="h-3 w-3 text-amber-500/60" />
                       )}
@@ -88,7 +94,7 @@ export const ReasoningSection = React.memo(({
                         "text-[9px] font-bold uppercase tracking-tighter",
                         step.type === "thinking" ? "text-primary/70" : "text-amber-500/70"
                       )}>
-                        {step.type === "thinking" ? "Reasoning" : `Tool: ${step.name || 'Action'}`}
+                        {step.type === "thinking" ? "Thinking" : `Tool call: ${step.name || 'Action'}`}
                       </span>
                     </div>
 
@@ -104,7 +110,7 @@ export const ReasoningSection = React.memo(({
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
 
               {!isGeneratingSQL && (
                 <div className="flex items-center gap-2 text-[9px] font-bold text-emerald-500/70 uppercase tracking-tighter">

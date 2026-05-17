@@ -19,7 +19,7 @@ export const AIAssistantHeader = ({
   showHistory,
   onToggleHistory,
   onNewChat,
-  onClose
+  onClose,
 }: AIAssistantHeaderProps) => (
   <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
     <div className="flex items-center gap-2">

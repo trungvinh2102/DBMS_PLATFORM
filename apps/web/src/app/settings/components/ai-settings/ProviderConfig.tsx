@@ -65,9 +65,11 @@ export function ProviderConfig({
                 <SelectValue placeholder="Select Provider" />
               </SelectTrigger>
               <SelectContent side="bottom" alignItemWithTrigger={false} className="rounded-xl border-border/50">
+                <SelectItem value="OpenAI" className="py-2.5">OpenAI</SelectItem>
                 <SelectItem value="Google" className="py-2.5">Google Gemini</SelectItem>
-                <SelectItem value="OpenAI" disabled className="py-2.5">OpenAI (Coming Soon)</SelectItem>
-                <SelectItem value="Anthropic" disabled className="py-2.5">Anthropic (Coming Soon)</SelectItem>
+                <SelectItem value="Anthropic" className="py-2.5">Anthropic Claude</SelectItem>
+                <SelectItem value="Qwen" className="py-2.5">Qwen</SelectItem>
+                <SelectItem value="DeepSeek" className="py-2.5">DeepSeek</SelectItem>
               </SelectContent>
             </Select>
           </div>

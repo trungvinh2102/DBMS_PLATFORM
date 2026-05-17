@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { FileSearch, MessageSquare, User, BrainCircuit } from "lucide-react";
+import { Check, Clipboard, FileSearch, MessageSquare, User, BrainCircuit } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
@@ -46,6 +46,7 @@ const AIMessageComponent = ({
 }: AIMessageProps) => {
   const [isThoughtVisible, setIsThoughtVisible] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isResponseCopied, setIsResponseCopied] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
   const [shouldShowCorrection, setShouldShowCorrection] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
@@ -54,19 +55,20 @@ const AIMessageComponent = ({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  // Auto-expand reasoning when it starts streaming without final results
+  // Auto-expand assistant activity while stream events are arriving.
   useEffect(() => {
-    if (message.thought && !message.sql && !isThoughtVisible) {
+    if ((message.isStreaming || message.steps?.length) && !message.sql && !isThoughtVisible) {
       setIsThoughtVisible(true);
     }
-  }, [message.thought, message.sql, isThoughtVisible]);
+  }, [message.isStreaming, message.steps?.length, message.sql, isThoughtVisible]);
 
   const status = useMemo(() => {
     if (message.content?.startsWith("Error:")) return null;
     if (message.sql || (message.content && !message.content.includes("Thinking"))) return null;
+    if (message.isStreaming && !message.content && !message.sql) return "Reading context...";
     if (!message.content && !message.thought && !message.sql) return "Brainstorming SQL strategy...";
     return null;
-  }, [message.content, message.thought, message.sql]);
+  }, [message.content, message.thought, message.sql, message.isStreaming]);
 
   const { score, cleaned } = useMemo(() => 
     extractConfidence(message.content || "", message.confidence), 
@@ -79,6 +81,7 @@ const AIMessageComponent = ({
     !cleaned.includes("<thinking>");
   
   const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation) || isError;
+  const canCopyResponse = message.role === "assistant" && !status && (hasTextContent || Boolean(message.explanation));
 
   const handleFeedback = useCallback(async (rating: 1 | -1) => {
     setFeedbackRating(rating);
@@ -124,24 +127,34 @@ const AIMessageComponent = ({
     }
   }, [message.sql]);
 
+  const handleCopyResponse = useCallback(() => {
+    const response = [cleaned || message.content, message.explanation].filter(Boolean).join("\n\n");
+    if (!response) return;
+
+    navigator.clipboard.writeText(response);
+    setIsResponseCopied(true);
+    toast.success("Response copied");
+    setTimeout(() => setIsResponseCopied(false), 2000);
+  }, [cleaned, message.content, message.explanation]);
+
   return (
     <div className={cn(
-      "flex gap-3 w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
+      "flex w-full gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300",
       message.role === "user" ? "flex-row-reverse" : "flex-row"
     )}>
       {/* Avatar Icon */}
       <div className={cn(
-        "shrink-0 w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-all duration-500",
+        "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border shadow-sm transition-all duration-500",
         message.role === "user"
           ? "bg-primary/20 border-primary/30 text-primary"
-          : "bg-muted border-border/50 text-muted-foreground"
+          : "bg-card border-border text-muted-foreground"
       )}>
-        {message.role === "user" ? <User className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
+        {message.role === "user" ? <User className="h-3.5 w-3.5" /> : <BrainCircuit className="h-3.5 w-3.5" />}
       </div>
 
       <div className={cn(
-        "flex flex-col gap-2 max-w-[85%] group",
-        message.role === "user" ? "items-end" : "items-start w-full ai-message",
+        "group flex min-w-0 flex-col gap-2",
+        message.role === "user" ? "max-w-[78%] items-end" : "w-full flex-1 items-start ai-message",
       )}>
         {/* 1. Reasoning Section (Assistant only) */}
         {message.role === "assistant" && (message.thought || (message.steps && message.steps.length > 0)) && (
@@ -151,44 +164,59 @@ const AIMessageComponent = ({
             showThought={isThoughtVisible}
             onToggle={() => setIsThoughtVisible(!isThoughtVisible)}
             isDark={isDark}
-            isGeneratingSQL={!message.sql && !isError && !message.content}
+            isGeneratingSQL={Boolean(message.isStreaming) && !isError}
           />
         )}
 
         {/* 2. Primary Response Bubble */}
         {(showPrimaryBubble || message.role === "user") && (
           <div className={cn(
-            "p-4 rounded-3xl text-[12px] leading-relaxed transition-all relative w-full",
+            "relative w-full rounded-2xl p-3.5 text-[13px] leading-6 transition-all",
             message.role === "user"
-              ? "bg-primary text-primary-foreground rounded-tr-none shadow-lg w-fit ml-auto"
-              : isDark ? "glass-v2 border border-white/5" : "bg-white border border-slate-200 shadow-sm"
+              ? "ml-auto w-fit rounded-tr-md bg-primary text-primary-foreground shadow-sm"
+              : isDark ? "border border-white/10 bg-card/70 shadow-sm" : "border border-slate-200 bg-white shadow-sm"
           )}>
             {message.role === "assistant" && (
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+              <div className="mb-3 flex items-center justify-between gap-3 border-b border-border/50 pb-2">
+                <div className="flex min-w-0 items-center gap-2">
                   {status ? (
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/60 flex items-center gap-1.5 animate-pulse">
+                    <span className="flex items-center gap-1.5 truncate text-[10px] font-semibold text-primary/80">
                       <BrainCircuit className="h-3 w-3" /> {status}
                     </span>
                   ) : (
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-1.5">
-                      <MessageSquare className="h-3 w-3" /> AI Response
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      <MessageSquare className="h-3 w-3" /> Assistant
                     </span>
                   )}
                 </div>
-                {message.confidence !== undefined && !status && <ConfidenceBadge score={score} />}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {message.confidence !== undefined && !status && <ConfidenceBadge score={score} />}
+                  {canCopyResponse && (
+                    <button
+                      type="button"
+                      onClick={handleCopyResponse}
+                      className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={isResponseCopied ? "Response copied" : "Copy assistant response"}
+                      title={isResponseCopied ? "Copied" : "Copy response"}
+                    >
+                      {isResponseCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Clipboard className="h-3.5 w-3.5" />}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
-            <MarkdownRenderer
-              content={message.role === "user" ? message.content : (cleaned || message.content)}
-              isDark={isDark}
-              role={message.role}
-              className={isError ? "text-destructive font-medium" : ""}
-            />
+            <div aria-live={message.isStreaming ? "polite" : undefined}>
+              <MarkdownRenderer
+                content={message.role === "user" ? message.content : (cleaned || message.content)}
+                isDark={isDark}
+                role={message.role}
+                className={isError ? "text-destructive font-medium" : ""}
+              />
+            </div>
 
             {message.explanation && message.role === "assistant" && (
-              <div className="pt-3 mt-4 border-t border-border/40 text-[11.5px] text-muted-foreground italic leading-relaxed">
+              <div className="mt-4 border-t border-border/50 pt-3 text-[12px] leading-6 text-muted-foreground">
                 <MarkdownRenderer
                   content={message.explanation}
                   isDark={isDark}
@@ -220,10 +248,10 @@ const AIMessageComponent = ({
 
             {message.analysis && (
               <div className={cn(
-                "p-5 rounded-3xl text-[12px] leading-relaxed shadow-sm border",
-                isDark ? "bg-[#111419] border-white/5" : "bg-slate-50 border-slate-100"
+                "rounded-2xl border p-4 text-[13px] leading-6 shadow-sm",
+                isDark ? "bg-card/70 border-white/10" : "bg-slate-50 border-slate-200"
               )}>
-                <div className="flex items-center gap-2 mb-3 text-primary font-black uppercase tracking-widest text-[10px]">
+                <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
                   <FileSearch className="h-3.5 w-3.5" /> Detailed Analysis
                 </div>
                 <MarkdownRenderer

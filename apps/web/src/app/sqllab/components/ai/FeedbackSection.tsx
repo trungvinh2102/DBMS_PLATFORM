@@ -32,25 +32,29 @@ export const FeedbackSection = React.memo(({
         <div className="flex items-center gap-1.5">
           <span className="text-[9px] text-muted-foreground/50 font-bold uppercase tracking-widest mr-1">Helpful?</span>
           <button
+            type="button"
             onClick={() => onRating(1)}
             className={cn(
-              "p-1.5 rounded-lg transition-all duration-200 hover:scale-110",
+              "rounded-lg p-1.5 transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               feedbackRating === 1
                 ? "bg-emerald-500/20 text-emerald-500"
                 : "hover:bg-emerald-500/10 text-muted-foreground/40 hover:text-emerald-500"
             )}
+            aria-label="Mark assistant response as helpful"
             title="Good response"
           >
             <ThumbsUp className="h-3.5 w-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => onRating(-1)}
             className={cn(
-              "p-1.5 rounded-lg transition-all duration-200 hover:scale-110",
+              "rounded-lg p-1.5 transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               feedbackRating === -1
                 ? "bg-red-500/20 text-red-500"
                 : "hover:bg-red-500/10 text-muted-foreground/40 hover:text-red-500"
             )}
+            aria-label="Mark assistant response as not helpful"
             title="Bad response"
           >
             <ThumbsDown className="h-3.5 w-3.5" />
@@ -69,8 +73,10 @@ export const FeedbackSection = React.memo(({
               autoFocus
             />
             <button
+              type="button"
               onClick={onSubmitCorrection}
-              className="p-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+              className="rounded-lg bg-primary/10 p-1.5 text-primary transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Submit assistant feedback"
               title="Submit feedback"
             >
               <Send className="h-3.5 w-3.5" />

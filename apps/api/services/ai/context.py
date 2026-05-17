@@ -5,6 +5,8 @@ Schema context generator for AI services, including RAG-based table selection
 and sample data injection.
 """
 import logging
+import os
+from dataclasses import dataclass
 from typing import Optional, Dict, List, Any
 from datetime import datetime
 from sqlalchemy import text
@@ -12,9 +14,18 @@ from sqlalchemy import text
 from models.metadata import SessionLocal
 from services.metadata import metadata_service
 from services.base_service import BaseDatabaseService
-from services.schema_retriever import schema_retriever
+from services.schema_retriever import TableRetrievalResult, schema_retriever
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SchemaContextResult:
+    """Schema prompt context plus retrieval trace metadata."""
+
+    context: str
+    retrieval_trace: Dict[str, Any]
+
 
 class SchemaContextService:
     """Provides structured database schema context for AI prompts."""
@@ -24,11 +35,24 @@ class SchemaContextService:
         self._cache_ttl_minutes = 10
 
     def format_schema_context(self, db_id: str, schema: str, intent: Optional[str] = None) -> str:
+        """Returns schema context text for existing callers."""
+        return self.build_schema_context(db_id, schema, intent=intent).context
+
+    def build_schema_context(self, db_id: str, schema: str, intent: Optional[str] = None) -> SchemaContextResult:
         """Constructs a rich, dialect-aware schema context with RAG-based selection."""
         # Use semantic retrieval if intent is provided
         relevant_tables = []
+        retrieval_results: List[TableRetrievalResult] = []
         if intent:
-            relevant_tables = schema_retriever.get_relevant_tables(db_id, intent, schema, top_k=8)
+            table_budget = self._table_budget()
+            retrieval_results = schema_retriever.retrieve_relevant_tables(
+                db_id,
+                intent,
+                schema,
+                top_k=table_budget,
+                candidate_limit=self._candidate_budget(table_budget),
+            )
+            relevant_tables = [result.table_name for result in retrieval_results]
             logger.info(f"RAG Context: Selected {len(relevant_tables)} tables for intent.")
 
         # Cache check for non-specific requests
@@ -37,12 +61,18 @@ class SchemaContextService:
             if cache_key in self._schema_cache:
                 entry = self._schema_cache[cache_key]
                 if (datetime.now() - entry["timestamp"]).seconds < (self._cache_ttl_minutes * 60):
-                    return entry["context"]
+                    return SchemaContextResult(
+                        context=entry["context"],
+                        retrieval_trace=self._build_retrieval_trace(intent, schema, []),
+                    )
 
         # 1. Fetch metadata
         all_cols = metadata_service.get_all_columns(db_id, schema)
         if not all_cols:
-            return "No schema metadata available."
+            return SchemaContextResult(
+                context="No schema metadata available.",
+                retrieval_trace=self._build_retrieval_trace(intent, schema, retrieval_results),
+            )
             
         # 2. Filter by relevance (RAG)
         if relevant_tables:
@@ -54,7 +84,10 @@ class SchemaContextService:
         db_type = self._get_db_type(db_id)
         all_fks = metadata_service.get_all_foreign_keys(db_id, schema)
         
-        context = [f"DATABASE DIALECT: {db_type.upper()}", "SCHEMA STRUCTURE:"]
+        context = [f"DATABASE DIALECT: {db_type.upper()}"]
+        if retrieval_results:
+            context.extend(self._format_retrieval_notes(retrieval_results))
+        context.append("SCHEMA STRUCTURE:")
         db_service = BaseDatabaseService()
         
         count = 0
@@ -85,7 +118,54 @@ class SchemaContextService:
         if not intent:
             self._schema_cache[f"{db_id}:{schema}"] = {"timestamp": datetime.now(), "context": context_str}
             
-        return context_str
+        return SchemaContextResult(
+            context=context_str,
+            retrieval_trace=self._build_retrieval_trace(intent, schema, retrieval_results),
+        )
+
+    def _format_retrieval_notes(self, results: List[TableRetrievalResult]) -> List[str]:
+        """Formats compact retrieval evidence for the model prompt."""
+        notes = ["RETRIEVAL NOTES:"]
+        for result in results:
+            terms = ", ".join(result.matched_terms) if result.matched_terms else "semantic match"
+            notes.append(
+                f"- {result.table_name}: score={result.score:.4f}, "
+                f"semantic={result.semantic_score:.3f}, lexical={result.lexical_score:.3f}, "
+                f"matched={terms}"
+            )
+        return notes
+
+    def _build_retrieval_trace(
+        self,
+        intent: Optional[str],
+        schema: str,
+        results: List[TableRetrievalResult],
+    ) -> Dict[str, Any]:
+        """Builds a safe trace payload for API responses and stream activity."""
+        return {
+            "intent": intent or "",
+            "schema": schema,
+            "tableBudget": self._table_budget(),
+            "candidateBudget": self._candidate_budget(self._table_budget()),
+            "tables": [result.to_trace_item() for result in results],
+        }
+
+    def _table_budget(self) -> int:
+        """Returns the final table budget for prompt context."""
+        return self._int_env("QURIODB_RAG_TABLE_BUDGET", 8, minimum=1, maximum=30)
+
+    def _candidate_budget(self, table_budget: int) -> int:
+        """Returns broad retrieval candidate budget before reranking."""
+        default_budget = max(table_budget * 3, 12)
+        return self._int_env("QURIODB_RAG_CANDIDATE_BUDGET", default_budget, minimum=table_budget, maximum=60)
+
+    def _int_env(self, name: str, default: int, minimum: int, maximum: int) -> int:
+        """Parses bounded integer environment config."""
+        try:
+            value = int(os.getenv(name, str(default)))
+        except ValueError:
+            value = default
+        return max(minimum, min(maximum, value))
 
     def _filter_tables(self, all_cols: Dict, relevant: List[str], db_id: str, schema: str) -> Dict:
         """Filters columns to relevant tables and their immediate neighbors via Foreign Keys."""

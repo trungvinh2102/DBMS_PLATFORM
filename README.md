@@ -106,6 +106,33 @@ Failing to do this will cause the Desktop app to continue running the old `api.e
 The application is configured to handle multiple environments (Local, Desktop, Production) automatically.
 To customize the API target, use the `NEXT_PUBLIC_API_URL` environment variable during build.
 
+### AI Assistant Configuration
+
+The AI Assistant uses LangChain and LangGraph behind QurioDB's existing chat API. OpenAI is the internal chat-message standard, while Gemini, Anthropic, Qwen, and DeepSeek are resolved through provider adapters.
+
+```powershell
+$env:OPENAI_API_KEY="your-openai-key"
+$env:GEMINI_API_KEY="your-gemini-key"
+$env:ANTHROPIC_API_KEY="your-anthropic-key"
+$env:QWEN_API_KEY="your-qwen-key"
+$env:DEEPSEEK_API_KEY="your-deepseek-key"
+```
+
+Qwen and DeepSeek use OpenAI-compatible endpoints by default. Override them when needed:
+
+```powershell
+$env:QWEN_BASE_URL="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
+```
+
+LangSmith tracing is opt-in:
+
+```powershell
+$env:LANGSMITH_TRACING="true"
+$env:LANGSMITH_API_KEY="your-langsmith-key"
+$env:LANGSMITH_PROJECT="QurioDB AI Assistant"
+```
+
 ---
 
 ## 📄 License

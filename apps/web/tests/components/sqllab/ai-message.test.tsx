@@ -1,0 +1,62 @@
+/**
+ * @file ai-message.test.tsx
+ * @description Unit tests for the SQL Lab AI assistant message presentation and interactions.
+ */
+
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import { AIMessage } from "@/app/sqllab/components/ai/AIMessage";
+
+describe("AIMessage", () => {
+  it("renders streamed SQL markdown immediately without a blank placeholder", () => {
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-streaming",
+          role: "assistant",
+          content: "```sql\nSELECT * FROM users",
+          isStreaming: true,
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/SELECT \* FROM users/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
+  });
+
+  it("copies the assistant response content", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-1",
+          role: "assistant",
+          content: "Use an indexed lookup for this query.",
+          explanation: "The indexed path should reduce table scans.",
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+        onApply={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("Use an indexed lookup for this query.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /copy assistant response/i }));
+
+    expect(writeText).toHaveBeenCalledWith(
+      "Use an indexed lookup for this query.\n\nThe indexed path should reduce table scans.",
+    );
+    expect(screen.getByRole("button", { name: /response copied/i })).toBeInTheDocument();
+  });
+});

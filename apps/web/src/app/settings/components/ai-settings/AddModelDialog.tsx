@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AIModel, NewAIModel } from "./types";
+import { NewAIModel } from "./types";
 
 interface AddModelDialogProps {
   isOpen: boolean;
@@ -100,8 +100,11 @@ export function AddModelDialog({
                   alignItemWithTrigger={false} 
                   className="rounded-xl border-border/50"
                 >
-                  <SelectItem value="Google" className="text-base py-3 px-4">Google</SelectItem>
-                  <SelectItem value="OpenAI" disabled className="text-base py-3 px-4">OpenAI</SelectItem>
+                  <SelectItem value="OpenAI" className="text-base py-3 px-4">OpenAI</SelectItem>
+                  <SelectItem value="Google" className="text-base py-3 px-4">Google Gemini</SelectItem>
+                  <SelectItem value="Anthropic" className="text-base py-3 px-4">Anthropic Claude</SelectItem>
+                  <SelectItem value="Qwen" className="text-base py-3 px-4">Qwen</SelectItem>
+                  <SelectItem value="DeepSeek" className="text-base py-3 px-4">DeepSeek</SelectItem>
                 </SelectContent>
               </Select>
             </div>

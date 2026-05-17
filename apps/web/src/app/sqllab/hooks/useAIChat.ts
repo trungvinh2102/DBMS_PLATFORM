@@ -8,6 +8,29 @@ import { aiApi } from "../../../lib/api-client";
 import { toast } from "sonner";
 import { Message, AIStep } from "../components/ai/types";
 
+const serializeMessageContent = (message: Message) => {
+  const parts = [message.content, message.sql ? `\`\`\`sql\n${message.sql}\n\`\`\`` : "", message.analysis].filter(Boolean);
+  return parts.join("\n\n").trim();
+};
+
+const formatToolCallContent = (toolData: any) => {
+  const args = toolData?.args && typeof toolData.args === "object"
+    ? Object.entries(toolData.args)
+        .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
+        .join("\n")
+    : "";
+
+  return toolData?.args?.intent || args || "Invoking tool...";
+};
+
+const STATUS_THINKING_EVENTS = new Set([
+  "Initializing context...",
+  "Analyzing schema...",
+  "Learning from your feedback...",
+  "Sẵn sàng.",
+  "Khởi tạo xong.",
+]);
+
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -224,53 +247,97 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       role: "assistant",
       content: "",
       isActionable: true,
+      isStreaming: true,
+      steps: [],
     };
 
     setMessages(prev => [...prev, initialAssistantMsg]);
 
-    let fullContent = "";
+    let responseContent = "";
+    let sqlContent = "";
+    let analysisContent = "";
+    let confidenceScore: number | undefined;
+    let streamSteps: AIStep[] = [];
+    let lastStreamEvent = "";
     try {
+      const chatMessages = [
+        ...messages
+          .map((message) => ({
+            role: message.role,
+            content: serializeMessageContent(message),
+          }))
+          .filter((message) => message.content),
+        { role: "user", content: input },
+      ];
+
       await aiApi.streamChat(
         {
           text: input,
+          messages: chatMessages,
           databaseId,
           schema: schema || "public",
-          modelId: selectedModel,
+          modelId: selectedModel || undefined,
           conversationId: conversationId || undefined,
         },
         (chunk, event) => {
-          // Internal state tracking for structured history
-          const lastOpen = fullContent.lastIndexOf("<thinking>");
-          const lastClose = fullContent.lastIndexOf("</thinking>");
-          const isInsideThinking = lastOpen > lastClose;
-
           if (event === "thinking") {
-            if (!isInsideThinking) {
-              fullContent += `<thinking>${chunk}`;
+            const text = String(chunk || "").trim();
+            if (!text) return;
+
+            const lastStep = streamSteps[streamSteps.length - 1];
+            const isStatusEvent = STATUS_THINKING_EVENTS.has(text);
+            if (lastStreamEvent === "thinking" && lastStep?.type === "thinking" && !isStatusEvent) {
+              streamSteps = [
+                ...streamSteps.slice(0, -1),
+                { ...lastStep, content: `${lastStep.content}${text.startsWith("\n") ? "" : "\n"}${text}`, status: "active" },
+              ];
             } else {
-              fullContent += chunk;
+              streamSteps = [
+                ...streamSteps.map((step) => ({ ...step, status: "complete" as const })),
+                { type: "thinking", content: text, status: "active" },
+              ];
             }
+            lastStreamEvent = "thinking";
           } else if (event === "tool_call") {
-            // Ensure any open thinking is closed before tool metadata
-            if (isInsideThinking) {
-              fullContent += "</thinking>";
-            }
             try {
               const toolData = typeof chunk === "string" ? JSON.parse(chunk) : chunk;
-              const intent = toolData.args?.intent || toolData.name;
-              fullContent += `<tool_call name="${toolData.name}" intent="${intent}" />`;
+              streamSteps = [
+                ...streamSteps.map((step) => ({ ...step, status: "complete" as const })),
+                {
+                  type: "tool_call",
+                  name: toolData.name || "Tool",
+                  content: formatToolCallContent(toolData),
+                  args: toolData.args,
+                  status: "complete",
+                },
+              ];
             } catch (e) {
-              fullContent += `<tool_call name="unknown" intent="Invoking tool..." />`;
+              streamSteps = [
+                ...streamSteps.map((step) => ({ ...step, status: "complete" as const })),
+                { type: "tool_call", name: "Tool", content: "Invoking tool...", status: "complete" },
+              ];
             }
+            lastStreamEvent = "tool_call";
+          } else if (event === "confidence") {
+            const parsedConfidence = Number(String(chunk || "").trim());
+            if (!Number.isNaN(parsedConfidence)) confidenceScore = parsedConfidence;
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = "confidence";
+          } else if (event === "sql") {
+            sqlContent += String(chunk || "");
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = "sql";
+          } else if (event === "analysis") {
+            analysisContent += String(chunk || "");
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = "analysis";
           } else if (event !== "error") {
-            // For other events (message, sql, confidence, etc.), do NOT force-close thinking.
-            // The backend may switch event types before the closing </thinking> tag is emitted.
-            // We let fullContent accumulate and the parser handles the tags naturally.
-            fullContent += chunk;
+            responseContent += String(chunk || "");
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = event || "message";
           }
 
-          // Parse the accumulating content to extract steps, sql, content, etc.
-          const parsed = parseMessageContent({ role: "assistant", content: fullContent });
+          const parsed = parseMessageContent({ role: "assistant", content: responseContent });
 
           setMessages(prev => prev.map(m => {
             if (m.id !== assistantMsgId) return m;
@@ -279,13 +346,20 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
               return {
                 ...m,
                 content: `Error: ${chunk}`,
-                isActionable: false
+                isActionable: false,
+                isStreaming: false,
               };
             }
 
             return {
               ...m,
               ...parsed,
+              sql: parsed.sql || sqlContent.trim(),
+              analysis: parsed.analysis || analysisContent.trim(),
+              confidence: parsed.confidence ?? confidenceScore,
+              thought: streamSteps.filter((step) => step.type === "thinking").map((step) => step.content).join("\n\n"),
+              steps: streamSteps,
+              isStreaming: true,
               isActionable: true
             };
           }));
@@ -302,12 +376,21 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     } catch (error: any) {
       toast.error(error.message || "Failed to generate SQL");
       setMessages(prev => prev.map(m =>
-        m.id === assistantMsgId ? { ...m, content: `Error: ${error.message}` } : m
+        m.id === assistantMsgId ? { ...m, content: `Error: ${error.message}`, isStreaming: false } : m
       ));
     } finally {
       setIsTyping(false);
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId
+          ? {
+              ...m,
+              isStreaming: false,
+              steps: m.steps?.map((step) => ({ ...step, status: "complete" as const })),
+            }
+          : m
+      ));
     }
-  }, [databaseId, schema, selectedModel, isTyping, conversationId, parseMessageContent, loadConversations]);
+  }, [databaseId, schema, selectedModel, isTyping, conversationId, messages, parseMessageContent, loadConversations]);
 
   return {
     messages,

@@ -16,13 +16,15 @@ import { parseSlashCommand, filterCommands, type SlashCommand } from "../utils/s
 import { ConversationHistory } from "./ai/ConversationHistory";
 import { AIAssistantHeader } from "./ai/AIAssistantHeader";
 import { AIChatMessages } from "./ai/AIChatMessages";
-import { AIChatInput } from "./ai/AIChatInput";
+import { AIChatInput, AUTO_MODEL_VALUE } from "./ai/AIChatInput";
+import type { AIRuntimeStatus } from "./ai/types";
 
 export function AIAssistantSidebar() {
   const lab = useSQLLabContext();
   const [input, setInput] = useState("");
   const [availableModels, setAvailableModels] = useState<any[]>([]);
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>(AUTO_MODEL_VALUE);
+  const [runtimeStatus, setRuntimeStatus] = useState<AIRuntimeStatus | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [commandMenuIndex, setCommandMenuIndex] = useState(0);
@@ -41,18 +43,27 @@ export function AIAssistantSidebar() {
     setIsTyping,
     isFetchingConversation,
     isLoadingConversations
-  } = useAIChat(lab.selectedDS || undefined, lab.selectedSchema, selectedModel);
+  } = useAIChat(
+    lab.selectedDS || undefined,
+    lab.selectedSchema,
+    selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
+  );
 
   // Initialize models and load logic
   useEffect(() => {
     const init = async () => {
       try {
-        const [models] = await Promise.all([
+        const [models, status] = await Promise.all([
           aiApi.getModels(),
+          aiApi.getAIStatus(),
           loadConversations(lab.selectedDS || undefined)
         ]);
-        setAvailableModels(models);
-        if (models?.length > 0) setSelectedModel(models[0].modelId);
+        setAvailableModels(models || []);
+        setRuntimeStatus(status);
+        setSelectedModel((current) => current || AUTO_MODEL_VALUE);
+        if (status && !status.hasApiKey) {
+          toast.warning("AI provider key is not configured.");
+        }
       } catch (e) {
         console.error("Failed to initialize AI assistant", e);
       }
@@ -179,7 +190,10 @@ export function AIAssistantSidebar() {
   const handleExplain = useCallback(async (s: string) => {
     setIsTyping(true);
     try {
-      const res = await aiApi.explainSQL({ sql: s, modelId: selectedModel });
+      const res = await aiApi.explainSQL({
+        sql: s,
+        modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
+      });
       addAssistantMessage(res.explanation);
     } finally { setIsTyping(false); }
   }, [selectedModel, addAssistantMessage, setIsTyping]);
@@ -187,7 +201,12 @@ export function AIAssistantSidebar() {
   const handleOptimize = useCallback(async (s: string) => {
     setIsTyping(true);
     try {
-      const res = await aiApi.optimizeSQL({ sql: s, databaseId: lab.selectedDS, schema: lab.selectedSchema, modelId: selectedModel });
+      const res = await aiApi.optimizeSQL({
+        sql: s,
+        databaseId: lab.selectedDS,
+        schema: lab.selectedSchema,
+        modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
+      });
       addAssistantMessage("Here is an optimized version:", res.sql || res.result);
     } finally { setIsTyping(false); }
   }, [lab.selectedDS, lab.selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
@@ -248,6 +267,7 @@ export function AIAssistantSidebar() {
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
         availableModels={availableModels}
+        runtimeStatus={runtimeStatus}
         onSend={handleSendRequest}
         showCommandMenu={showCommandMenu}
         commandMenuIndex={commandMenuIndex}

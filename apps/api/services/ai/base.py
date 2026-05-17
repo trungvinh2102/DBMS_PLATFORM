@@ -7,10 +7,8 @@ message persistence, and response parsing.
 import os
 import re
 import uuid
-import json
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
 
 try:
     import google.generativeai as genai
@@ -22,6 +20,7 @@ except ImportError:
 from models.metadata import AIChatMessage, AIGeneratedQuery, UserAIConfig, SessionLocal
 from services.conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
+from .langchain_runtime import langchain_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +60,17 @@ class BaseAIService:
         return self._api_configured
 
     def _generate_response(self, combined_prompt: str, model_id: Optional[str] = None, user_id: Optional[str] = None) -> str:
-        """Internal helper to communicate with the Gemini API, using user-specific keys if available."""
+        """Internal helper to communicate with Gemini through LangChain, with legacy fallback."""
+        try:
+            return langchain_runtime.invoke_text(
+                system_prompt="You are QurioDB's SQL-focused AI assistant.",
+                prompt=combined_prompt,
+                model_id=model_id,
+                user_id=user_id,
+            )
+        except Exception as e:
+            logger.warning("LangChain generation failed; falling back to legacy Gemini SDK: %s", e)
+
         if not HAS_GENAI:
             return "AI Error: google-generativeai package is not installed"
             

@@ -17,6 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { AIRuntimeStatus } from "./types";
+
+export const AUTO_MODEL_VALUE = "__auto__";
+
+interface AIModelOption {
+  name: string;
+  modelId: string;
+  provider?: string;
+}
 
 interface AIChatInputProps {
   input: string;
@@ -25,7 +34,8 @@ interface AIChatInputProps {
   isTyping: boolean;
   selectedModel: string;
   onModelChange: (val: string) => void;
-  availableModels: any[];
+  availableModels: AIModelOption[];
+  runtimeStatus?: AIRuntimeStatus | null;
   onSend: () => void;
   showCommandMenu: boolean;
   commandMenuIndex: number;
@@ -40,11 +50,19 @@ export const AIChatInput = ({
   selectedModel,
   onModelChange,
   availableModels,
+  runtimeStatus,
   onSend,
   showCommandMenu,
   commandMenuIndex,
   onCommandSelect
-}: AIChatInputProps) => (
+}: AIChatInputProps) => {
+  const hasAnyKey = runtimeStatus?.hasApiKey ?? true;
+  const providerHasKey = (provider?: string) => {
+    if (!provider || !runtimeStatus?.providers) return true;
+    return runtimeStatus.providers[provider.toLowerCase()]?.hasApiKey ?? true;
+  };
+
+  return (
   <div className="p-4 border-t border-border bg-muted/10 backdrop-blur-3xl">
     <div className="flex flex-col gap-3">
       <div className="relative group bg-background/50 rounded-2xl border border-border/50 focus-within:border-primary/50 transition-all p-2 shadow-inner">
@@ -67,19 +85,27 @@ export const AIChatInput = ({
           <div className="flex items-center justify-between mt-2 px-1 pb-1">
             <div className="flex items-center gap-2">
               <BrainCircuit className="h-3.5 w-3.5 text-primary/70" />
-              <Select value={selectedModel} onValueChange={(val) => val && onModelChange(val)}>
+              <Select value={selectedModel || AUTO_MODEL_VALUE} onValueChange={(val) => val && onModelChange(val)}>
                 <SelectTrigger className="border-none bg-muted/50 hover:bg-muted h-7 px-3 focus:ring-0 text-[10px] font-black uppercase tracking-widest min-w-30 justify-between shadow-none rounded-lg">
                 <SelectValue placeholder="Model" />
               </SelectTrigger>
               <SelectContent className="glass border-border/50">
+                <SelectItem value={AUTO_MODEL_VALUE} disabled={!hasAnyKey} className="text-[10px] font-bold uppercase tracking-wider">
+                  Auto Provider
+                </SelectItem>
                 {availableModels.map(m => (
-                  <SelectItem key={m.modelId} value={m.modelId} className="text-[10px] font-bold uppercase tracking-wider">
-                    {m.name}
+                  <SelectItem
+                    key={m.modelId}
+                    value={m.modelId}
+                    disabled={!providerHasKey(m.provider)}
+                    className="text-[10px] font-bold uppercase tracking-wider"
+                  >
+                    {m.name}{m.provider ? ` · ${m.provider}` : ""}
                   </SelectItem>
                 ))}
                 {availableModels.length === 0 && (
-                  <SelectItem value="gemini-1.5-flash" className="text-[10px] font-bold uppercase tracking-wider">
-                    Gemini 1.5 Flash
+                  <SelectItem value="gpt-4o-mini" disabled={!hasAnyKey} className="text-[10px] font-bold uppercase tracking-wider">
+                    GPT-4o mini
                   </SelectItem>
                 )}
               </SelectContent>
@@ -101,4 +127,5 @@ export const AIChatInput = ({
       </div>
     </div>
   </div>
-);
+  );
+};

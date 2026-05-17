@@ -7,6 +7,7 @@ Fixtures and configuration for pytest.
 import pytest
 from unittest.mock import MagicMock
 from functools import wraps
+from fastapi.testclient import TestClient
 
 # Mock auth middleware decorators before application imports so tests bypass auth
 def mock_decorator(f):
@@ -20,24 +21,60 @@ utils.auth_middleware.login_required = mock_decorator
 utils.auth_middleware.admin_required = mock_decorator
 
 from app import create_app
+from utils.auth_middleware import get_current_user
 import services.base_service
 import services.connection
 import services.execution
 import services.metadata
 
+
+class FastAPIResponseAdapter:
+    """Compatibility wrapper for legacy Flask-style response.json property tests."""
+
+    def __init__(self, response):
+        self._response = response
+        self.json = response.json()
+
+    def __getattr__(self, name):
+        return getattr(self._response, name)
+
+
+class FastAPIClientAdapter:
+    """Small adapter exposing Flask-like test client calls over FastAPI TestClient."""
+
+    def __init__(self, app):
+        self._client = TestClient(app)
+
+    def get(self, *args, **kwargs):
+        return FastAPIResponseAdapter(self._client.get(*args, **kwargs))
+
+    def post(self, *args, **kwargs):
+        return FastAPIResponseAdapter(self._client.post(*args, **kwargs))
+
+    def put(self, *args, **kwargs):
+        return FastAPIResponseAdapter(self._client.put(*args, **kwargs))
+
+    def delete(self, *args, **kwargs):
+        return FastAPIResponseAdapter(self._client.delete(*args, **kwargs))
+
+
 @pytest.fixture
 def app():
     """Create and configure a new app instance for each test."""
     app = create_app()
-    app.config.update({
-        "TESTING": True,
-    })
+    app.dependency_overrides[get_current_user] = lambda: {
+        "userId": "test-user-id",
+        "email": "test@example.com",
+        "role": "Admin",
+        "username": "test",
+    }
     yield app
+    app.dependency_overrides.clear()
 
 @pytest.fixture
 def client(app):
     """A test client for the app."""
-    return app.test_client()
+    return FastAPIClientAdapter(app)
 
 @pytest.fixture
 def mock_session(mocker):

@@ -6,13 +6,21 @@ Specialized AI service delegator that coordinates multiple AI strategies
 """
 import logging
 import json
-import google.generativeai as genai
 from typing import Dict, Any, Optional
 
 from .ai.sql import SqlAIService
 from .ai.agent import AgentAIService
 from .ai.context import schema_context_service
 from .ai.feedback_context import feedback_context_service
+from .ai.langchain_runtime import langchain_runtime
+from .ai.stream_parser import TaggedResponseStreamParser
+
+try:
+    import google.generativeai as genai
+    HAS_GENAI = True
+except ImportError:
+    genai = None
+    HAS_GENAI = False
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +58,22 @@ class AIService(SqlAIService, AgentAIService):
         
         prompt = f"PREFIX:\n{prefix}\n\nSUFFIX:\n{suffix}\n\nCOMPLETION:"
         try:
+            completion = langchain_runtime.invoke_text(
+                system_prompt=system_instruction,
+                prompt=prompt,
+                model_id=model_id,
+                user_id=user_id,
+                db_id=db_id,
+                temperature=0.1,
+                max_tokens=128,
+            )
+            return {"completion": self._clean_sql_code(completion)}
+        except Exception as langchain_error:
+            logger.warning("LangChain autocomplete failed; falling back to legacy Gemini SDK: %s", langchain_error)
+
+        try:
+            if not HAS_GENAI:
+                return {"completion": "", "error": "AI provider packages are not installed"}
             model = genai.GenerativeModel(
                 model_name=model_id or "gemini-2.5-flash",
                 system_instruction=system_instruction,
@@ -81,9 +105,16 @@ class AIService(SqlAIService, AgentAIService):
             yield "thinking", "Analyzing schema..."
             
             # Yield tool call metadata as JSON
-            yield "tool_call", json.dumps({"name": "SchemaContextLoader", "args": {"databaseId": db_id, "intent": "Nạp thông tin database"}})
+            retrieval_intent = self._rewrite_retrieval_intent(prompt, history or [])
+            yield "tool_call", json.dumps({"name": "SchemaContextLoader", "args": {"databaseId": db_id, "intent": retrieval_intent}}, ensure_ascii=False)
             
-            context = self._format_schema_context(db_id, schema, intent=prompt)
+            context_result = schema_context_service.build_schema_context(db_id, schema, intent=retrieval_intent)
+            context = context_result.context
+            if context_result.retrieval_trace.get("tables"):
+                yield "tool_call", json.dumps({
+                    "name": "RetrievalTrace",
+                    "args": context_result.retrieval_trace,
+                }, ensure_ascii=False)
             
             # Fetch feedback context if user_id is available
             feedback = ""
@@ -97,10 +128,36 @@ class AIService(SqlAIService, AgentAIService):
         else:
             yield "thinking", "Khởi tạo xong."
 
-        messages = self._context_mgr.build_context(conv_id, prompt) if conv_id else [{'role': 'user', 'parts': [{'text': prompt}]}]
-        
         try:
+            langchain_history = history or []
+            if conv_id and not langchain_history:
+                langchain_history = self._load_langchain_history(conv_id)
+
+            parser = TaggedResponseStreamParser()
+            for chunk in langchain_runtime.stream_text(
+                system_prompt=system_prompt,
+                prompt=prompt,
+                db_id=db_id,
+                model_id=model_id,
+                user_id=user_id,
+                history=langchain_history,
+            ):
+                for event, parsed_chunk in parser.feed(chunk):
+                    yield event, parsed_chunk
+            for event, parsed_chunk in parser.flush():
+                yield event, parsed_chunk
+            return
+        except Exception as langchain_error:
+            logger.warning("LangChain streaming failed; falling back to legacy Gemini SDK: %s", langchain_error)
+
+        try:
+            if not HAS_GENAI:
+                yield "error", "AI provider packages are not installed"
+                return
+
+            messages = self._context_mgr.build_context(conv_id, prompt) if conv_id else [{'role': 'user', 'parts': [{'text': prompt}]}]
             model = genai.GenerativeModel(model_name=model_id or "gemini-2.0-flash", system_instruction=system_prompt)
+            parser = TaggedResponseStreamParser()
             for chunk in model.generate_content(messages, stream=True):
                 if not chunk.candidates: continue
                 for part in chunk.candidates[0].content.parts:
@@ -108,9 +165,52 @@ class AIService(SqlAIService, AgentAIService):
                         # Clean thought text from AI
                         yield "thinking", part.thought
                     elif hasattr(part, 'text') and part.text:
-                        yield "message", part.text
+                        for event, parsed_chunk in parser.feed(part.text):
+                            yield event, parsed_chunk
+            for event, parsed_chunk in parser.flush():
+                yield event, parsed_chunk
         except Exception as e:
             yield "error", str(e)
+
+    def _rewrite_retrieval_intent(self, prompt: str, history: list) -> str:
+        """Adds recent SQL context for follow-up retrieval without an LLM call."""
+        if not history:
+            return prompt
+
+        latest_sql = ""
+        for message in reversed(history[-6:]):
+            content = str(message.get("content", ""))
+            if "```sql" in content:
+                latest_sql = content.split("```sql", 1)[1].split("```", 1)[0].strip()
+                break
+            if "SELECT" in content.upper():
+                latest_sql = content[-1200:]
+                break
+
+        follow_up_markers = {"that", "it", "this", "previous", "query", "add", "filter"}
+        prompt_terms = {term.strip(".,!?").lower() for term in prompt.split()}
+        if latest_sql and follow_up_markers.intersection(prompt_terms):
+            return f"{prompt}\n\nPrevious SQL context:\n{latest_sql[:1200]}"
+        return prompt
+
+    def _load_langchain_history(self, conv_id: str) -> list:
+        """Loads compact chat history in LangChain-compatible role/content format."""
+        try:
+            from models.metadata import AIChatMessage, SessionLocal
+
+            session = SessionLocal()
+            try:
+                messages = session.query(AIChatMessage)\
+                    .filter(AIChatMessage.conversationId == conv_id)\
+                    .order_by(AIChatMessage.created_on.desc())\
+                    .limit(10)\
+                    .all()
+                return [{'role': m.role, 'content': m.content} for m in reversed(messages)]
+            finally:
+                session.close()
+        except Exception as e:
+            logger.warning("Failed to load LangChain chat history: %s", e)
+            return []
 
 # Singleton Instance
 ai_service = AIService()

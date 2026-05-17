@@ -204,6 +204,7 @@ export const userApi = {
 };
 
 export const aiApi = {
+  getAIStatus: () => req(api.get("ai/status")),
   getModels: () => req(api.get("ai/models")),
   addModel: (data: any) => req(api.post("ai/models", data)),
   getAIConfig: (reveal: boolean = false) => req(api.get("ai-config/get", { params: { reveal } })),
@@ -269,10 +270,12 @@ export const aiApi = {
 
     const processPart = (part: string) => {
       const lines = part.split("\n");
+      let hasSseData = false;
       for (const line of lines) {
         if (line.startsWith("event: ")) {
           currentEvent = line.substring(7).trim();
         } else if (line.startsWith("data: ")) {
+          hasSseData = true;
           let content = line.substring(6);
           if (content === "[DONE]") return;
           
@@ -282,6 +285,10 @@ export const aiApi = {
           
           onChunk(content, currentEvent); 
         }
+      }
+
+      if (!hasSseData && part.trim()) {
+        onChunk(part, currentEvent);
       }
     };
 

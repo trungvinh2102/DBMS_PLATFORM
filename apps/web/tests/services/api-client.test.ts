@@ -99,6 +99,7 @@ describe("api-client", () => {
     expect(await aiApi.optimizeSQL({})).toEqual({ success: true });
 
     // Missing aiApi methods
+    await aiApi.getAIStatus();
     await aiApi.getModels();
     await aiApi.addModel({});
     await aiApi.getAIConfig(true);
