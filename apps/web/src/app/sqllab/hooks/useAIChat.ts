@@ -23,6 +23,37 @@ const formatToolCallContent = (toolData: any) => {
   return toolData?.args?.intent || args || "Invoking tool...";
 };
 
+const parsePersistedToolCall = (name?: string, intent?: string, innerContent?: string): AIStep => {
+  const rawContent = (innerContent || "").trim();
+
+  if (rawContent) {
+    try {
+      const toolData = JSON.parse(rawContent);
+      return {
+        type: "tool_call",
+        name: toolData.name || name || "Tool",
+        content: formatToolCallContent(toolData),
+        args: toolData.args,
+        status: "complete",
+      };
+    } catch {
+      return {
+        type: "tool_call",
+        name: name || "Tool",
+        content: intent || rawContent,
+        status: "complete",
+      };
+    }
+  }
+
+  return {
+    type: "tool_call",
+    name: name || "Tool",
+    content: intent || (name ? `Action: ${name}` : "Invoking tool..."),
+    status: "complete",
+  };
+};
+
 const STATUS_THINKING_EVENTS = new Set([
   "Initializing context...",
   "Analyzing schema...",
@@ -73,11 +104,18 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let thought = "";
     let sql = "";
     let analysis = "";
+    let confidence: number | undefined;
+
+    const confidenceMatch = text.match(/<confidence>([\s\S]*?)<\/confidence>/i);
+    if (confidenceMatch) {
+      const parsedConfidence = Number(confidenceMatch[1].trim());
+      if (!Number.isNaN(parsedConfidence)) confidence = parsedConfidence;
+    }
 
     // Extract all thinking and tool call sections, then group them by type
     const steps: AIStep[] = [];
     const thinkingContent: string[] = [];
-    const toolActions: string[] = [];
+    const toolSteps: AIStep[] = [];
 
     // Regular expression to find both thinking and tool_call tags
     const stepRegex = /<(thinking|tool_call)(?:\s+name="([^"]*)")?(?:\s+intent="([^"]*)")?(?:\s+\/>|>([\s\S]*?)<\/\1>)/gi;
@@ -89,7 +127,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         const content = (innerContent || "").trim();
         if (content) thinkingContent.push(content);
       } else if (type === "tool_call") {
-        toolActions.push(intent || `Action: ${name}`);
+        toolSteps.push(parsePersistedToolCall(name, intent, innerContent));
       }
     }
 
@@ -110,13 +148,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     }
 
     // 2. Consolidated Tool Step
-    if (toolActions.length > 0) {
-      steps.push({
-        type: "tool_call",
-        content: toolActions.join("\n"),
-        name: "Actions"
-      });
-    }
+    steps.push(...toolSteps);
 
     // Extract the final thought text for historical reference (joined)
     thought = thinkingContent.join("\n\n");
@@ -124,6 +156,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     // Clean content by removing all thinking and tool_call blocks
     // We use a more aggressive approach to catch dangling tags or mismatched blocks
     content = text
+      .replace(/<confidence>[\s\S]*?<\/confidence>/gi, "")
       .replace(/<(thinking|tool_call)[\s\S]*?(?:<\/\1>|\/>)/gi, "") // Remove balanced blocks
       .replace(/<thinking>[\s\S]*/gi, "") // Remove any unclosed opening tag and everything after
       .replace(/<\/thinking>/gi, "")      // Remove any dangling closing tags
@@ -156,7 +189,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       content = "";
     }
 
-    return { content, thought, sql, analysis, steps };
+    return { content, thought, sql, analysis, confidence, steps };
   }, []);
 
   const addAssistantMessage = useCallback((content: string, sql?: string, explanation?: string, isActionable = true) => {

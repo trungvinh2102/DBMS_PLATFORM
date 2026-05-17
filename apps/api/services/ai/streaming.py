@@ -9,6 +9,7 @@ from typing import Dict, List
 
 STREAM_RESPONSE_PARTS = {
     "thinking": [],
+    "tool_call": [],
     "confidence": [],
     "message": [],
     "sql": [],
@@ -44,6 +45,7 @@ def build_assistant_history_content(parts: Dict[str, List[str]]) -> str:
     """Rebuilds streamed semantic events into the legacy persisted message format."""
     blocks = []
     thinking = "".join(parts.get("thinking", [])).strip()
+    tool_calls = [chunk.strip() for chunk in parts.get("tool_call", []) if chunk.strip()]
     confidence = "".join(parts.get("confidence", [])).strip()
     message = "".join(parts.get("message", [])).strip()
     sql = "".join(parts.get("sql", [])).strip()
@@ -51,6 +53,8 @@ def build_assistant_history_content(parts: Dict[str, List[str]]) -> str:
 
     if thinking:
         blocks.append(f"<thinking>\n{thinking}\n</thinking>")
+    for tool_call in tool_calls:
+        blocks.append(f"<tool_call>{tool_call}</tool_call>")
     if confidence:
         blocks.append(f"<confidence>{confidence}</confidence>")
     if message:
