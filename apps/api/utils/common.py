@@ -4,7 +4,7 @@ common.py
 Utility functions for common operations like configuration masking and encryption wrappers.
 """
 
-from utils.crypto import encrypt, decrypt
+from .crypto import encrypt, decrypt
 import re
 import logging
 

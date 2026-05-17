@@ -8,7 +8,7 @@ import datetime
 
 from sqlalchemy import Boolean, Column, DateTime, String, Text
 
-from models.base import Base
+from .base import Base
 
 
 class AIModel(Base):

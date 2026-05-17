@@ -9,7 +9,7 @@ import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
 from sqlalchemy.orm import relationship
 
-from models.base import Base
+from .base import Base
 
 
 class AIConversation(Base):

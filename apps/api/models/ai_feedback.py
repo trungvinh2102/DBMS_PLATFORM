@@ -8,7 +8,7 @@ import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 
-from models.base import Base
+from .base import Base
 
 
 class AIFeedback(Base):

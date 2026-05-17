@@ -5,14 +5,11 @@ User service for managing profiles, settings, and preferences.
 """
 from models import SessionLocal, User, UserSetting
 import uuid
-import json
 import os
-import base64
-import re
 import cloudinary
 import cloudinary.uploader
 
-from services.auth_service import auth_service
+from .auth_service import auth_service
 
 # Configure Cloudinary
 cloudinary.config(

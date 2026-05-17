@@ -9,7 +9,7 @@ import datetime
 from sqlalchemy import Column, DateTime, ForeignKey, JSON, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from models.base import Base
+from .base import Base
 
 
 class SchemaEmbedding(Base):

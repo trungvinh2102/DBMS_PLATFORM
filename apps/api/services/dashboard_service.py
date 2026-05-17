@@ -23,7 +23,7 @@ class DashboardService:
                 return {"error": "Database not found"}
 
             # Enhanced stats from DuckDB (Analytical engine)
-            from services.analytics_service import analytics_service
+            from .analytics_service import analytics_service
             analytics_stats = analytics_service.get_query_performance_trends()
             status_dist = analytics_service.get_status_distribution()
             

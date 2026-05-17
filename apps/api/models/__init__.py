@@ -4,22 +4,22 @@ models
 Public exports for QurioDB metadata database models and database session helpers.
 """
 
-from models.ai_chat_message import AIChatMessage
-from models.ai_conversation import AIConversation
-from models.ai_feedback import AIFeedback
-from models.ai_generated_query import AIGeneratedQuery
-from models.ai_model import AIModel
-from models.base import Base
-from models.database import DATABASE_URL, SessionLocal, engine
-from models.db import Db
-from models.enums import Environment, SSLMode
-from models.query_history import QueryHistory
-from models.role import Role
-from models.saved_query import SavedQuery
-from models.schema_embedding import SchemaEmbedding
-from models.user import User
-from models.user_ai_config import UserAIConfig
-from models.user_setting import UserSetting
+from .ai_chat_message import AIChatMessage
+from .ai_conversation import AIConversation
+from .ai_feedback import AIFeedback
+from .ai_generated_query import AIGeneratedQuery
+from .ai_model import AIModel
+from .base import Base
+from .database import DATABASE_URL, SessionLocal, engine
+from .db import Db
+from .enums import Environment, SSLMode
+from .query_history import QueryHistory
+from .role import Role
+from .saved_query import SavedQuery
+from .schema_embedding import SchemaEmbedding
+from .user import User
+from .user_ai_config import UserAIConfig
+from .user_setting import UserSetting
 
 __all__ = [
     "AIChatMessage",

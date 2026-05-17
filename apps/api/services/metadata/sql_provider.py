@@ -7,7 +7,7 @@ Metadata provider for SQL-compliant databases using SQLAlchemy.
 import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy import text, inspect
-from services.metadata.foreign_keys import get_all_foreign_keys
+from .foreign_keys import get_all_foreign_keys
 
 logger = logging.getLogger(__name__)
 

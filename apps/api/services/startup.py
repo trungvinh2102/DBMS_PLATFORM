@@ -62,7 +62,7 @@ def seed_default_admin(session, role_model, user_model):
     if not admin_role:
         return
 
-    from services.auth_service import auth_service
+    from .auth_service import auth_service
 
     admin_user = user_model(
         id=str(uuid.uuid4()),

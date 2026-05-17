@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Dict, Any, List, Optional, Tuple
 
-from services.base_service import BaseDatabaseService
+from .base_service import BaseDatabaseService
 from sqlalchemy.orm import Session
 
 from models import Db, QueryHistory, SavedQuery

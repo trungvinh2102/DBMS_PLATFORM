@@ -9,11 +9,11 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy import text
 
-from services.base_service import BaseDatabaseService
+from ..base_service import BaseDatabaseService
 from models import SessionLocal
-from services.metadata.sql_provider import SqlMetadataProvider
-from services.metadata.mongo_provider import MongoMetadataProvider
-from services.metadata.redis_provider import RedisMetadataProvider
+from .sql_provider import SqlMetadataProvider
+from .mongo_provider import MongoMetadataProvider
+from .redis_provider import RedisMetadataProvider
 
 logger = logging.getLogger(__name__)
 

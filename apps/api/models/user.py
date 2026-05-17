@@ -9,7 +9,7 @@ import datetime
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
 
-from models.base import Base
+from .base import Base
 
 
 class User(Base):

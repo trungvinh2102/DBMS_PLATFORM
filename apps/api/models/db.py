@@ -9,8 +9,8 @@ import datetime
 from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, JSON, String
 from sqlalchemy.dialects.postgresql import ARRAY
 
-from models.base import Base
-from models.enums import Environment, SSLMode
+from .base import Base
+from .enums import Environment, SSLMode
 
 
 class Db(Base):

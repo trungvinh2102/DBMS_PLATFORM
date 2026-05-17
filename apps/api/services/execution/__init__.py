@@ -10,14 +10,14 @@ from datetime import datetime
 import uuid
 import logging
 
-from services.base_service import BaseDatabaseService
+from ..base_service import BaseDatabaseService
 from sqlalchemy.orm import Session
 
 from models import Db, QueryHistory, SavedQuery
-from services.execution.sql_executor import SqlExecutor
-from services.execution.mongo_executor import MongoExecutor
-from services.execution.redis_executor import RedisExecutor
-from services.execution.explain_executor import ExplainExecutor
+from .sql_executor import SqlExecutor
+from .mongo_executor import MongoExecutor
+from .redis_executor import RedisExecutor
+from .explain_executor import ExplainExecutor
 
 logger = logging.getLogger(__name__)
 

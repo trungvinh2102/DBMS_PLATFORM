@@ -8,7 +8,7 @@ import logging
 from typing import Any, Dict, Iterable, List
 
 from models import SessionLocal
-from services.metadata import metadata_service
+from ...metadata import metadata_service
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ class SchemaMetadataSource:
         """Returns the configured database dialect if available."""
         session = SessionLocal()
         try:
-            from services.base_service import BaseDatabaseService
+            from ...base_service import BaseDatabaseService
 
             return BaseDatabaseService().get_db_config(database_id, session)[0]
         except Exception:

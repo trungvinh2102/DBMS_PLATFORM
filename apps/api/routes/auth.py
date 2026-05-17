@@ -2,7 +2,6 @@
 backend/routes/auth.py
 """
 from fastapi import APIRouter, Request, Response, HTTPException
-from typing import Dict, Any
 from pydantic import BaseModel
 from services.auth_service import auth_service
 import os

@@ -7,7 +7,7 @@ Gemini embedding adapter for schema retrieval with graceful offline fallback.
 import logging
 from typing import List, Optional
 
-from services.ai.base import _get_system_api_key
+from ..base import _get_system_api_key
 
 try:
     import google.generativeai as genai

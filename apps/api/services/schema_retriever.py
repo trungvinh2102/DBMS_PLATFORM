@@ -9,11 +9,11 @@ import logging
 from typing import List, Dict, Optional
 
 from models import SchemaEmbedding, SessionLocal
-from services.ai.retrieval import TableRetrievalResult
-from services.ai.retrieval.embedding_gateway import GeminiEmbeddingGateway
-from services.ai.retrieval.metadata_source import SchemaMetadataSource
-from services.ai.retrieval.ranking import cosine_similarity, fuse_scores, rerank_tables
-from services.ai.retrieval.text import (
+from .ai.retrieval import TableRetrievalResult
+from .ai.retrieval.embedding_gateway import GeminiEmbeddingGateway
+from .ai.retrieval.metadata_source import SchemaMetadataSource
+from .ai.retrieval.ranking import cosine_similarity, fuse_scores, rerank_tables
+from .ai.retrieval.text import (
     build_reasons,
     build_table_search_text,
     column_names,

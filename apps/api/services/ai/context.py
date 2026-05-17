@@ -12,9 +12,9 @@ from datetime import datetime
 from sqlalchemy import text
 
 from models import SessionLocal
-from services.metadata import metadata_service
-from services.base_service import BaseDatabaseService
-from services.schema_retriever import TableRetrievalResult, schema_retriever
+from ..metadata import metadata_service
+from ..base_service import BaseDatabaseService
+from ..schema_retriever import TableRetrievalResult, schema_retriever
 
 logger = logging.getLogger(__name__)
 
