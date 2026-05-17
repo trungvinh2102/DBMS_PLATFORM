@@ -10,7 +10,9 @@ import os
 from typing import Dict, Any, List, Optional, Tuple
 
 from services.base_service import BaseDatabaseService
-from models import Db, QueryHistory, SavedQuery, SessionLocal
+from sqlalchemy.orm import Session
+
+from models import Db, QueryHistory, SavedQuery
 from utils.common import mask_config, encrypt_uri, decrypt_uri
 from utils.crypto import encrypt, decrypt
 from utils.connection_utils import ConnectionStringBuilder
@@ -25,20 +27,15 @@ class ConnectionService(BaseDatabaseService):
     Manages database connection configurations and provides connectivity testing.
     """
 
-    def list_databases(self) -> List[Dict[str, Any]]:
+    def list_databases(self, session: Session) -> List[Dict[str, Any]]:
         """Lists all configured database connections with masked sensitive data."""
-        session = SessionLocal()
-        try:
-            dbs = session.query(Db).order_by(Db.databaseName).all()
-            return [self._format_db_response(db) for db in dbs]
-        finally:
-            session.close()
+        dbs = session.query(Db).order_by(Db.databaseName).all()
+        return [self._format_db_response(db) for db in dbs]
 
-    def create_database(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_database(self, data: Dict[str, Any], session: Session) -> Dict[str, Any]:
         """Creates a new database connection configuration after a successful test."""
-        session = SessionLocal()
         try:
-            self._verify_connection(data)
+            self._verify_connection(data, session)
 
             config = data['config'].copy()
             # Skip encryption for file-based databases (no sensitive credentials)
@@ -67,12 +64,9 @@ class ConnectionService(BaseDatabaseService):
         except Exception as e:
             session.rollback()
             raise e
-        finally:
-            session.close()
 
-    def update_database(self, db_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    def update_database(self, db_id: str, data: Dict[str, Any], session: Session) -> Dict[str, Any]:
         """Updates an existing database connection after a successful test."""
-        session = SessionLocal()
         try:
             db = session.query(Db).filter(Db.id == db_id).first()
             if not db:
@@ -88,12 +82,9 @@ class ConnectionService(BaseDatabaseService):
         except Exception as e:
             session.rollback()
             raise e
-        finally:
-            session.close()
 
-    def delete_database(self, db_id: str) -> bool:
+    def delete_database(self, db_id: str, session: Session) -> bool:
         """Deletes a database connection and its associated history."""
-        session = SessionLocal()
         try:
             # Delete dependent records first
             session.query(QueryHistory).filter(QueryHistory.databaseId == db_id).delete()
@@ -111,13 +102,11 @@ class ConnectionService(BaseDatabaseService):
         except Exception as e:
             session.rollback()
             raise e
-        finally:
-            session.close()
 
-    def test_connection(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def test_connection(self, data: Dict[str, Any], session: Optional[Session] = None) -> Dict[str, Any]:
         """Tests connectivity to a database with the provided configuration."""
         try:
-            db_type, config = self._prepare_test_config(data)
+            db_type, config = self._prepare_test_config(data, session)
             if not config:
                 return {"success": False, "message": "Missing configuration"}
 
@@ -148,9 +137,9 @@ class ConnectionService(BaseDatabaseService):
             "config": mask_config(db.config)
         }
 
-    def _verify_connection(self, data: Dict[str, Any]):
+    def _verify_connection(self, data: Dict[str, Any], session: Optional[Session] = None):
         """Runs a connection test and raises an exception if it fails."""
-        test_result = self.test_connection(data)
+        test_result = self.test_connection(data, session)
         if not test_result['success']:
             raise Exception(f"Connection test failed: {test_result['message']}")
 
@@ -199,32 +188,31 @@ class ConnectionService(BaseDatabaseService):
                 self._encrypt_sensitive_fields(new_config)
             db.config = new_config
 
-    def _prepare_test_config(self, data: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
+    def _prepare_test_config(self, data: Dict[str, Any], session: Optional[Session] = None) -> Tuple[str, Dict[str, Any]]:
         """Merges provided test data with existing configuration if an ID is present."""
         db_id = data.get('id')
         db_type = data.get('type', '').lower()
         config = data.get('config')
 
         if db_id:
-            session = SessionLocal()
-            try:
-                exist_type, exist_config = self.get_db_config(db_id, session)
-                db_type = db_type or exist_type
-                if config:
-                    merged = exist_config.copy()
-                    # Handle sensitive data masks
-                    if config.get('password') == "********":
-                        config['password'] = exist_config.get('password')
+            if session is None:
+                raise ValueError("A database session is required when testing an existing connection.")
+
+            exist_type, exist_config = self.get_db_config(db_id, session)
+            db_type = db_type or exist_type
+            if config:
+                merged = exist_config.copy()
+                # Handle sensitive data masks
+                if config.get('password') == "********":
+                    config['password'] = exist_config.get('password')
+                
+                if config.get('uri') and '****' in config['uri']:
+                    config['uri'] = exist_config.get('uri')
                     
-                    if config.get('uri') and '****' in config['uri']:
-                        config['uri'] = exist_config.get('uri')
-                        
-                    merged.update(config)
-                    config = merged
-                else:
-                    config = exist_config
-            finally:
-                session.close()
+                merged.update(config)
+                config = merged
+            else:
+                config = exist_config
         elif not config:
             # Fallback: interpret fields directly from data
             config = {k: v for k, v in data.items() if k not in ('id', 'type')}

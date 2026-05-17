@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 from functools import wraps
 from fastapi.testclient import TestClient
 
-# Mock auth middleware decorators before application imports so tests bypass auth
 def mock_decorator(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -29,7 +28,7 @@ import services.metadata
 
 
 class FastAPIResponseAdapter:
-    """Compatibility wrapper for legacy Flask-style response.json property tests."""
+    """Compatibility wrapper for tests that access response.json as a property."""
 
     def __init__(self, response):
         self._response = response
@@ -40,7 +39,7 @@ class FastAPIResponseAdapter:
 
 
 class FastAPIClientAdapter:
-    """Small adapter exposing Flask-like test client calls over FastAPI TestClient."""
+    """Small adapter exposing compact test client calls over FastAPI TestClient."""
 
     def __init__(self, app):
         self._client = TestClient(app)
@@ -85,10 +84,9 @@ def mock_session(mocker):
     mock_session_cls = mocker.patch("services.base_service.SessionLocal")
     mock_session_inst = MagicMock()
     mock_session_cls.return_value = mock_session_inst
-    # Also patch it in other service files where imported
-    mocker.patch("services.connection.SessionLocal", return_value=mock_session_inst)
-    mocker.patch("services.execution.SessionLocal", return_value=mock_session_inst)
+    # Patch modules that still own their own sessions plus the FastAPI DB dependency.
     mocker.patch("services.metadata.SessionLocal", return_value=mock_session_inst)
+    mocker.patch("deps.SessionLocal", return_value=mock_session_inst)
     return mock_session_inst
 
 @pytest.fixture

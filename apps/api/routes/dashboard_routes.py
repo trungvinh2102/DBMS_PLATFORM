@@ -30,5 +30,5 @@ def get_stats(db_id: str):
 
 @dashboard_bp.get('/health')
 def health():
-    """Blueprint heartbeat."""
+    """Router heartbeat."""
     return {"status": "ok"}

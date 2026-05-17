@@ -9,6 +9,11 @@ import os
 
 auth_bp = APIRouter()
 
+
+def is_production_environment() -> bool:
+    """Return whether secure production cookie settings should be used."""
+    return os.getenv("API_ENV") == "production"
+
 class LoginRequest(BaseModel):
     username: str = None
     email: str = None
@@ -47,7 +52,7 @@ def login(request: Request, response: Response, data: LoginRequest):
         if not is_standalone:
             result.pop('token')
             
-        is_prod = os.getenv("FLASK_ENV") == "production"
+        is_prod = is_production_environment()
         
         response.set_cookie(
             key='auth_token',
@@ -83,7 +88,7 @@ def register(request: Request, response: Response, data: RegisterRequest):
         if not is_standalone:
             result.pop('token')
             
-        is_prod = os.getenv("FLASK_ENV") == "production"
+        is_prod = is_production_environment()
         
         response.set_cookie(
             key='auth_token',

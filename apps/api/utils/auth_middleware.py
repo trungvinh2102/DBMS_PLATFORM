@@ -6,7 +6,10 @@ from fastapi import Request, HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 import os
-from models import SessionLocal, User
+from sqlalchemy.orm import Session
+
+from deps import get_db
+from models import User
 
 SECRET_KEY = os.getenv("JWT_SECRET", "secret")
 ALGORITHM = "HS256"
@@ -24,7 +27,11 @@ MOCK_ADMIN = {
 
 security = HTTPBearer(auto_error=False)
 
-def get_current_user(request: Request, auth: HTTPAuthorizationCredentials = Security(security)):
+def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+    auth: HTTPAuthorizationCredentials = Security(security),
+):
     if DISABLE_AUTH:
         return MOCK_ADMIN
         
@@ -43,17 +50,10 @@ def get_current_user(request: Request, auth: HTTPAuthorizationCredentials = Secu
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token payload")
             
-        session = SessionLocal()
-        if not session:
-            raise HTTPException(status_code=500, detail="Database connection failed")
-            
-        try:
-            user = session.query(User).filter(User.id == user_id).first()
-            if not user:
-                raise HTTPException(status_code=401, detail='User no longer exists')
-            return payload # {userId, email, role}
-        finally:
-            session.close()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=401, detail='User no longer exists')
+        return payload # {userId, email, role}
             
     except Exception as e:
         raise HTTPException(status_code=401, detail=f'Token is invalid: {str(e)}')

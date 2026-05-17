@@ -11,7 +11,9 @@ import uuid
 import logging
 
 from services.base_service import BaseDatabaseService
-from models import Db, QueryHistory, SavedQuery, SessionLocal
+from sqlalchemy.orm import Session
+
+from models import Db, QueryHistory, SavedQuery
 from services.execution.sql_executor import SqlExecutor
 from services.execution.mongo_executor import MongoExecutor
 from services.execution.redis_executor import RedisExecutor
@@ -32,7 +34,14 @@ class ExecutionService(BaseDatabaseService):
         self.redis_executor = RedisExecutor(self)
         self.explain_executor = ExplainExecutor(self)
 
-    def execute_query(self, database_id: str, sql: str, auto_commit: bool = True, limit: int = 1000) -> Dict[str, Any]:
+    def execute_query(
+        self,
+        database_id: str,
+        sql: str,
+        session: Session,
+        auto_commit: bool = True,
+        limit: int = 1000,
+    ) -> Dict[str, Any]:
         """Routes and executes a query, persisting the outcome to history."""
         start_time = datetime.now()
         status = 'SUCCESS'
@@ -44,11 +53,7 @@ class ExecutionService(BaseDatabaseService):
                 raise ValueError("Database ID and SQL query are required.")
 
             # Resolve db_type to determine correct executor
-            session = SessionLocal()
-            try:
-                db_type, _ = self.get_db_config(database_id, session)
-            finally:
-                session.close()
+            db_type, _ = self.get_db_config(database_id, session)
 
             # Delegate execution based on engine type
             if db_type == 'mongodb':
@@ -64,7 +69,7 @@ class ExecutionService(BaseDatabaseService):
             logger.error(f"Execution failed for {database_id}: {status} - {error_message}")
             
         execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-        self._save_history(database_id, sql, status, execution_time_ms, error_message)
+        self._save_history(database_id, sql, status, execution_time_ms, error_message, session)
              
         return {
             "data": data,
@@ -73,16 +78,12 @@ class ExecutionService(BaseDatabaseService):
             "error": error_message
         }
 
-    def get_explain_plan(self, database_id: str, sql: str) -> Dict[str, Any]:
+    def get_explain_plan(self, database_id: str, sql: str, session: Session) -> Dict[str, Any]:
         """Routes an EXPLAIN request to the ExplainExecutor."""
         if not database_id or not sql:
             raise ValueError("Database ID and SQL query are required.")
 
-        session = SessionLocal()
-        try:
-            db_type, _ = self.get_db_config(database_id, session)
-        finally:
-            session.close()
+        db_type, _ = self.get_db_config(database_id, session)
 
         # We only support EXPLAIN for SQL relational DBs for now
         if db_type in ['mongodb', 'redis']:
@@ -90,9 +91,8 @@ class ExecutionService(BaseDatabaseService):
 
         return self.explain_executor.execute(database_id, sql)
 
-    def _save_history(self, db_id: str, sql: str, status: str, time_ms: int, error: Optional[str]):
+    def _save_history(self, db_id: str, sql: str, status: str, time_ms: int, error: Optional[str], session: Session):
         """Persists the outcome of a query execution for later analysis."""
-        session = SessionLocal()
         try:
              history = QueryHistory(
                  id=str(uuid.uuid4()),
@@ -106,12 +106,9 @@ class ExecutionService(BaseDatabaseService):
              session.commit()
         except Exception as ex:
              logger.error(f"Failed to save history: {ex}")
-        finally:
-             session.close()
 
-    def save_query(self, data: Dict[str, Any]) -> Dict[str, str]:
+    def save_query(self, data: Dict[str, Any], session: Session) -> Dict[str, str]:
         """Stores a named query in the user's library."""
-        session = SessionLocal()
         try:
             q = SavedQuery(
                 id=str(uuid.uuid4()),
@@ -127,12 +124,9 @@ class ExecutionService(BaseDatabaseService):
         except Exception as e:
             logger.error(f"Failed to save query: {e}")
             raise
-        finally:
-            session.close()
 
-    def get_query_history(self, database_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_query_history(self, session: Session, database_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
         """Retrieves and serializes query execution history, optionally filtered by database."""
-        session = SessionLocal()
         try:
             query = session.query(QueryHistory).order_by(QueryHistory.created_on.desc())
             if database_id:
@@ -154,12 +148,9 @@ class ExecutionService(BaseDatabaseService):
         except Exception as e:
             logger.error(f"Failed to retrieve history: {e}")
             return []
-        finally:
-            session.close()
             
-    def list_saved_queries(self, database_id: Optional[str] = None, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_saved_queries(self, session: Session, database_id: Optional[str] = None, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lists saved queries, optionally filtered by database or user ownership."""
-        session = SessionLocal()
         try:
             query = session.query(SavedQuery).order_by(SavedQuery.changed_on.desc())
             if database_id: query = query.filter(SavedQuery.databaseId == database_id)
@@ -172,7 +163,5 @@ class ExecutionService(BaseDatabaseService):
         except Exception as e:
             logger.error(f"Failed to list saved queries: {e}")
             return []
-        finally:
-            session.close()
 
 execution_service = ExecutionService()
