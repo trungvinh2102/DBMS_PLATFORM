@@ -25,10 +25,9 @@ class SaveConfigRequest(BaseModel):
 def _provider_matches(config_provider: str, requested_provider: str) -> bool:
     aliases = {
         "google gemini": "google",
-        "gemini": "google",
         "open ai": "openai",
         "claude": "anthropic",
-        "anthripic": "anthropic",
+        "anthropic": "anthropic",
         "alibaba qwen": "qwen",
     }
     config_value = (config_provider or "Google").strip().lower()

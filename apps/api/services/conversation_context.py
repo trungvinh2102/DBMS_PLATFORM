@@ -34,10 +34,10 @@ class ConversationContextManager:
     1. Load messages for the conversation from DB (ordered chronologically)
     2. If total <= SUMMARY_TRIGGER: pass them all as raw messages
     3. If total > SUMMARY_TRIGGER: summarize older messages + keep recent raw
-    4. Format as Gemini-compatible messages array or text block
+    4. Format as provider-compatible messages array or text block
 
     Usage:
-        ctx_mgr = ConversationContextManager(gemini_model)
+        ctx_mgr = ConversationContextManager(optional_summary_model)
         
         # For multi-turn (stream endpoint):
         messages = ctx_mgr.build_context(conv_id, "show me users")
@@ -49,7 +49,7 @@ class ConversationContextManager:
     def __init__(self, ai_model=None):
         """
         Args:
-            ai_model: A google.generativeai.GenerativeModel instance for summarization.
+            ai_model: Optional model client with generate_content() for summarization.
                       If None, falls back to naive summary extraction.
         """
         self._ai_model = ai_model
@@ -62,11 +62,11 @@ class ConversationContextManager:
         current_prompt: str,
     ) -> List[Dict[str, Any]]:
         """
-        Builds a Gemini-compatible messages array for multi-turn calls.
+        Builds a provider-compatible messages array for multi-turn calls.
 
         Returns:
             List of {'role': 'user'|'model', 'parts': [{'text': ...}]}
-            Ready to pass to model.generate_content(messages, ...)
+            Ready for legacy native model clients that accept content parts.
         """
         if not conversation_id:
             return [{"role": "user", "parts": [{"text": current_prompt}]}]
@@ -233,7 +233,7 @@ class ConversationContextManager:
         self,
         messages: List[Dict[str, str]]
     ) -> List[Dict[str, Any]]:
-        """Convert DB messages to Gemini API format."""
+        """Convert DB messages to native content-part format."""
         formatted = []
         prev_role = None
 
@@ -241,7 +241,7 @@ class ConversationContextManager:
             role = "model" if msg["role"] == "assistant" else "user"
             content = self._truncate(msg["content"], MSG_TRUNCATE_LEN * 2)
 
-            # Gemini requires alternating user/model — merge consecutive same-role msgs
+            # Native content-part APIs require alternating user/model turns.
             if role == prev_role and formatted:
                 # Append to previous message's text
                 formatted[-1]["parts"][0]["text"] += f"\n\n{content}"

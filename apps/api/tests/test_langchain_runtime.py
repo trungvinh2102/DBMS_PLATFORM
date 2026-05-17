@@ -70,21 +70,19 @@ def test_status_reports_supported_provider_registry():
     assert status["defaultModels"]["google"] == "gemini-2.5-flash"
 
 
-def test_non_google_langchain_failure_does_not_fallback_to_gemini(monkeypatch):
+def test_langchain_failure_returns_provider_error_without_native_fallback(monkeypatch):
     service = BaseAIService()
 
     def fail_invoke(*args, **kwargs):
         raise RuntimeError("forced langchain failure")
 
-    def fail_genai():
-        raise AssertionError("Gemini fallback should not run for OpenAI models")
-
     monkeypatch.setattr(langchain_runtime, "invoke_text", fail_invoke)
-    monkeypatch.setattr(service, "_ensure_genai", fail_genai)
 
-    result = service._generate_response("Generate SQL", model_id="gpt-4o-mini")
+    openai_result = service._generate_response("Generate SQL", model_id="gpt-4o-mini")
+    google_result = service._generate_response("Generate SQL", model_id="gemini-2.5-flash")
 
-    assert result.startswith("AI Error: LangChain generation failed for provider openai")
+    assert openai_result.startswith("AI Error: LangChain generation failed for provider openai")
+    assert google_result.startswith("AI Error: LangChain generation failed for provider google")
 
 
 def test_user_ai_config_sqlite_migration_allows_one_key_per_provider():
