@@ -5,6 +5,7 @@ Specialized AI service delegator that coordinates multiple AI strategies
 (SQL tasks, Agents, Semantic Context) for QurioDB.
 """
 import logging
+import re
 from typing import Dict, Any, Optional
 
 from .ai.sql import SqlAIService
@@ -15,6 +16,26 @@ from .ai.langchain_runtime import langchain_runtime
 from .ai.stream_parser import TaggedResponseStreamParser
 
 logger = logging.getLogger(__name__)
+
+DATABASE_TASK_KEYWORDS = {
+    "sql", "query", "queries", "database", "db", "schema", "table", "tables",
+    "column", "columns", "row", "rows", "join", "filter", "where", "group",
+    "order", "limit", "select", "insert", "update", "delete", "mongodb",
+    "mql", "collection", "index", "indexes", "explain", "optimize",
+    "users", "orders", "customers", "revenue", "count", "sum", "average",
+    "analysis", "analytics", "data", "dataset", "report",
+    "truy vấn", "cơ sở dữ liệu", "du lieu", "dữ liệu", "bang", "bảng",
+    "cot", "cột", "dong", "dòng", "loc", "lọc", "sap xep", "sắp xếp",
+    "thong ke", "thống kê", "phan tich", "phân tích", "nguoi dung",
+    "người dùng", "doanh thu", "dem", "đếm", "online", "nhay cam",
+    "nhạy cảm",
+}
+
+GENERAL_CHAT_PATTERNS = (
+    r"^(hi|hello|hey|thanks|thank you|ok|okay|bye)\b",
+    r"^(xin chào|chào|cảm ơn|cam on|tạm biệt|tam biet)\b",
+    r"^(bạn là ai|ban la ai|mày là ai|may la ai|m la ai|who are you|what are you|what can you do|help)\??$",
+)
 
 class AIService(SqlAIService, AgentAIService):
     """
@@ -76,14 +97,21 @@ class AIService(SqlAIService, AgentAIService):
     # --- Streaming Logic ---
     def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None, conv_id: Optional[str] = None):
         """Streams responses for chat interfaces using SSE events."""
+        history = history or []
+        is_database_request = self._is_database_assistant_request(prompt, history)
+        quick_response = self._quick_general_response(prompt) if not is_database_request else ""
+        if quick_response:
+            yield "message", quick_response
+            return
+
         # Yield clean text. Frontend will handle wrapping for the UI steps.
         yield "thinking", "Đang khởi tạo bối cảnh..."
         
         system_prompt = "You are the Supreme SQL Architect. Use English for reasoning steps but respond in the user's language."
-        if db_id:
+        if db_id and is_database_request:
             yield "thinking", "Phân tích lược đồ..."
             
-            retrieval_intent = self._rewrite_retrieval_intent(prompt, history or [])
+            retrieval_intent = self._rewrite_retrieval_intent(prompt, history)
 
             context_result = schema_context_service.build_schema_context(db_id, schema, intent=retrieval_intent)
             context = context_result.context
@@ -97,11 +125,15 @@ class AIService(SqlAIService, AgentAIService):
             from .prompts import get_sql_generation_prompt
             system_prompt = get_sql_generation_prompt(context, feedback_context=feedback)
             yield "thinking", "Sẵn sàng."
+        elif db_id:
+            from .prompts import get_general_chat_prompt
+            system_prompt = get_general_chat_prompt()
+            yield "thinking", "Khởi tạo xong."
         else:
             yield "thinking", "Khởi tạo xong."
 
         try:
-            langchain_history = history or []
+            langchain_history = history
             if conv_id and not langchain_history:
                 langchain_history = self._load_langchain_history(conv_id)
 
@@ -147,6 +179,65 @@ class AIService(SqlAIService, AgentAIService):
         if latest_sql and follow_up_markers.intersection(prompt_terms):
             return f"{prompt}\n\nPrevious SQL context:\n{latest_sql[:1200]}"
         return prompt
+
+    def _is_database_assistant_request(self, prompt: str, history: list) -> bool:
+        """Returns true when a chat turn needs expensive schema retrieval."""
+        normalized = " ".join(str(prompt or "").lower().split())
+        if not normalized:
+            return False
+
+        if any(re.search(pattern, normalized) for pattern in GENERAL_CHAT_PATTERNS):
+            return False
+
+        if self._has_recent_sql_context(history) and self._is_follow_up_prompt(normalized):
+            return True
+
+        return any(keyword in normalized for keyword in DATABASE_TASK_KEYWORDS)
+
+    def _has_recent_sql_context(self, history: list) -> bool:
+        for message in reversed(history[-6:]):
+            content = str(message.get("content", ""))
+            upper_content = content.upper()
+            if "```SQL" in upper_content or "SELECT " in upper_content or "FROM " in upper_content:
+                return True
+        return False
+
+    def _is_follow_up_prompt(self, normalized_prompt: str) -> bool:
+        follow_up_markers = {
+            "that", "it", "this", "previous", "query", "add", "filter", "sort",
+            "same", "now", "fix", "explain", "optimize", "đó", "do", "nó",
+            "nay", "này", "trước", "truoc", "thêm", "them", "lọc", "loc",
+            "sắp xếp", "sap xep", "sửa", "sua",
+        }
+        prompt_terms = {term.strip(".,!?").lower() for term in normalized_prompt.split()}
+        return bool(follow_up_markers.intersection(prompt_terms))
+
+    def _quick_general_response(self, prompt: str) -> str:
+        """Returns instant responses for obvious non-database chat turns."""
+        normalized = " ".join(str(prompt or "").lower().strip().split())
+        if not normalized:
+            return ""
+
+        if re.match(r"^(bạn là ai|ban la ai|mày là ai|may la ai|m la ai|who are you|what are you)\??$", normalized):
+            return (
+                "Tôi là QurioDB copilot, trợ lý trong QurioDB. "
+                "Tôi có thể giúp bạn tạo, giải thích, tối ưu và sửa truy vấn SQL/MongoDB, "
+                "hoặc phân tích dữ liệu từ database bạn đang kết nối."
+            )
+
+        if re.match(r"^(xin chào|chào|hi|hello|hey)\b", normalized):
+            return "Xin chào! Tôi là QurioDB copilot. Bạn muốn tôi hỗ trợ truy vấn hay phân tích dữ liệu nào?"
+
+        if re.match(r"^(cảm ơn|cam on|thanks|thank you|ok|okay)\b", normalized):
+            return "Rất vui được hỗ trợ bạn."
+
+        if re.match(r"^(help|what can you do)\??$", normalized):
+            return (
+                "Tôi có thể giúp tạo SQL/MongoDB query, giải thích query, tối ưu hiệu năng, "
+                "sửa lỗi truy vấn và phân tích dữ liệu dựa trên schema trong QurioDB."
+            )
+
+        return ""
 
     def _load_langchain_history(self, conv_id: str) -> list:
         """Loads compact chat history in LangChain-compatible role/content format."""

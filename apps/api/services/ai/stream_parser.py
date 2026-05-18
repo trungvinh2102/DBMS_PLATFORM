@@ -67,6 +67,11 @@ class TaggedResponseStreamParser:
 
     def _handle_internal_tool_event(self) -> str:
         stripped = self.buffer.lstrip()
+        if stripped and "<tool_call".startswith(stripped):
+            return "wait"
+        if stripped.startswith("<tool_call"):
+            return self._handle_internal_tool_tag(stripped)
+
         if not stripped.startswith("{"):
             return "none"
 
@@ -81,6 +86,18 @@ class TaggedResponseStreamParser:
             return "none"
 
         self.buffer = stripped[end_index:].lstrip()
+        self.discard_leading_whitespace = not self.buffer
+        return "discard"
+
+    def _handle_internal_tool_tag(self, stripped: str) -> str:
+        close_tag = "</tool_call>"
+        close_index = stripped.find(close_tag)
+        if close_index < 0:
+            if self._looks_like_internal_tool_prefix(stripped) or len(stripped) < 2048:
+                return "wait"
+            return "none"
+
+        self.buffer = stripped[close_index + len(close_tag):].lstrip()
         self.discard_leading_whitespace = not self.buffer
         return "discard"
 

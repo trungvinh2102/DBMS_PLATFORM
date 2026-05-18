@@ -4,9 +4,13 @@ ai_stream.py
 Streaming chat route for the AI Assistant.
 """
 
+import datetime
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from models import AIChatMessage, AIConversation, SessionLocal
 from schemas.ai import StreamChatRequest
 from services.ai.conversation_store import conversation_store
 from services.ai.streaming import (
@@ -32,7 +36,10 @@ def stream_chat(data: StreamChatRequest, current_user: dict = Depends(get_curren
         last_message,
         data.conversationId,
     )
+    request_history = [message for message in messages[:-1] if message.get("content")]
     history = conversation_store.load_recent_history(conversation_id) if user_id else []
+    if not history:
+        history = request_history
     ai_service._save_chat("user", last_message, user_id, data.databaseId, conv_id=conversation_id)
 
     return StreamingResponse(
@@ -53,6 +60,7 @@ def _resolve_stream_messages(data: StreamChatRequest):
 
 def _stream_response(data: StreamChatRequest, user_id: str, last_message: str, conversation_id: str, history: list):
     response_parts = new_response_parts()
+    assistant_message_id = None
     try:
         for event, chunk in ai_service.stream_generate_response(
             last_message,
@@ -64,14 +72,22 @@ def _stream_response(data: StreamChatRequest, user_id: str, last_message: str, c
             conv_id=conversation_id,
         ):
             append_stream_part(response_parts, event, chunk)
+            assistant_message_id = _persist_stream_snapshot(
+                response_parts,
+                assistant_message_id,
+                user_id,
+                data.databaseId,
+                conversation_id,
+            )
             yield encode_sse_event(event, chunk)
 
-        full_response = build_assistant_history_content(response_parts)
-        if full_response:
-            ai_service._save_chat("assistant", full_response, user_id, data.databaseId, conv_id=conversation_id)
     except Exception as exc:
         error_message = f"Error: {exc}"
-        ai_service._save_chat("assistant", error_message, user_id, data.databaseId, conv_id=conversation_id)
+        if assistant_message_id:
+            append_stream_part(response_parts, "message", f"\n\n{error_message}")
+            _persist_stream_snapshot(response_parts, assistant_message_id, user_id, data.databaseId, conversation_id)
+        else:
+            ai_service._save_chat("assistant", error_message, user_id, data.databaseId, conv_id=conversation_id)
         yield encode_sse_event("error", error_message)
 
 
@@ -83,3 +99,36 @@ def _stream_headers(conversation_id: str):
         "Expires": "0",
         "X-Accel-Buffering": "no",
     }
+
+
+def _persist_stream_snapshot(parts: dict, message_id: str | None, user_id: str, database_id: str, conversation_id: str) -> str | None:
+    content = build_assistant_history_content(parts)
+    if not content:
+        return message_id
+
+    session = SessionLocal()
+    try:
+        if message_id:
+            message = session.query(AIChatMessage).get(message_id)
+            if message:
+                message.content = content
+        else:
+            message_id = str(uuid.uuid4())
+            session.add(AIChatMessage(
+                id=message_id,
+                role="assistant",
+                content=content,
+                userId=user_id,
+                databaseId=database_id,
+                conversationId=conversation_id,
+            ))
+        conversation = session.query(AIConversation).get(conversation_id)
+        if conversation:
+            conversation.changed_on = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
+        session.commit()
+        return message_id
+    except Exception:
+        session.rollback()
+        return message_id
+    finally:
+        session.close()

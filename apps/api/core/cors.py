@@ -37,5 +37,5 @@ def configure_cors(app: FastAPI) -> None:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["Authorization"],
+        expose_headers=["Authorization", "X-Conversation-Id"],
     )

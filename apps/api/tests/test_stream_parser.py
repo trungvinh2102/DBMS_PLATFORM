@@ -71,3 +71,24 @@ def test_parser_discards_internal_tool_json_split_across_chunks():
     ])
 
     assert events == [("message", "Xin chào!")]
+
+
+def test_parser_discards_internal_tool_call_tags():
+    events = collect_events([
+        '<tool_call>{"name": "SchemaContextLoader", "args": {"databaseId": "db-1"}}</tool_call>',
+        "\n\n",
+        '<tool_call>{"name": "RetrievalTrace", "args": {"tables": []}}</tool_call>',
+        "\nHello!",
+    ])
+
+    assert events == [("message", "Hello!")]
+
+
+def test_parser_discards_internal_tool_call_tags_split_at_tag_prefix():
+    events = collect_events([
+        "<tool",
+        '_call>{"name": "SchemaContextLoader", "args": {"databaseId": "db-1"}}</tool_call>',
+        "\nHello!",
+    ])
+
+    assert events == [("message", "Hello!")]

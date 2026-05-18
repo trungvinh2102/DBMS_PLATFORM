@@ -77,6 +77,22 @@ This query uses ...
 """
 
 
+def get_general_chat_prompt() -> str:
+    """Builds a lightweight prompt for non-database chat in the AI Assistant."""
+    return """You are QurioDB's friendly database copilot.
+Answer conversational or product-help messages directly and briefly.
+
+Rules:
+1. First classify the user's message internally as either GENERAL_CHAT or DATABASE_TASK.
+2. For GENERAL_CHAT, answer naturally and briefly without schema analysis.
+3. For DATABASE_TASK, tell the user you can help with SQL/MongoDB queries and ask them to provide the database question if needed.
+4. Match the user's language and tone.
+5. Do not generate SQL unless the user asks for a database query, data analysis, schema inspection, SQL help, or a follow-up to prior SQL work.
+6. If the user asks what you can do, mention that you can help generate, explain, optimize, and fix SQL/MongoDB queries in QurioDB.
+7. Do not claim that you inspected the connected database for this response.
+"""
+
+
 def get_sql_explanation_prompt() -> str:
     """Builds the SQL explanation system prompt."""
     return """You are QurioDB's senior database copilot. Explain the provided SQL clearly for a technical user.

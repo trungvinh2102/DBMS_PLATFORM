@@ -195,6 +195,56 @@ def test_stream_response_does_not_emit_retrieval_trace_tool_call(monkeypatch):
     assert not trace_events
 
 
+def test_stream_response_skips_schema_retrieval_for_general_chat(monkeypatch):
+    """Small talk should not pay the schema retrieval cost just because a DB is selected."""
+    service = AIService()
+    called = {"model": False}
+
+    monkeypatch.setattr(
+        "services.ai_service.schema_context_service.build_schema_context",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("schema retrieval should be skipped")),
+    )
+    monkeypatch.setattr(
+        "services.ai_service.feedback_context_service.get_feedback_context",
+        lambda *_: (_ for _ in ()).throw(AssertionError("feedback retrieval should be skipped")),
+    )
+
+    def stream_text(**kwargs):
+        called["model"] = True
+        assert "GENERAL_CHAT" in kwargs["system_prompt"]
+        return iter(["Tôi là QurioDB copilot."])
+
+    monkeypatch.setattr("services.ai_service.langchain_runtime.stream_text", stream_text)
+
+    events = list(service.stream_generate_response("mày là ai", db_id="db-1", schema="public", history=[]))
+
+    assert called["model"] is True
+    assert ("thinking", "Phân tích lược đồ...") not in events
+    assert "QurioDB copilot" in "".join(chunk for event, chunk in events if event == "message")
+
+
+def test_stream_response_uses_schema_retrieval_for_database_chat(monkeypatch):
+    """Data questions should still use schema retrieval."""
+    service = AIService()
+    called = {"schema": False}
+
+    def build_schema_context(*_args, **_kwargs):
+        called["schema"] = True
+        return type(
+            "ContextResult",
+            (),
+            {"context": "DATABASE DIALECT: POSTGRES", "retrieval_trace": {"tables": []}},
+        )()
+
+    monkeypatch.setattr("services.ai_service.schema_context_service.build_schema_context", build_schema_context)
+    monkeypatch.setattr("services.ai_service.feedback_context_service.get_feedback_context", lambda *_: "")
+    monkeypatch.setattr("services.ai_service.langchain_runtime.stream_text", lambda **_: iter(["done"]))
+
+    list(service.stream_generate_response("Những người dùng nào dùng từ ngữ nhạy cảm", db_id="db-1", schema="public", history=[]))
+
+    assert called["schema"] is True
+
+
 def test_rewrite_retrieval_intent_uses_previous_sql_for_followups():
     """Follow-up prompts should retrieve against the previous SQL context."""
     service = AIService()

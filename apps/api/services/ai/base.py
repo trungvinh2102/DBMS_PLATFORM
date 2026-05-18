@@ -7,9 +7,10 @@ message persistence, and response parsing.
 import re
 import uuid
 import logging
+import datetime
 from typing import Dict, Any, Optional
 
-from models import AIChatMessage, AIGeneratedQuery, SessionLocal, UserAIConfig
+from models import AIChatMessage, AIConversation, AIGeneratedQuery, SessionLocal, UserAIConfig
 from ..conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
 from .langchain_runtime import get_ai_api_key, langchain_runtime
@@ -72,6 +73,10 @@ class BaseAIService:
                 conversationId=conv_id
             )
             session.add(msg)
+            if conv_id:
+                conversation = session.query(AIConversation).get(conv_id)
+                if conversation:
+                    conversation.changed_on = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
             session.commit()
             return msg_id
         except Exception as e:

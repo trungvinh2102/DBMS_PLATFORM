@@ -32,6 +32,32 @@ const LABELED_THINKING_EVENT_PATTERN = /^(Intent|Schema mapping|Strategy):/i;
 
 export const isLabeledThinkingEvent = (text: string) => LABELED_THINKING_EVENT_PATTERN.test(text.trim());
 
+const toThinkingSteps = (events: any[]): AIStep[] => {
+  return events.reduce<AIStep[]>((steps, event) => {
+    if (event?.type !== "thinking" || !event?.content) return steps;
+
+    const rawText = String(event.content);
+    const text = rawText.trim();
+    if (!text) return steps;
+
+    const lastStep = steps[steps.length - 1];
+    const shouldStartStep =
+      !lastStep ||
+      isStatusThinkingEvent(text) ||
+      isStatusThinkingEvent(lastStep.content) ||
+      isLabeledThinkingEvent(text);
+
+    if (shouldStartStep) {
+      return [...steps, { type: "thinking", content: text, status: "complete" }];
+    }
+
+    return [
+      ...steps.slice(0, -1),
+      { ...lastStep, content: `${lastStep.content}${rawText}` },
+    ];
+  }, []);
+};
+
 const INTERNAL_TOOL_NAMES = new Set(["SchemaContextLoader", "RetrievalTrace"]);
 
 const findJsonObjectEnd = (text: string, startIndex: number) => {
@@ -119,6 +145,23 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
     if (message.role === "user") return { content: message.content };
 
+    if (message.events || message.sql || message.analysis || message.thought || message.confidence !== undefined) {
+      const steps = Array.isArray(message.events) ? toThinkingSteps(message.events) : undefined;
+
+      return {
+        content: message.content || "",
+        explanation: message.explanation || "",
+        thought: message.thought || message.thinking || "",
+        sql: message.sql || "",
+        analysis: message.analysis || "",
+        confidence: message.confidence,
+        columns: message.columns,
+        data: message.data,
+        suggestions: message.suggestions,
+        steps,
+      };
+    }
+
     let text = stripInternalToolEnvelopes(message.content).trim();
 
     // 1. Check if content is JSON (New Agent format)
@@ -139,6 +182,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           columns: data.columns,
           data: data.data,
           suggestions: data.suggestions,
+          steps: Array.isArray(data.events) ? toThinkingSteps(data.events) : undefined,
         };
       } catch (e) {
         console.warn("Failed to parse JSON message, falling back to regex", e);
@@ -361,18 +405,19 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         },
         (chunk, event) => {
           if (event === "thinking") {
-            const text = String(chunk || "").trim();
+            const rawText = String(chunk || "");
+            const text = rawText.trim();
             if (!text) return;
 
             const lastStep = streamSteps[streamSteps.length - 1];
             const isStatusEvent = isStatusThinkingEvent(text);
             const isPreviousStatusEvent = lastStep?.type === "thinking" && isStatusThinkingEvent(lastStep.content);
             const shouldKeepSeparateThinkingEvent =
-              isStatusEvent || isPreviousStatusEvent || isLabeledThinkingEvent(text) || isLabeledThinkingEvent(lastStep?.content || "");
+              isStatusEvent || isPreviousStatusEvent || isLabeledThinkingEvent(text);
             if (lastStreamEvent === "thinking" && lastStep?.type === "thinking" && !shouldKeepSeparateThinkingEvent) {
               streamSteps = [
                 ...streamSteps.slice(0, -1),
-                { ...lastStep, content: `${lastStep.content}${text.startsWith("\n") ? "" : "\n"}${text}`, status: "active" },
+                { ...lastStep, content: `${lastStep.content}${rawText}`, status: "active" },
               ];
             } else {
               streamSteps = [

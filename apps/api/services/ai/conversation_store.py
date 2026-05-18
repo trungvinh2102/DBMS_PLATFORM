@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException
 
 from models import AIChatMessage, AIConversation, AIFeedback, SessionLocal
+from services.ai.streaming import parse_assistant_history_content
 
 
 class AIConversationStore:
@@ -47,7 +48,7 @@ class AIConversationStore:
                 .order_by(AIChatMessage.created_on.desc())\
                 .limit(limit)\
                 .all()
-            return [{"role": message.role, "content": message.content} for message in reversed(messages)]
+            return [{"role": message.role, "content": self._history_context_content(message)} for message in reversed(messages)]
         finally:
             session.close()
 
@@ -162,12 +163,41 @@ class AIConversationStore:
         result = {
             "id": message.id,
             "role": message.role,
-            "content": message.content,
-            "created_on": message.created_on.isoformat(),
+            "content": self._message_content(message),
+            "created_on": self._isoformat_utc(message.created_on),
         }
+        if message.role == "assistant":
+            result.update(self._assistant_fields(message))
         if include_database:
             result["databaseId"] = message.databaseId
         return result
+
+    def _message_content(self, message: AIChatMessage) -> str:
+        if message.role != "assistant":
+            return message.content
+        return self._assistant_fields(message)["content"]
+
+    def _assistant_fields(self, message: AIChatMessage) -> Dict:
+        payload = parse_assistant_history_content(message.content)
+        return {
+            "content": payload.get("content") or "",
+            "thought": payload.get("thinking") or "",
+            "sql": payload.get("sql") or "",
+            "analysis": payload.get("analysis") or "",
+            "confidence": payload.get("confidence"),
+            "events": payload.get("events") or [],
+        }
+
+    def _history_context_content(self, message: AIChatMessage) -> str:
+        if message.role != "assistant":
+            return message.content
+        payload = parse_assistant_history_content(message.content)
+        parts = [
+            payload.get("content") or "",
+            f"SQL:\n{payload.get('sql')}" if payload.get("sql") else "",
+            f"Analysis:\n{payload.get('analysis')}" if payload.get("analysis") else "",
+        ]
+        return "\n\n".join(part for part in parts if part).strip()
 
     def _conversation_to_dict(self, conversation: AIConversation) -> Dict:
         return {
@@ -175,9 +205,14 @@ class AIConversationStore:
             "title": conversation.title,
             "isPinned": conversation.isPinned,
             "databaseId": conversation.databaseId,
-            "created_on": conversation.created_on.isoformat(),
-            "changed_on": conversation.changed_on.isoformat(),
+            "created_on": self._isoformat_utc(conversation.created_on),
+            "changed_on": self._isoformat_utc(conversation.changed_on),
         }
+
+    def _isoformat_utc(self, value: datetime.datetime) -> str:
+        if value.tzinfo:
+            return value.astimezone(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+        return value.isoformat() + "Z"
 
 
 conversation_store = AIConversationStore()

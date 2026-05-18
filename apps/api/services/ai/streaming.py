@@ -5,7 +5,8 @@ Helpers for AI Assistant server-sent events and persisted stream content.
 """
 
 import json
-from typing import Dict, List, Tuple
+import re
+from typing import Any, Dict, List, Tuple
 
 STREAM_RESPONSE_PARTS = {
     "thinking": [],
@@ -14,6 +15,21 @@ STREAM_RESPONSE_PARTS = {
     "sql": [],
     "analysis": [],
 }
+
+STATUS_THINKING_EVENTS = {
+    "Initializing context...",
+    "Analyzing schema...",
+    "Learning from your feedback...",
+    "Ready.",
+    "Initialization complete.",
+    "Đang khởi tạo bối cảnh...",
+    "Phân tích lược đồ...",
+    "Học hỏi từ phản hồi của các bạn...",
+    "Sẵn sàng.",
+    "Khởi tạo xong.",
+}
+
+LABELED_THINKING_EVENT_PATTERN = re.compile(r"^(Intent|Schema mapping|Strategy):", re.I)
 
 
 def new_response_parts() -> Dict[str, List[str]]:
@@ -37,16 +53,177 @@ def append_stream_part(parts: Dict[str, List[str]], event: str, chunk: str) -> N
 
 
 def build_assistant_history_content(parts: Dict[str, List[str]]) -> str:
-    """Rebuilds streamed semantic events into the legacy persisted message format."""
-    events = parts.get("_events") or _events_from_legacy_parts(parts)
-    blocks = []
-    for event, chunks in _group_consecutive_events(events):
-        content = "".join(chunks).strip()
+    """Serializes streamed semantic events without embedding UI tags in content."""
+    payload = build_assistant_history_payload(parts)
+    if not payload["events"] and not payload["content"]:
+        return ""
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def build_assistant_history_payload(parts: Dict[str, List[str]]) -> Dict[str, Any]:
+    """Builds a structured assistant message from streamed event chunks."""
+    events = _semantic_events(parts.get("_events") or _events_from_legacy_parts(parts))
+    payload: Dict[str, Any] = {
+        "content": "",
+        "thinking": "",
+        "sql": "",
+        "analysis": "",
+        "confidence": None,
+        "events": [],
+    }
+
+    for event, content in events:
         if not content:
             continue
-        blocks.append(_format_event_for_history(event, content))
+        if event == "message":
+            payload["content"] = _concat_text(payload["content"], content)
+        elif event == "thinking":
+            payload["thinking"] = _append_text(payload["thinking"], content)
+        elif event == "sql":
+            payload["sql"] = _concat_text(payload["sql"], content)
+        elif event == "analysis":
+            payload["analysis"] = _concat_text(payload["analysis"], content)
+        elif event == "confidence":
+            payload["confidence"] = _parse_confidence(content)
+        payload["events"].append({"type": event, "content": content})
 
-    return "\n\n".join(blocks)
+    return payload
+
+
+def _semantic_events(events: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    semantic_events: List[Tuple[str, str]] = []
+    for event, chunk in events:
+        event_name = str(event or "message")
+        raw_text = str(chunk)
+        text = raw_text.strip()
+        if not text:
+            continue
+
+        if event_name == "thinking":
+            _append_thinking_event(semantic_events, raw_text, text)
+            continue
+
+        if semantic_events and semantic_events[-1][0] == event_name and event_name in {"message", "sql", "analysis"}:
+            semantic_events[-1] = (event_name, semantic_events[-1][1] + raw_text)
+        else:
+            semantic_events.append((event_name, text if event_name == "confidence" else raw_text.strip()))
+    return semantic_events
+
+
+def _append_thinking_event(events: List[Tuple[str, str]], raw_text: str, text: str) -> None:
+    if not events or events[-1][0] != "thinking":
+        events.append(("thinking", text))
+        return
+
+    previous = events[-1][1]
+    should_start_step = (
+        _is_status_thinking_event(text)
+        or _is_status_thinking_event(previous)
+        or _is_labeled_thinking_event(text)
+    )
+    if should_start_step:
+        events.append(("thinking", text))
+    else:
+        events[-1] = ("thinking", previous + raw_text)
+
+
+def _is_status_thinking_event(text: str) -> bool:
+    return text.strip() in STATUS_THINKING_EVENTS
+
+
+def _is_labeled_thinking_event(text: str) -> bool:
+    return bool(LABELED_THINKING_EVENT_PATTERN.match(text.strip()))
+
+
+def parse_assistant_history_content(content: str) -> Dict[str, Any]:
+    """Parses structured or legacy persisted assistant content for API responses."""
+    cleaned = clean_assistant_history_content(content)
+    empty_payload = {
+        "content": "",
+        "thinking": "",
+        "sql": "",
+        "analysis": "",
+        "confidence": None,
+        "events": [],
+    }
+    if not cleaned:
+        return empty_payload
+
+    try:
+        payload = json.loads(cleaned)
+        if isinstance(payload, dict):
+            return {
+                **empty_payload,
+                **payload,
+                "content": payload.get("content") or payload.get("summary") or "",
+                "thinking": payload.get("thinking") or payload.get("thought") or "",
+                "events": payload.get("events") if isinstance(payload.get("events"), list) else [],
+            }
+    except json.JSONDecodeError:
+        pass
+
+    return _parse_legacy_history_content(cleaned, empty_payload)
+
+
+def clean_assistant_history_content(content: str) -> str:
+    """Removes internal tool trace envelopes from persisted assistant content."""
+    if not content:
+        return ""
+    return re.sub(r"\s*<tool_call[^>]*>[\s\S]*?</tool_call>\s*", "\n\n", str(content)).strip()
+
+
+def _parse_legacy_history_content(content: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    working = content
+
+    for match in re.finditer(r"<thinking>\s*([\s\S]*?)\s*</thinking>", working, flags=re.I):
+        text = match.group(1).strip()
+        if text:
+            payload["thinking"] = _append_text(payload["thinking"], text)
+            payload["events"].append({"type": "thinking", "content": text})
+    working = re.sub(r"\s*<thinking>[\s\S]*?</thinking>\s*", "\n\n", working, flags=re.I)
+
+    confidence_match = re.search(r"<confidence>\s*([\s\S]*?)\s*</confidence>", working, flags=re.I)
+    if confidence_match:
+        text = confidence_match.group(1).strip()
+        payload["confidence"] = _parse_confidence(text)
+        payload["events"].append({"type": "confidence", "content": text})
+    working = re.sub(r"\s*<confidence>[\s\S]*?</confidence>\s*", "\n\n", working, flags=re.I)
+
+    sql_match = re.search(r"```sql\s*([\s\S]*?)\s*```", working, flags=re.I)
+    if sql_match:
+        text = sql_match.group(1).strip()
+        payload["sql"] = text
+        payload["events"].append({"type": "sql", "content": text})
+    working = re.sub(r"\s*```sql[\s\S]*?```\s*", "\n\n", working, flags=re.I)
+
+    analysis_match = re.search(r"### ANALYSIS:\s*([\s\S]*)", working, flags=re.I)
+    if analysis_match:
+        text = analysis_match.group(1).strip()
+        payload["analysis"] = text
+        payload["events"].append({"type": "analysis", "content": text})
+    working = re.sub(r"\s*### ANALYSIS:[\s\S]*", "", working, flags=re.I)
+
+    payload["content"] = working.strip()
+    if payload["content"]:
+        payload["events"].insert(0, {"type": "message", "content": payload["content"]})
+    return payload
+
+
+def _append_text(existing: str, text: str) -> str:
+    if not existing:
+        return text
+    return f"{existing}\n\n{text}"
+
+
+def _concat_text(existing: str, text: str) -> str:
+    return f"{existing}{text}" if existing else text
+
+
+def _parse_confidence(content: str):
+    try:
+        return int(str(content).strip())
+    except ValueError:
+        return content
 
 
 def _events_from_legacy_parts(parts: Dict[str, List[str]]) -> List[Tuple[str, str]]:
@@ -55,29 +232,3 @@ def _events_from_legacy_parts(parts: Dict[str, List[str]]) -> List[Tuple[str, st
     for event in STREAM_RESPONSE_PARTS:
         events.extend((event, chunk) for chunk in parts.get(event, []))
     return events
-
-
-def _group_consecutive_events(events: List[Tuple[str, str]]) -> List[Tuple[str, List[str]]]:
-    """Keeps stream ordering while joining adjacent chunks from the same event."""
-    grouped = []
-    for event, chunk in events:
-        if grouped and grouped[-1][0] == event:
-            grouped[-1][1].append(chunk)
-        else:
-            grouped.append((event, [chunk]))
-    return grouped
-
-
-def _format_event_for_history(event: str, content: str) -> str:
-    """Formats one persisted stream event in a reload-friendly legacy shape."""
-    if event == "thinking":
-        return f"<thinking>\n{content}\n</thinking>"
-    if event == "confidence":
-        return f"<confidence>{content}</confidence>"
-    if event == "message":
-        return content
-    if event == "sql":
-        return f"```sql\n{content}\n```"
-    if event == "analysis":
-        return f"### ANALYSIS:\n{content}"
-    return f'<stream_event name="{event}">{content}</stream_event>'
