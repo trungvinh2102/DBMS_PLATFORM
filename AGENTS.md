@@ -191,6 +191,7 @@ python -m pytest
 Read project rules when relevant:
 
 - `.codex/rules/clean-code.md`: code quality, naming, file size, file headers.
+- `.codex/rules/code-change-quality-gate.md`: mandatory quality gate for every code edit, bug fix, refactor, and generated implementation.
 - `.codex/rules/tests.md`: test expectations for features, fixes, and refactors.
 - `.codex/rules/documents.md`: documentation structure under `docs/`.
 - `.codex/rules/research.md`: research expectations for large/uncertain tasks.
