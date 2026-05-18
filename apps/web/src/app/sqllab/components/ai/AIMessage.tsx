@@ -31,7 +31,6 @@ interface AIMessageProps {
   message: Message;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
-  onApply: (sql: string) => void;
   onSuggestionClick?: (suggestion: string) => void;
   conversationId?: string | null;
 }
@@ -40,7 +39,6 @@ const AIMessageComponent = ({
   message,
   onExplain,
   onOptimize,
-  onApply,
   onSuggestionClick,
   conversationId
 }: AIMessageProps) => {
@@ -55,23 +53,21 @@ const AIMessageComponent = ({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  // Auto-expand assistant activity while stream events are arriving.
+  // Auto-expand assistant activity while stream events or persisted thinking steps are available.
   useEffect(() => {
-    if ((message.isStreaming || message.steps?.length) && !message.sql && !isThoughtVisible) {
+    if ((message.isStreaming || message.steps?.length || message.thought) && !isThoughtVisible) {
       setIsThoughtVisible(true);
     }
-  }, [message.isStreaming, message.steps?.length, message.sql, isThoughtVisible]);
+  }, [message.isStreaming, message.steps?.length, message.thought, isThoughtVisible]);
 
   const status = useMemo(() => {
     if (message.content?.startsWith("Error:")) return null;
     if (message.sql || (message.content && !message.content.includes("Thinking"))) return null;
-    if (message.isStreaming && !message.content && !message.sql) return "Reading context...";
-    if (!message.content && !message.thought && !message.sql) return "Brainstorming SQL strategy...";
     return null;
   }, [message.content, message.thought, message.sql, message.isStreaming]);
 
-  const { score, cleaned } = useMemo(() => 
-    extractConfidence(message.content || "", message.confidence), 
+  const { score, cleaned } = useMemo(() =>
+    extractConfidence(message.content || "", message.confidence),
     [message.content, message.confidence]
   );
 
@@ -79,7 +75,7 @@ const AIMessageComponent = ({
   const hasTextContent = cleaned.trim().length > 0 &&
     !cleaned.includes("Crafting the SQL") &&
     !cleaned.includes("<thinking>");
-  
+
   const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation) || isError;
   const canCopyResponse = message.role === "assistant" && !status && (hasTextContent || Boolean(message.explanation));
 
@@ -238,7 +234,6 @@ const AIMessageComponent = ({
                 copied={isCopied}
                 onExplain={onExplain}
                 onOptimize={onOptimize}
-                onApply={onApply}
               />
             )}
 
@@ -281,7 +276,7 @@ const AIMessageComponent = ({
 
             <SuggestionList
               suggestions={message.suggestions || []}
-              onSuggestionClick={onSuggestionClick || (() => {})}
+              onSuggestionClick={onSuggestionClick || (() => { })}
             />
           </div>
         )}

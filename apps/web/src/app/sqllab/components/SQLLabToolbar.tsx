@@ -237,25 +237,6 @@ export function SQLLabToolbar() {
         )}
       />
 
-      <ToolbarButton
-        icon={<Zap className="h-4 w-4" />}
-        label="AI SQL"
-        active={lab.showAISidebar}
-        onClick={() => {
-          if (lab.showAISidebar) {
-            lab.setShowAISidebar(false);
-          } else {
-            lab.setShowAISidebar(true);
-            lab.setShowRightPanel(false);
-          }
-        }}
-        className={cn(
-          "font-bold transition-all duration-300",
-          lab.showAISidebar
-            ? "bg-amber-500/20 text-amber-600 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-            : "text-amber-600/70 hover:bg-amber-500/10 hover:text-amber-600 border-transparent",
-        )}
-      />
     </header>
   );
 }

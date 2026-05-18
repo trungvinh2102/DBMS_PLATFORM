@@ -21,7 +21,6 @@ describe("AIMessage", () => {
         }}
         onExplain={vi.fn()}
         onOptimize={vi.fn()}
-        onApply={vi.fn()}
       />,
     );
 
@@ -46,7 +45,6 @@ describe("AIMessage", () => {
         }}
         onExplain={vi.fn()}
         onOptimize={vi.fn()}
-        onApply={vi.fn()}
       />,
     );
 
@@ -58,5 +56,46 @@ describe("AIMessage", () => {
       "Use an indexed lookup for this query.\n\nThe indexed path should reduce table scans.",
     );
     expect(screen.getByRole("button", { name: /response copied/i })).toBeInTheDocument();
+  });
+
+  it("does not render an apply-to-editor action for assistant SQL", () => {
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-sql",
+          role: "assistant",
+          content: "",
+          sql: "SELECT 1;",
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /apply to editor/i })).not.toBeInTheDocument();
+  });
+
+  it("shows saved thinking activity even when the assistant message has SQL", () => {
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-sql-thinking",
+          role: "assistant",
+          content: "",
+          sql: "SELECT 1;",
+          steps: [
+            {
+              type: "thinking",
+              content: "Initializing context...",
+              status: "complete",
+            },
+          ],
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Initializing context...")).toBeInTheDocument();
   });
 });

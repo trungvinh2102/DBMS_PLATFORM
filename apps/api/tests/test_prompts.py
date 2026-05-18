@@ -25,6 +25,10 @@ def test_sql_generation_prompt_preserves_streaming_contract():
     prompt = get_sql_generation_prompt(SCHEMA_CONTEXT)
 
     assert "<thinking>" in prompt
+    assert "<thinking>Intent:" in prompt
+    assert "<thinking>Schema mapping:" in prompt
+    assert "<thinking>Strategy:" in prompt
+    assert "Never combine multiple labels in the same <thinking> event" in prompt
     assert "<confidence>" in prompt
     assert "```sql" in prompt
     assert "### ANALYSIS" in prompt

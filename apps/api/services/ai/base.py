@@ -66,7 +66,7 @@ class BaseAIService:
             msg = AIChatMessage(
                 id=msg_id,
                 role=role,
-                content=str(content)[:5000], 
+                content=str(content),
                 userId=user_id,
                 databaseId=db_id,
                 conversationId=conv_id

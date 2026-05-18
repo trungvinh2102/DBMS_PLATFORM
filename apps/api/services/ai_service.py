@@ -5,7 +5,6 @@ Specialized AI service delegator that coordinates multiple AI strategies
 (SQL tasks, Agents, Semantic Context) for QurioDB.
 """
 import logging
-import json
 from typing import Dict, Any, Optional
 
 from .ai.sql import SqlAIService
@@ -75,32 +74,24 @@ class AIService(SqlAIService, AgentAIService):
         return completion
 
     # --- Streaming Logic ---
-
     def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None, conv_id: Optional[str] = None):
         """Streams responses for chat interfaces using SSE events."""
         # Yield clean text. Frontend will handle wrapping for the UI steps.
-        yield "thinking", "Initializing context..."
+        yield "thinking", "Đang khởi tạo bối cảnh..."
         
         system_prompt = "You are the Supreme SQL Architect. Use English for reasoning steps but respond in the user's language."
         if db_id:
-            yield "thinking", "Analyzing schema..."
+            yield "thinking", "Phân tích lược đồ..."
             
-            # Yield tool call metadata as JSON
             retrieval_intent = self._rewrite_retrieval_intent(prompt, history or [])
-            yield "tool_call", json.dumps({"name": "SchemaContextLoader", "args": {"databaseId": db_id, "intent": retrieval_intent}}, ensure_ascii=False)
-            
+
             context_result = schema_context_service.build_schema_context(db_id, schema, intent=retrieval_intent)
             context = context_result.context
-            if context_result.retrieval_trace.get("tables"):
-                yield "tool_call", json.dumps({
-                    "name": "RetrievalTrace",
-                    "args": context_result.retrieval_trace,
-                }, ensure_ascii=False)
-            
+
             # Fetch feedback context if user_id is available
             feedback = ""
             if user_id:
-                yield "thinking", "Learning from your feedback..."
+                yield "thinking", "Học hỏi từ phản hồi của các bạn..."
                 feedback = feedback_context_service.get_feedback_context(db_id, user_id)
 
             from .prompts import get_sql_generation_prompt

@@ -4,7 +4,7 @@
  */
 
 export interface AIStep {
-  type: "thinking" | "tool_call";
+  type: "thinking";
   content: string;
   name?: string;
   args?: any;

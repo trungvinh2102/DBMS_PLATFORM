@@ -13,54 +13,100 @@ const serializeMessageContent = (message: Message) => {
   return parts.join("\n\n").trim();
 };
 
-const formatToolCallContent = (toolData: any) => {
-  const args = toolData?.args && typeof toolData.args === "object"
-    ? Object.entries(toolData.args)
-        .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
-        .join("\n")
-    : "";
-
-  return toolData?.args?.intent || args || "Invoking tool...";
-};
-
-const parsePersistedToolCall = (name?: string, intent?: string, innerContent?: string): AIStep => {
-  const rawContent = (innerContent || "").trim();
-
-  if (rawContent) {
-    try {
-      const toolData = JSON.parse(rawContent);
-      return {
-        type: "tool_call",
-        name: toolData.name || name || "Tool",
-        content: formatToolCallContent(toolData),
-        args: toolData.args,
-        status: "complete",
-      };
-    } catch {
-      return {
-        type: "tool_call",
-        name: name || "Tool",
-        content: intent || rawContent,
-        status: "complete",
-      };
-    }
-  }
-
-  return {
-    type: "tool_call",
-    name: name || "Tool",
-    content: intent || (name ? `Action: ${name}` : "Invoking tool..."),
-    status: "complete",
-  };
-};
-
-const STATUS_THINKING_EVENTS = new Set([
+export const STATUS_THINKING_EVENTS = new Set([
   "Initializing context...",
   "Analyzing schema...",
   "Learning from your feedback...",
+  "Ready.",
+  "Initialization complete.",
+  "Đang khởi tạo bối cảnh...",
+  "Phân tích lược đồ...",
+  "Học hỏi từ phản hồi của các bạn...",
   "Sẵn sàng.",
   "Khởi tạo xong.",
 ]);
+
+export const isStatusThinkingEvent = (text: string) => STATUS_THINKING_EVENTS.has(text.trim());
+
+const LABELED_THINKING_EVENT_PATTERN = /^(Intent|Schema mapping|Strategy):/i;
+
+export const isLabeledThinkingEvent = (text: string) => LABELED_THINKING_EVENT_PATTERN.test(text.trim());
+
+const INTERNAL_TOOL_NAMES = new Set(["SchemaContextLoader", "RetrievalTrace"]);
+
+const findJsonObjectEnd = (text: string, startIndex: number) => {
+  let depth = 0;
+  let isInString = false;
+  let isEscaped = false;
+
+  for (let index = startIndex; index < text.length; index += 1) {
+    const char = text[index];
+
+    if (isEscaped) {
+      isEscaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      isEscaped = isInString;
+      continue;
+    }
+
+    if (char === '"') {
+      isInString = !isInString;
+      continue;
+    }
+
+    if (isInString) continue;
+
+    if (char === "{") depth += 1;
+    if (char === "}") depth -= 1;
+    if (depth === 0) return index + 1;
+  }
+
+  return -1;
+};
+
+const isInternalToolEnvelope = (value: unknown) => {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as { name?: unknown; args?: unknown };
+  return typeof payload.name === "string" && INTERNAL_TOOL_NAMES.has(payload.name) && Boolean(payload.args);
+};
+
+export const stripInternalToolEnvelopes = (text: string) => {
+  let cleaned = "";
+  let index = 0;
+
+  while (index < text.length) {
+    if (text[index] !== "{") {
+      cleaned += text[index];
+      index += 1;
+      continue;
+    }
+
+    const endIndex = findJsonObjectEnd(text, index);
+    if (endIndex < 0) {
+      cleaned += text.slice(index);
+      break;
+    }
+
+    const candidate = text.slice(index, endIndex);
+    try {
+      if (isInternalToolEnvelope(JSON.parse(candidate))) {
+        index = endIndex;
+        while (text[index] === "\n" || text[index] === "\r" || text[index] === " " || text[index] === "\t") index += 1;
+        continue;
+      }
+    } catch {
+      // Not a JSON envelope; keep rendering the original text.
+    }
+
+    cleaned += candidate;
+    index = endIndex;
+  }
+
+  return cleaned.trim();
+};
 
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,7 +119,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
     if (message.role === "user") return { content: message.content };
 
-    let text = message.content.trim();
+    let text = stripInternalToolEnvelopes(message.content).trim();
 
     // 1. Check if content is JSON (New Agent format)
     if (text.startsWith("{") && (text.endsWith("}") || text.includes("}"))) {
@@ -112,22 +158,26 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       if (!Number.isNaN(parsedConfidence)) confidence = parsedConfidence;
     }
 
-    // Extract all thinking and tool call sections, then group them by type
+    // Extract all thinking sections as user-visible assistant activity.
     const steps: AIStep[] = [];
     const thinkingContent: string[] = [];
-    const toolSteps: AIStep[] = [];
 
-    // Regular expression to find both thinking and tool_call tags
+    // Regular expression also matches legacy tool_call tags so they can be stripped later.
     const stepRegex = /<(thinking|tool_call)(?:\s+name="([^"]*)")?(?:\s+intent="([^"]*)")?(?:\s+\/>|>([\s\S]*?)<\/\1>)/gi;
     let stepMatch;
 
     while ((stepMatch = stepRegex.exec(text)) !== null) {
-      const [_, type, name, intent, innerContent] = stepMatch;
+      const [, type, , , innerContent] = stepMatch;
       if (type === "thinking") {
         const content = (innerContent || "").trim();
-        if (content) thinkingContent.push(content);
-      } else if (type === "tool_call") {
-        toolSteps.push(parsePersistedToolCall(name, intent, innerContent));
+        if (content) {
+          thinkingContent.push(content);
+          steps.push({
+            type: "thinking",
+            content,
+            status: "complete",
+          });
+        }
       }
     }
 
@@ -139,16 +189,13 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       if (content) thinkingContent.push(content);
     }
 
-    // 1. Consolidated Reasoning Step
-    if (thinkingContent.length > 0 || (partialMatch && !text.includes("</thinking>", partialMatch.index))) {
+    if (!steps.length && (thinkingContent.length > 0 || (partialMatch && !text.includes("</thinking>", partialMatch.index)))) {
       steps.push({
         type: "thinking",
-        content: thinkingContent.join("\n\n") || "Analyzing..."
+        content: thinkingContent.join("\n\n") || "Analyzing...",
+        status: "complete",
       });
     }
-
-    // 2. Consolidated Tool Step
-    steps.push(...toolSteps);
 
     // Extract the final thought text for historical reference (joined)
     thought = thinkingContent.join("\n\n");
@@ -318,8 +365,11 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             if (!text) return;
 
             const lastStep = streamSteps[streamSteps.length - 1];
-            const isStatusEvent = STATUS_THINKING_EVENTS.has(text);
-            if (lastStreamEvent === "thinking" && lastStep?.type === "thinking" && !isStatusEvent) {
+            const isStatusEvent = isStatusThinkingEvent(text);
+            const isPreviousStatusEvent = lastStep?.type === "thinking" && isStatusThinkingEvent(lastStep.content);
+            const shouldKeepSeparateThinkingEvent =
+              isStatusEvent || isPreviousStatusEvent || isLabeledThinkingEvent(text) || isLabeledThinkingEvent(lastStep?.content || "");
+            if (lastStreamEvent === "thinking" && lastStep?.type === "thinking" && !shouldKeepSeparateThinkingEvent) {
               streamSteps = [
                 ...streamSteps.slice(0, -1),
                 { ...lastStep, content: `${lastStep.content}${text.startsWith("\n") ? "" : "\n"}${text}`, status: "active" },
@@ -331,26 +381,6 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
               ];
             }
             lastStreamEvent = "thinking";
-          } else if (event === "tool_call") {
-            try {
-              const toolData = typeof chunk === "string" ? JSON.parse(chunk) : chunk;
-              streamSteps = [
-                ...streamSteps.map((step) => ({ ...step, status: "complete" as const })),
-                {
-                  type: "tool_call",
-                  name: toolData.name || "Tool",
-                  content: formatToolCallContent(toolData),
-                  args: toolData.args,
-                  status: "complete",
-                },
-              ];
-            } catch (e) {
-              streamSteps = [
-                ...streamSteps.map((step) => ({ ...step, status: "complete" as const })),
-                { type: "tool_call", name: "Tool", content: "Invoking tool...", status: "complete" },
-              ];
-            }
-            lastStreamEvent = "tool_call";
           } else if (event === "confidence") {
             const parsedConfidence = Number(String(chunk || "").trim());
             if (!Number.isNaN(parsedConfidence)) confidenceScore = parsedConfidence;

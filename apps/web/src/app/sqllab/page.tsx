@@ -23,12 +23,11 @@ import { SQLLabEditorContainer } from "./components/SQLLabEditorContainer";
 import { SQLLabResultPanel } from "./components/SQLLabResultPanel";
 
 // Skeletons
-import { PanelSkeleton, SidebarSkeleton } from "./components/Skeletons";
+import { PanelSkeleton } from "./components/Skeletons";
 
 // Lazy-loaded components
 const SQLLabObjectPanel = lazy(() => import("./components/SQLLabObjectPanel").then(m => ({ default: m.SQLLabObjectPanel })));
 const SQLLabHistoryPanel = lazy(() => import("./components/SQLLabHistoryPanel").then(m => ({ default: m.SQLLabHistoryPanel })));
-const AIAssistantSidebar = lazy(() => import("./components/AIAssistantSidebar").then(m => ({ default: m.AIAssistantSidebar })));
 const SaveQueryDialog = lazy(() => import("./components/SaveQueryDialog").then(m => ({ default: m.SaveQueryDialog })));
 const OpenQueryDialog = lazy(() => import("./components/OpenQueryDialog").then(m => ({ default: m.OpenQueryDialog })));
 const SchemaContent = lazy(() => import("./components/SchemaContent").then(m => ({ default: m.SchemaContent })));
@@ -56,55 +55,46 @@ function SQLLabContent() {
           <SQLLabToolbar />
 
           <div className="flex-1 flex overflow-hidden">
-            <ResizablePanelGroup direction="horizontal">
-              <ResizablePanel defaultSize={65} minSize={30}>
-                <ResizablePanelGroup direction="vertical">
-                  <ResizablePanel defaultSize={60} minSize={20}>
-                    <SQLLabEditorContainer />
-                  </ResizablePanel>
+            {lab.showAISidebar ? (
+              <SQLLabEditorContainer />
+            ) : (
+              <ResizablePanelGroup direction="horizontal">
+                <ResizablePanel defaultSize={65} minSize={30}>
+                  <ResizablePanelGroup direction="vertical">
+                    <ResizablePanel defaultSize={60} minSize={20}>
+                      <SQLLabEditorContainer />
+                    </ResizablePanel>
 
-                  <ResizableHandle withHandle className="h-1 hover:bg-primary/20 transition-colors" />
+                    <ResizableHandle withHandle className="h-1 hover:bg-primary/20 transition-colors" />
 
-                  <ResizablePanel defaultSize={40} minSize={10}>
-                    <SQLLabResultPanel />
-                  </ResizablePanel>
-                </ResizablePanelGroup>
-              </ResizablePanel>
+                    <ResizablePanel defaultSize={40} minSize={10}>
+                      <SQLLabResultPanel />
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
+                </ResizablePanel>
 
-              {lab.showRightPanel && (
-                <>
-                  <ResizableHandle withHandle className="w-1 hover:bg-primary/20 transition-colors" />
-                  <ResizablePanel defaultSize={35} minSize={20} className="bg-background">
-                    <Suspense fallback={<PanelSkeleton />}>
-                      {lab.rightPanelMode === "object" ? (
-                        <SQLLabObjectPanel />
-                      ) : lab.rightPanelMode === "history" ? (
-                        <SQLLabHistoryPanel />
-                      ) : (
-                        <SchemaContent
-                          databaseId={lab.selectedDS}
-                          schema={lab.selectedSchema}
-                          dataSources={lab.dataSources}
-                        />
-                      )}
-                    </Suspense>
-                  </ResizablePanel>
-                </>
-              )}
-
-              {lab.showAISidebar && (
-                <>
-                  <ResizableHandle withHandle className="w-1 hover:bg-primary/20 transition-colors" />
-                  <ResizablePanel defaultSize={30} minSize={20}>
-                    <div className="h-full w-full bg-background border-l">
-                      <Suspense fallback={<SidebarSkeleton />}>
-                        <AIAssistantSidebar />
+                {lab.showRightPanel && (
+                  <>
+                    <ResizableHandle withHandle className="w-1 hover:bg-primary/20 transition-colors" />
+                    <ResizablePanel defaultSize={35} minSize={20} className="bg-background">
+                      <Suspense fallback={<PanelSkeleton />}>
+                        {lab.rightPanelMode === "object" ? (
+                          <SQLLabObjectPanel />
+                        ) : lab.rightPanelMode === "history" ? (
+                          <SQLLabHistoryPanel />
+                        ) : (
+                          <SchemaContent
+                            databaseId={lab.selectedDS}
+                            schema={lab.selectedSchema}
+                            dataSources={lab.dataSources}
+                          />
+                        )}
                       </Suspense>
-                    </div>
-                  </ResizablePanel>
-                </>
-              )}
-            </ResizablePanelGroup>
+                    </ResizablePanel>
+                  </>
+                )}
+              </ResizablePanelGroup>
+            )}
           </div>
         </div>
       </div>

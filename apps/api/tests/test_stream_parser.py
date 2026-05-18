@@ -33,7 +33,41 @@ def test_parser_splits_model_thinking_sql_and_analysis():
     assert by_event["analysis"] == "Uses the users table."
 
 
+def test_parser_preserves_separate_thinking_events():
+    events = collect_events([
+        "<thinking>Intent: count users.</thinking>",
+        "<thinking>Schema mapping: use public.users.</thinking>",
+        "<thinking>Strategy: group by status.</thinking>",
+    ])
+
+    assert events == [
+        ("thinking", "Intent: count users."),
+        ("thinking", "Schema mapping: use public.users."),
+        ("thinking", "Strategy: group by status."),
+    ]
+
+
 def test_parser_keeps_plain_message_text():
     events = collect_events(["Hello ", "world"])
 
     assert "".join(chunk for event, chunk in events if event == "message") == "Hello world"
+
+
+def test_parser_discards_internal_tool_json_envelopes():
+    events = collect_events([
+        '{"name": "SchemaContextLoader", "args": {"databaseId": "db-1", "intent": "Xin chào"}}',
+        '{"name": "RetrievalTrace", "args": {"intent": "Xin chào", "tables": []}}',
+        "Xin chào! Tôi là QurioDB copilot.",
+    ])
+
+    assert "".join(chunk for event, chunk in events if event == "message") == "Xin chào! Tôi là QurioDB copilot."
+
+
+def test_parser_discards_internal_tool_json_split_across_chunks():
+    events = collect_events([
+        '{"name": "Schema',
+        'ContextLoader", "args": {"databaseId": "db-1", "intent": "Xin chào"}}',
+        "\nXin chào!",
+    ])
+
+    assert events == [("message", "Xin chào!")]

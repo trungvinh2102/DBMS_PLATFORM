@@ -19,7 +19,6 @@ interface AIChatMessagesProps {
   conversationId?: string | null;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
-  onApply: (sql: string) => void;
   onSuggestionClick: (suggestion: string) => void;
 }
 
@@ -32,12 +31,11 @@ export const AIChatMessages = ({
   conversationId,
   onExplain,
   onOptimize,
-  onApply,
   onSuggestionClick
 }: AIChatMessagesProps) => (
   <div
     ref={parentRef}
-    className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth scrollbar-thin scrollbar-thumb-muted focus:outline-none"
+    className="flex-1 overflow-y-auto scroll-smooth px-3 py-6 scrollbar-thin scrollbar-thumb-muted focus:outline-none md:px-6"
   >
     <div
       className="relative w-full"
@@ -75,7 +73,6 @@ export const AIChatMessages = ({
                     message={m}
                     onExplain={onExplain}
                     onOptimize={onOptimize}
-                    onApply={onApply}
                     onSuggestionClick={onSuggestionClick}
                     conversationId={conversationId}
                   />
@@ -87,11 +84,13 @@ export const AIChatMessages = ({
       )}
 
       {messages.length === 0 && !isTyping && !isFetchingConversation && (
-        <div className="h-full mt-20 flex flex-col items-center justify-center p-8 text-center opacity-30 select-none">
-          <Sparkles className="h-12 w-12 text-primary mb-4" />
-          <h2 className="text-xl font-black uppercase tracking-tighter">New Chat</h2>
-          <p className="text-xs uppercase tracking-widest font-bold">Describe your data needs to begin</p>
-          <div className="mt-4 flex items-center gap-1.5">
+        <div className="mt-16 flex min-h-72 w-full select-none flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/15 p-8 text-center">
+          <Sparkles className="mb-4 h-12 w-12 text-primary/70" />
+          <h2 className="text-xl font-black tracking-tight">Start with a data question</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+            Ask for SQL, chart-ready queries, explanations, optimization, or a result interpretation.
+          </p>
+          <div className="mt-5 flex items-center gap-1.5 text-muted-foreground">
             <kbd className="px-2 py-0.5 rounded border border-border/50 bg-muted/50 text-[10px] font-mono font-bold">/</kbd>
             <span className="text-[10px] uppercase tracking-widest font-bold">for quick commands</span>
           </div>

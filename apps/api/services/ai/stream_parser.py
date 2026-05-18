@@ -5,6 +5,8 @@ Incremental parser that converts tagged LLM text into semantic stream events for
 the AI Assistant UI.
 """
 
+import json
+from json import JSONDecodeError
 from typing import Iterable, List, Tuple
 
 StreamEvent = Tuple[str, str]
@@ -14,6 +16,7 @@ class TaggedResponseStreamParser:
     """Parses model output tags into stable SSE event names."""
 
     DEFAULT_MARKERS = ("<thinking>", "<confidence>", "```sql", "### ANALYSIS:")
+    INTERNAL_TOOL_NAMES = {"SchemaContextLoader", "RetrievalTrace"}
     CLOSE_MARKERS = {
         "thinking": "</thinking>",
         "confidence": "</confidence>",
@@ -24,6 +27,7 @@ class TaggedResponseStreamParser:
         self.buffer = ""
         self.mode = "message"
         self.keep_len = max(len(marker) for marker in self.DEFAULT_MARKERS) - 1
+        self.discard_leading_whitespace = False
 
     def feed(self, chunk: str) -> List[StreamEvent]:
         """Consumes a text chunk and returns parsed semantic events."""
@@ -31,10 +35,21 @@ class TaggedResponseStreamParser:
             return []
 
         self.buffer += chunk
+        if self.mode == "message" and self.discard_leading_whitespace:
+            self.buffer = self.buffer.lstrip()
+            self.discard_leading_whitespace = False
+
         events: List[StreamEvent] = []
 
         while self.buffer:
             before = (self.mode, self.buffer)
+            if self.mode == "message":
+                internal_tool_action = self._handle_internal_tool_event()
+                if internal_tool_action == "discard":
+                    continue
+                if internal_tool_action == "wait":
+                    break
+
             if self.mode != "message":
                 parsed = self._drain_mode()
             else:
@@ -49,6 +64,36 @@ class TaggedResponseStreamParser:
                 break
 
         return self._clean_events(events)
+
+    def _handle_internal_tool_event(self) -> str:
+        stripped = self.buffer.lstrip()
+        if not stripped.startswith("{"):
+            return "none"
+
+        try:
+            payload, end_index = json.JSONDecoder().raw_decode(stripped)
+        except JSONDecodeError:
+            if len(stripped) < 512 or self._looks_like_internal_tool_prefix(stripped):
+                return "wait"
+            return "none"
+
+        if not self._is_internal_tool_payload(payload):
+            return "none"
+
+        self.buffer = stripped[end_index:].lstrip()
+        self.discard_leading_whitespace = not self.buffer
+        return "discard"
+
+    def _looks_like_internal_tool_prefix(self, text: str) -> bool:
+        prefix = text[:160]
+        return '"name"' in prefix and any(tool_name in prefix for tool_name in self.INTERNAL_TOOL_NAMES)
+
+    def _is_internal_tool_payload(self, payload) -> bool:
+        return (
+            isinstance(payload, dict)
+            and payload.get("name") in self.INTERNAL_TOOL_NAMES
+            and isinstance(payload.get("args"), dict)
+        )
 
     def flush(self) -> List[StreamEvent]:
         """Emits any buffered text at stream end."""

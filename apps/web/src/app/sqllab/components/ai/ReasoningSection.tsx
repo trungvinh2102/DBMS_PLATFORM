@@ -5,7 +5,7 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { BrainCircuit, Wrench, CheckCircle2, Loader2 } from "lucide-react";
+import { BrainCircuit, CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIStep } from "./types";
 
@@ -75,7 +75,7 @@ export const ReasoningSection = React.memo(({
                   {/* Step Dot/Icon */}
                   <div className={cn(
                     "absolute -left-[31px] top-0.5 w-2.5 h-2.5 rounded-full border-2 bg-background transition-all group-hover/step:scale-125",
-                    step.type === "thinking" ? "border-primary/40" : "border-amber-400/60",
+                    "border-primary/40",
                     isActiveStep && "border-primary"
                   )}>
                     {isActiveStep && (
@@ -85,16 +85,12 @@ export const ReasoningSection = React.memo(({
 
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-2">
-                      {step.type === "thinking" ? (
-                        isActiveStep ? <Loader2 className="h-3 w-3 text-primary/70 animate-spin" /> : <BrainCircuit className="h-3 w-3 text-primary/60" />
-                      ) : (
-                        <Wrench className="h-3 w-3 text-amber-500/60" />
-                      )}
+                      {isActiveStep ? <Loader2 className="h-3 w-3 text-primary/70 animate-spin" /> : <BrainCircuit className="h-3 w-3 text-primary/60" />}
                       <span className={cn(
                         "text-[9px] font-bold uppercase tracking-tighter",
-                        step.type === "thinking" ? "text-primary/70" : "text-amber-500/70"
+                        "text-primary/70"
                       )}>
-                        {step.type === "thinking" ? "Thinking" : `Tool call: ${step.name || 'Action'}`}
+                        Thinking
                       </span>
                     </div>
 

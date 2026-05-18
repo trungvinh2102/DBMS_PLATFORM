@@ -1,10 +1,10 @@
 /**
  * @file SQLBlock.tsx
- * @description Syntax-highlighted SQL code block with interactive tools (copy, explain, optimize, apply).
+ * @description Syntax-highlighted SQL code block with interactive tools for copy, explain, and optimize actions.
  */
 
 import React from "react";
-import { Copy, Check, Sparkles, FileSearch, Wand2, ArrowRight } from "lucide-react";
+import { Copy, Check, Sparkles, FileSearch, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,6 @@ interface SQLBlockProps {
   copied: boolean;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
-  onApply: (sql: string) => void;
 }
 
 export const SQLBlock = React.memo(({ 
@@ -30,8 +29,7 @@ export const SQLBlock = React.memo(({
   onCopy, 
   copied, 
   onExplain, 
-  onOptimize, 
-  onApply 
+  onOptimize
 }: SQLBlockProps) => (
   <div className={cn(
     "w-full rounded-2xl border shadow-lg overflow-hidden group/sql transition-all hover:border-primary/30",
@@ -111,13 +109,6 @@ export const SQLBlock = React.memo(({
         </Button>
       </div>
 
-      <Button
-        className="w-full h-9 bg-primary hover:bg-primary/90 text-primary-foreground border-none text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-primary/20 rounded-xl"
-        onClick={() => onApply(sql)}
-      >
-        <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
-        Apply to Editor
-      </Button>
     </div>
   </div>
 ));

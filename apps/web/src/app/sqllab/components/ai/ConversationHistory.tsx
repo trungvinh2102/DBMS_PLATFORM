@@ -91,7 +91,7 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
   // For simplicity, just render direct list since it's a small app
 
   return (
-    <div className="flex flex-col gap-2 p-2">
+    <div className="flex min-h-0 flex-col gap-2 p-2">
       {isLoading ? (
         <div className="flex flex-col gap-2 animate-pulse">
           {[1, 2, 3, 4].map(i => (

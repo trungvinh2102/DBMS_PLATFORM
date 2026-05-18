@@ -163,8 +163,8 @@ def test_table_search_text_includes_foreign_keys_and_indexes():
     assert "idx_orders_customer_id" in text
 
 
-def test_stream_response_emits_retrieval_trace_tool_call(monkeypatch):
-    """Streaming chat should expose retrieval trace as assistant activity."""
+def test_stream_response_does_not_emit_retrieval_trace_tool_call(monkeypatch):
+    """Streaming chat should keep retrieval trace out of user-visible activity."""
     service = AIService()
     monkeypatch.setattr(
         "services.ai_service.schema_context_service.build_schema_context",
@@ -192,7 +192,7 @@ def test_stream_response_emits_retrieval_trace_tool_call(monkeypatch):
     events = list(service.stream_generate_response("show orders", db_id="db-1", schema="public", history=[]))
 
     trace_events = [chunk for event, chunk in events if event == "tool_call" and "RetrievalTrace" in chunk]
-    assert trace_events
+    assert not trace_events
 
 
 def test_rewrite_retrieval_intent_uses_previous_sql_for_followups():
