@@ -99,6 +99,34 @@ describe("AIMessage", () => {
     expect(screen.getByText("Initializing context...")).toBeInTheDocument();
   });
 
+  it("keeps assistant activity hidden after the user hides it", async () => {
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-hide-activity",
+          role: "assistant",
+          content: "",
+          steps: [
+            {
+              type: "thinking",
+              content: "Xác định yêu cầu của người dùng.",
+              status: "complete",
+            },
+          ],
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Xác định yêu cầu của người dùng.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /hide assistant activity/i }));
+
+    expect(screen.getByRole("button", { name: /view assistant activity/i })).toBeInTheDocument();
+    expect(screen.queryByText("Xác định yêu cầu của người dùng.")).not.toBeInTheDocument();
+  });
+
   it("does not show confidence metadata after the assistant finishes", () => {
     render(
       <AIMessage

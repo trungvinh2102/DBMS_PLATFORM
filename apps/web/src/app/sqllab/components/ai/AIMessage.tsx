@@ -45,6 +45,7 @@ const AIMessageComponent = ({
   conversationId
 }: AIMessageProps) => {
   const [isThoughtVisible, setIsThoughtVisible] = useState(false);
+  const [hasUserToggledThought, setHasUserToggledThought] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isResponseCopied, setIsResponseCopied] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
@@ -55,12 +56,17 @@ const AIMessageComponent = ({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
+  useEffect(() => {
+    setIsThoughtVisible(false);
+    setHasUserToggledThought(false);
+  }, [message.id]);
+
   // Auto-expand assistant activity while stream events or persisted thinking steps are available.
   useEffect(() => {
-    if ((message.isStreaming || message.steps?.length || message.thought) && !isThoughtVisible) {
+    if (!hasUserToggledThought && (message.isStreaming || message.steps?.length || message.thought) && !isThoughtVisible) {
       setIsThoughtVisible(true);
     }
-  }, [message.isStreaming, message.steps?.length, message.thought, isThoughtVisible]);
+  }, [message.isStreaming, message.steps?.length, message.thought, isThoughtVisible, hasUserToggledThought]);
 
   const status = useMemo(() => {
     if (message.content?.startsWith("Error:")) return null;
@@ -83,6 +89,7 @@ const AIMessageComponent = ({
   const shouldShowConfidence = Boolean(message.isStreaming) && message.confidence !== undefined && !status;
   const visibleCitations = useMemo(() => message.citations?.slice(0, 8) || [], [message.citations]);
   const handleToggleThought = useCallback(() => {
+    setHasUserToggledThought(true);
     setIsThoughtVisible((current) => !current);
   }, []);
 
