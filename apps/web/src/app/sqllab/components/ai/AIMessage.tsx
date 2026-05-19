@@ -80,6 +80,7 @@ const AIMessageComponent = ({
 
   const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation) || isError;
   const canCopyResponse = message.role === "assistant" && !status && (hasTextContent || Boolean(message.explanation));
+  const shouldShowConfidence = Boolean(message.isStreaming) && message.confidence !== undefined && !status;
   const visibleCitations = useMemo(() => message.citations?.slice(0, 8) || [], [message.citations]);
   const handleToggleThought = useCallback(() => {
     setIsThoughtVisible((current) => !current);
@@ -192,7 +193,7 @@ const AIMessageComponent = ({
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  {message.confidence !== undefined && !status && <ConfidenceBadge score={score} />}
+                  {shouldShowConfidence && <ConfidenceBadge score={score} />}
                   {canCopyResponse && (
                     <button
                       type="button"

@@ -98,4 +98,23 @@ describe("AIMessage", () => {
 
     expect(screen.getByText("Initializing context...")).toBeInTheDocument();
   });
+
+  it("does not show confidence metadata after the assistant finishes", () => {
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-complete-confidence",
+          role: "assistant",
+          content: "The query is ready.",
+          confidence: 1,
+          isStreaming: false,
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("The query is ready.")).toBeInTheDocument();
+    expect(screen.queryByText(/20% Confidence/i)).not.toBeInTheDocument();
+  });
 });
