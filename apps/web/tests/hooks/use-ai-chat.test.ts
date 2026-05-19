@@ -4,7 +4,7 @@
  */
 
 import { act, renderHook, waitFor } from "../test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { aiApi } from "@/lib/api-client";
 import {
@@ -18,6 +18,10 @@ import {
 describe("useAIChat stream status handling", () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("recognizes localized startup statuses so they render as separate activity steps", () => {
@@ -93,5 +97,31 @@ describe("useAIChat stream status handling", () => {
 
     expect(window.localStorage.getItem(getActiveAIConversationStorageKey("db-1"))).toBeNull();
     expect(result.current.conversationId).toBeNull();
+  });
+
+  it("keeps final streamed assistant content when chunks are frame-batched", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk, onHeaders) => {
+      onHeaders?.(new Headers({ "X-Conversation-Id": "conv-stream" }));
+      onChunk("SELECT", "message");
+      onChunk(" 1;", "message");
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("make a test query");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)).toEqual(
+        expect.objectContaining({
+          role: "assistant",
+          content: "SELECT 1;",
+          isStreaming: false,
+        }),
+      );
+    });
+    expect(result.current.conversationId).toBe("conv-stream");
   });
 });

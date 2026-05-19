@@ -25,12 +25,22 @@ interface AIAssistantProps {
   newChatSignal: number;
 }
 
+const shouldShowSlashCommands = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.startsWith("/") && !trimmed.includes(" ");
+};
+
 export function AIAssistant({
   showHistory,
   onShowHistoryChange,
   newChatSignal,
 }: AIAssistantProps) {
   const lab = useSQLLabContext();
+  const selectedDatabaseId = lab.selectedDS || undefined;
+  const selectedSchema = lab.selectedSchema;
+  const selectedDatabaseType = lab.selectedDSType;
+  const editorSql = lab.sql || "";
+  const lastError = lab.error || undefined;
   const [input, setInput] = useState("");
   const [availableModels, setAvailableModels] = useState<any[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>(AUTO_MODEL_VALUE);
@@ -54,8 +64,8 @@ export function AIAssistant({
     isFetchingConversation,
     isLoadingConversations
   } = useAIChat(
-    lab.selectedDS || undefined,
-    lab.selectedSchema,
+    selectedDatabaseId,
+    selectedSchema,
     selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
   );
 
@@ -66,7 +76,7 @@ export function AIAssistant({
         const [models, status] = await Promise.all([
           aiApi.getModels(),
           aiApi.getAIStatus(),
-          loadConversations(lab.selectedDS || undefined)
+          loadConversations(selectedDatabaseId)
         ]);
         setAvailableModels(models || []);
         setRuntimeStatus(status);
@@ -79,7 +89,7 @@ export function AIAssistant({
       }
     };
     init();
-  }, [lab.selectedDS, loadConversations]);
+  }, [selectedDatabaseId, loadConversations]);
 
   // Virtualization
   const virtualizer = useVirtualizer({
@@ -107,25 +117,25 @@ export function AIAssistant({
   useEffect(() => {
     if (lab.fixSQLError) {
       const errorMsg = lab.fixSQLError;
-      const currentSql = lab.sql;
       lab.setFixSQLError(null);
-      const prompt = `I'm getting this SQL error: "${errorMsg}".\n\nHere is my current SQL:\n\`\`\`sql\n${currentSql}\n\`\`\`\n\nPlease analyze and fix this query.`;
+      const prompt = `I'm getting this SQL error: "${errorMsg}".\n\nHere is my current SQL:\n\`\`\`sql\n${editorSql}\n\`\`\`\n\nPlease analyze and fix this query.`;
       startNewChat();
       onShowHistoryChange(false);
       setTimeout(() => _handleSend(prompt), 0);
     }
-  }, [lab.fixSQLError, lab.sql, _handleSend, lab.setFixSQLError, onShowHistoryChange, startNewChat]);
+  }, [lab.fixSQLError, editorSql, _handleSend, lab.setFixSQLError, onShowHistoryChange, startNewChat]);
 
-  // Command visibility
-  useEffect(() => {
-    const trimmed = input.trim();
-    if (trimmed.startsWith("/") && !trimmed.includes(" ")) {
-      setShowCommandMenu(true);
-      setCommandMenuIndex(0);
-    } else {
-      setShowCommandMenu(false);
-    }
-  }, [input]);
+  const filteredCommandOptions = React.useMemo(
+    () => (showCommandMenu ? filterCommands(input) : []),
+    [input, showCommandMenu],
+  );
+
+  const handleInputChange = useCallback((value: string) => {
+    setInput(value);
+    const shouldShowCommands = shouldShowSlashCommands(value);
+    setShowCommandMenu(shouldShowCommands);
+    if (shouldShowCommands) setCommandMenuIndex(0);
+  }, []);
 
   const handleSendRequest = useCallback(async () => {
     if (!input.trim()) return;
@@ -136,22 +146,22 @@ export function AIAssistant({
     const parsed = parseSlashCommand(currentInput);
     if (parsed) {
       const prompt = parsed.command.buildPrompt({
-        editorSQL: lab.sql || "",
+        editorSQL: editorSql,
         args: parsed.args,
-        databaseType: lab.selectedDSType,
-        schema: lab.selectedSchema,
-        lastError: lab.error || undefined,
+        databaseType: selectedDatabaseType,
+        schema: selectedSchema,
+        lastError,
       });
 
       if (!prompt) {
-        if (parsed.command.requiresEditorSQL && !lab.sql?.trim()) toast.error(`${parsed.command.command} requires SQL in the editor`);
+        if (parsed.command.requiresEditorSQL && !editorSql.trim()) toast.error(`${parsed.command.command} requires SQL in the editor`);
         else if (parsed.command.acceptsArgs && !parsed.args) toast.error(`Usage: ${parsed.command.command} ${parsed.command.argsHint || '<args>'}`);
         return;
       }
       return _handleSend(prompt);
     }
     return _handleSend(currentInput);
-  }, [input, lab.sql, lab.selectedDSType, lab.selectedSchema, lab.error, _handleSend]);
+  }, [input, editorSql, selectedDatabaseType, selectedSchema, lastError, _handleSend]);
 
   const handleCommandSelect = useCallback((cmd: SlashCommand) => {
     if (cmd.acceptsArgs) {
@@ -162,25 +172,26 @@ export function AIAssistant({
       setShowCommandMenu(false);
       setTimeout(async () => {
         const prompt = cmd.buildPrompt({
-          editorSQL: lab.sql || "",
+          editorSQL: editorSql,
           args: "",
-          databaseType: lab.selectedDSType,
-          schema: lab.selectedSchema,
-          lastError: lab.error || undefined,
+          databaseType: selectedDatabaseType,
+          schema: selectedSchema,
+          lastError,
         });
         if (!prompt) {
-          if (cmd.requiresEditorSQL && !lab.sql?.trim()) toast.error(`${cmd.command} requires SQL in the editor`);
+          if (cmd.requiresEditorSQL && !editorSql.trim()) toast.error(`${cmd.command} requires SQL in the editor`);
           return;
         }
         setInput("");
         await _handleSend(prompt);
       }, 0);
     }
-  }, [lab.sql, lab.selectedDSType, lab.selectedSchema, lab.error, _handleSend]);
+  }, [editorSql, selectedDatabaseType, selectedSchema, lastError, _handleSend]);
 
-  const onKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (showCommandMenu) {
-      const filtered = filterCommands(input);
+      const filtered = filteredCommandOptions;
+      if (filtered.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setCommandMenuIndex((prev) => (prev + 1) % filtered.length);
@@ -202,7 +213,7 @@ export function AIAssistant({
       e.preventDefault();
       handleSendRequest();
     }
-  };
+  }, [commandMenuIndex, filteredCommandOptions, handleCommandSelect, handleSendRequest, showCommandMenu]);
 
   const handleExplain = useCallback(async (s: string) => {
     setIsTyping(true);
@@ -220,15 +231,24 @@ export function AIAssistant({
     try {
       const res = await aiApi.optimizeSQL({
         sql: s,
-        databaseId: lab.selectedDS,
-        schema: lab.selectedSchema,
+        databaseId: selectedDatabaseId,
+        schema: selectedSchema,
         modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
       });
       addAssistantMessage("Here is an optimized version:", res.sql || res.result);
     } finally { setIsTyping(false); }
-  }, [lab.selectedDS, lab.selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
+  }, [selectedDatabaseId, selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
 
   const handleSuggestionClick = useCallback((suggestion: string) => _handleSend(suggestion), [_handleSend]);
+
+  const handleSelectConversation = useCallback((id: string) => {
+    loadConversation(id);
+    onShowHistoryChange(false);
+  }, [loadConversation, onShowHistoryChange]);
+
+  const handleRefreshConversations = useCallback(() => {
+    loadConversations(selectedDatabaseId);
+  }, [loadConversations, selectedDatabaseId]);
 
   const AIActions = React.useMemo(() => ({
     onExplain: handleExplain,
@@ -257,8 +277,8 @@ export function AIAssistant({
               <ConversationHistory
                 conversations={conversations}
                 currentId={conversationId}
-                onSelect={(id) => { loadConversation(id); onShowHistoryChange(false); }}
-                onRefresh={() => loadConversations(lab.selectedDS || undefined)}
+                onSelect={handleSelectConversation}
+                onRefresh={handleRefreshConversations}
                 isLoading={isLoadingConversations}
               />
             </div>
@@ -277,7 +297,7 @@ export function AIAssistant({
 
         <AIChatInput
           input={input}
-          onInputChange={setInput}
+          onInputChange={handleInputChange}
           onKeyDown={onKeyDown}
           isTyping={isTyping}
           selectedModel={selectedModel}
@@ -287,6 +307,7 @@ export function AIAssistant({
           onSend={handleSendRequest}
           showCommandMenu={showCommandMenu}
           commandMenuIndex={commandMenuIndex}
+          commandOptions={filteredCommandOptions}
           onCommandSelect={handleCommandSelect}
         />
       </section>
@@ -307,8 +328,8 @@ export function AIAssistant({
             <ConversationHistory
               conversations={conversations}
               currentId={conversationId}
-              onSelect={(id) => { loadConversation(id); onShowHistoryChange(false); }}
-              onRefresh={() => loadConversations(lab.selectedDS || undefined)}
+              onSelect={handleSelectConversation}
+              onRefresh={handleRefreshConversations}
               isLoading={isLoadingConversations}
             />
           </div>

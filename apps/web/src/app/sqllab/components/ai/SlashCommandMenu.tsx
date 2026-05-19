@@ -17,11 +17,13 @@ interface SlashCommandMenuProps {
   visible: boolean;
   /** Active index (managed by parent for keyboard nav) */
   activeIndex?: number;
+  /** Pre-filtered command options from the parent input state */
+  commands?: SlashCommand[];
 }
 
-export function SlashCommandMenu({ inputValue, onSelect, visible, activeIndex = 0 }: SlashCommandMenuProps) {
+function SlashCommandMenuComponent({ inputValue, onSelect, visible, activeIndex = 0, commands }: SlashCommandMenuProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const filteredCommands = filterCommands(inputValue);
+  const filteredCommands = commands ?? filterCommands(inputValue);
 
   // Scroll active item into view when activeIndex changes
   useEffect(() => {
@@ -116,3 +118,6 @@ export function SlashCommandMenu({ inputValue, onSelect, visible, activeIndex = 
     </div>
   );
 }
+
+export const SlashCommandMenu = React.memo(SlashCommandMenuComponent);
+SlashCommandMenu.displayName = "SlashCommandMenu";

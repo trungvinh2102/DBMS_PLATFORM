@@ -38,7 +38,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-export function ConversationHistory({ conversations, currentId, onSelect, onRefresh, isLoading }: Props) {
+function ConversationHistoryComponent({ conversations, currentId, onSelect, onRefresh, isLoading }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -235,3 +235,6 @@ export function ConversationHistory({ conversations, currentId, onSelect, onRefr
     </div>
   );
 }
+
+export const ConversationHistory = React.memo(ConversationHistoryComponent);
+ConversationHistory.displayName = "ConversationHistory";

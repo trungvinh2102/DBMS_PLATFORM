@@ -35,6 +35,8 @@ interface AIMessageProps {
   conversationId?: string | null;
 }
 
+const noopSuggestionClick = () => {};
+
 const AIMessageComponent = ({
   message,
   onExplain,
@@ -78,6 +80,10 @@ const AIMessageComponent = ({
 
   const showPrimaryBubble = Boolean(status) || hasTextContent || Boolean(message.explanation) || isError;
   const canCopyResponse = message.role === "assistant" && !status && (hasTextContent || Boolean(message.explanation));
+  const visibleCitations = useMemo(() => message.citations?.slice(0, 8) || [], [message.citations]);
+  const handleToggleThought = useCallback(() => {
+    setIsThoughtVisible((current) => !current);
+  }, []);
 
   const handleFeedback = useCallback(async (rating: 1 | -1) => {
     setFeedbackRating(rating);
@@ -158,7 +164,7 @@ const AIMessageComponent = ({
             thought={message.thought}
             steps={message.steps}
             showThought={isThoughtVisible}
-            onToggle={() => setIsThoughtVisible(!isThoughtVisible)}
+            onToggle={handleToggleThought}
             isDark={isDark}
             isGeneratingSQL={Boolean(message.isStreaming) && !isError}
           />
@@ -257,7 +263,7 @@ const AIMessageComponent = ({
               </div>
             )}
 
-            {message.citations && message.citations.length > 0 && (
+            {visibleCitations.length > 0 && (
               <div className={cn(
                 "rounded-lg border p-3 text-[12px] leading-5 shadow-sm",
                 isDark ? "bg-card/70 border-white/10" : "bg-white border-slate-200"
@@ -266,7 +272,7 @@ const AIMessageComponent = ({
                   <Database className="h-3.5 w-3.5" /> Sources
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {message.citations.slice(0, 8).map((citation) => (
+                  {visibleCitations.map((citation) => (
                     <span
                       key={citation.id}
                       className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground"
@@ -302,7 +308,7 @@ const AIMessageComponent = ({
 
             <SuggestionList
               suggestions={message.suggestions || []}
-              onSuggestionClick={onSuggestionClick || (() => { })}
+              onSuggestionClick={onSuggestionClick || noopSuggestionClick}
             />
           </div>
         )}

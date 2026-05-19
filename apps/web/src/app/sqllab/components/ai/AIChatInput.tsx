@@ -39,10 +39,11 @@ interface AIChatInputProps {
   onSend: () => void;
   showCommandMenu: boolean;
   commandMenuIndex: number;
+  commandOptions?: SlashCommand[];
   onCommandSelect: (cmd: SlashCommand) => void;
 }
 
-export const AIChatInput = ({
+const AIChatInputComponent = ({
   input,
   onInputChange,
   onKeyDown,
@@ -54,6 +55,7 @@ export const AIChatInput = ({
   onSend,
   showCommandMenu,
   commandMenuIndex,
+  commandOptions,
   onCommandSelect
 }: AIChatInputProps) => {
   const hasAnyKey = runtimeStatus?.hasApiKey ?? true;
@@ -71,6 +73,7 @@ export const AIChatInput = ({
             onSelect={onCommandSelect}
             visible={showCommandMenu}
             activeIndex={commandMenuIndex}
+            commands={commandOptions}
           />
 
           <Textarea
@@ -128,3 +131,6 @@ export const AIChatInput = ({
     </div>
   );
 };
+
+export const AIChatInput = React.memo(AIChatInputComponent);
+AIChatInput.displayName = "AIChatInput";

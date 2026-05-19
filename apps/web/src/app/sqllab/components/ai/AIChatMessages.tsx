@@ -22,7 +22,7 @@ interface AIChatMessagesProps {
   onSuggestionClick: (suggestion: string) => void;
 }
 
-export const AIChatMessages = ({
+const AIChatMessagesComponent = ({
   messages,
   isTyping,
   isFetchingConversation,
@@ -64,7 +64,7 @@ export const AIChatMessages = ({
               key={vMsg.key}
               ref={virtualizer.measureElement}
               data-index={vMsg.index}
-              className="absolute top-0 left-0 w-full"
+              className="absolute top-0 left-0 w-full [content-visibility:auto] [contain-intrinsic-size:0_180px]"
               style={{ transform: `translateY(${vMsg.start}px)` }}
             >
               <div className="pb-6">
@@ -99,3 +99,6 @@ export const AIChatMessages = ({
     </div>
   </div>
 );
+
+export const AIChatMessages = React.memo(AIChatMessagesComponent);
+AIChatMessages.displayName = "AIChatMessages";

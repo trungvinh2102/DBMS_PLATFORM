@@ -177,7 +177,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
+  const messagesRef = useRef<Message[]>([]);
   const restoredConversationRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
     if (message.role === "user") return { content: message.content };
@@ -422,10 +427,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       return;
     }
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
-    setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
 
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
     const assistantMsgId = (Date.now() + 1).toString();
     const initialAssistantMsg: Message = {
       id: assistantMsgId,
@@ -436,7 +440,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       steps: [],
     };
 
-    setMessages(prev => [...prev, initialAssistantMsg]);
+    setMessages(prev => [...prev, userMsg, initialAssistantMsg]);
 
     let responseContent = "";
     let sqlContent = "";
@@ -447,9 +451,87 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let warnings: string[] = [];
     let streamSteps: AIStep[] = [];
     let lastStreamEvent = "";
+    let lastParsedContent = "";
+    let lastParsedMessage: Partial<Message> = parseMessageContent({ role: "assistant", content: "" });
+    let streamThought = "";
+    let pendingAssistantEvent: string | undefined;
+    let pendingAssistantChunk: unknown;
+    let scheduledAssistantFrame: number | null = null;
+
+    const completeStreamSteps = () => {
+      streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+      streamThought = streamSteps.filter((step) => step.type === "thinking").map((step) => step.content).join("\n\n");
+    };
+
+    const getParsedMessage = () => {
+      if (responseContent !== lastParsedContent) {
+        lastParsedContent = responseContent;
+        lastParsedMessage = parseMessageContent({ role: "assistant", content: responseContent });
+      }
+
+      return lastParsedMessage;
+    };
+
+    const flushAssistantMessage = () => {
+      if (scheduledAssistantFrame !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(scheduledAssistantFrame);
+        scheduledAssistantFrame = null;
+      }
+
+      const event = pendingAssistantEvent;
+      const chunk = pendingAssistantChunk;
+      pendingAssistantEvent = undefined;
+      pendingAssistantChunk = undefined;
+      const parsed = getParsedMessage();
+
+      setMessages(prev => prev.map(m => {
+        if (m.id !== assistantMsgId) return m;
+
+        if (event === "error") {
+          return {
+            ...m,
+            content: `Error: ${chunk}`,
+            isActionable: false,
+            isStreaming: false,
+          };
+        }
+
+        return {
+          ...m,
+          ...parsed,
+          sql: parsed.sql || sqlContent.trim(),
+          analysis: parsed.analysis || analysisContent.trim(),
+          confidence: parsed.confidence ?? confidenceScore,
+          citations,
+          retrievalTrace,
+          warnings,
+          thought: streamThought,
+          steps: streamSteps,
+          isStreaming: true,
+          isActionable: true
+        };
+      }));
+    };
+
+    const scheduleAssistantMessageFlush = (event?: string, chunk?: unknown) => {
+      pendingAssistantEvent = event;
+      pendingAssistantChunk = chunk;
+
+      if (scheduledAssistantFrame !== null) return;
+      if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+        flushAssistantMessage();
+        return;
+      }
+
+      scheduledAssistantFrame = window.requestAnimationFrame(() => {
+        scheduledAssistantFrame = null;
+        flushAssistantMessage();
+      });
+    };
+
     try {
       const chatMessages = [
-        ...messages
+        ...messagesRef.current
           .map((message) => ({
             role: message.role,
             content: serializeMessageContent(message),
@@ -489,67 +571,40 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
                 { type: "thinking", content: text, status: "active" },
               ];
             }
+            streamThought = streamSteps.filter((step) => step.type === "thinking").map((step) => step.content).join("\n\n");
             lastStreamEvent = "thinking";
           } else if (event === "confidence") {
             const parsedConfidence = Number(String(chunk || "").trim());
             if (!Number.isNaN(parsedConfidence)) confidenceScore = parsedConfidence;
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = "confidence";
           } else if (event === "sql") {
             sqlContent += String(chunk || "");
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = "sql";
           } else if (event === "analysis") {
             analysisContent += String(chunk || "");
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = "analysis";
           } else if (event === "citations") {
             citations = Array.isArray(chunk) ? chunk : [];
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = "citations";
           } else if (event === "retrieval_trace") {
             retrievalTrace = chunk && typeof chunk === "object" ? chunk as Record<string, any> : undefined;
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = "retrieval_trace";
           } else if (event === "warnings") {
             warnings = Array.isArray(chunk) ? chunk.map(String) : [];
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = "warnings";
           } else if (event !== "error") {
             responseContent += String(chunk || "");
-            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            completeStreamSteps();
             lastStreamEvent = event || "message";
           }
 
-          const parsed = parseMessageContent({ role: "assistant", content: responseContent });
-
-          setMessages(prev => prev.map(m => {
-            if (m.id !== assistantMsgId) return m;
-
-            if (event === "error") {
-              return {
-                ...m,
-                content: `Error: ${chunk}`,
-                isActionable: false,
-                isStreaming: false,
-              };
-            }
-
-            return {
-              ...m,
-              ...parsed,
-              sql: parsed.sql || sqlContent.trim(),
-              analysis: parsed.analysis || analysisContent.trim(),
-              confidence: parsed.confidence ?? confidenceScore,
-              citations,
-              retrievalTrace,
-              warnings,
-              thought: streamSteps.filter((step) => step.type === "thinking").map((step) => step.content).join("\n\n"),
-              steps: streamSteps,
-              isStreaming: true,
-              isActionable: true
-            };
-          }));
+          scheduleAssistantMessageFlush(event, chunk);
         },
         (headers) => {
           const cid = headers.get("X-Conversation-Id");
@@ -563,10 +618,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
 
     } catch (error: any) {
       toast.error(error.message || "Failed to generate SQL");
+      flushAssistantMessage();
       setMessages(prev => prev.map(m =>
         m.id === assistantMsgId ? { ...m, content: `Error: ${error.message}`, isStreaming: false } : m
       ));
     } finally {
+      flushAssistantMessage();
       setIsTyping(false);
       setMessages(prev => prev.map(m =>
         m.id === assistantMsgId
@@ -578,7 +635,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           : m
       ));
     }
-  }, [databaseId, schema, selectedModel, isTyping, conversationId, messages, parseMessageContent, loadConversations]);
+  }, [databaseId, schema, selectedModel, isTyping, conversationId, parseMessageContent, loadConversations]);
 
   return {
     messages,
