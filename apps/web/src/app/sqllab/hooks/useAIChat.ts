@@ -65,8 +65,11 @@ export const STATUS_THINKING_EVENTS = new Set([
 export const isStatusThinkingEvent = (text: string) => STATUS_THINKING_EVENTS.has(text.trim());
 
 const LABELED_THINKING_EVENT_PATTERN = /^(Intent|Schema mapping|Strategy):/i;
+const THINKING_LABEL_PATTERN = /^\s*(Intent|Schema mapping|Strategy):\s*/i;
 
 export const isLabeledThinkingEvent = (text: string) => LABELED_THINKING_EVENT_PATTERN.test(text.trim());
+
+export const stripThinkingLabel = (text: string) => String(text || "").replace(THINKING_LABEL_PATTERN, "");
 
 const toThinkingSteps = (events: any[]): AIStep[] => {
   return events.reduce<AIStep[]>((steps, event) => {
@@ -75,6 +78,9 @@ const toThinkingSteps = (events: any[]): AIStep[] => {
     const rawText = String(event.content);
     const text = rawText.trim();
     if (!text) return steps;
+    const displayText = stripThinkingLabel(text).trim();
+    const displayRawText = stripThinkingLabel(rawText);
+    if (!displayText) return steps;
 
     const lastStep = steps[steps.length - 1];
     const shouldStartStep =
@@ -84,12 +90,12 @@ const toThinkingSteps = (events: any[]): AIStep[] => {
       isLabeledThinkingEvent(text);
 
     if (shouldStartStep) {
-      return [...steps, { type: "thinking", content: text, status: "complete" }];
+      return [...steps, { type: "thinking", content: displayText, status: "complete" }];
     }
 
     return [
       ...steps.slice(0, -1),
-      { ...lastStep, content: `${lastStep.content}${rawText}` },
+      { ...lastStep, content: `${lastStep.content}${displayRawText}` },
     ];
   }, []);
 };
@@ -261,7 +267,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     while ((stepMatch = stepRegex.exec(text)) !== null) {
       const [, type, , , innerContent] = stepMatch;
       if (type === "thinking") {
-        const content = (innerContent || "").trim();
+        const content = stripThinkingLabel(innerContent || "").trim();
         if (content) {
           thinkingContent.push(content);
           steps.push({
@@ -278,7 +284,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const partialMatch = text.match(partialThoughtRegex);
     if (partialMatch && !text.includes("</thinking>", partialMatch.index)) {
       const content = partialMatch[1].trim();
-      if (content) thinkingContent.push(content);
+      if (content) thinkingContent.push(stripThinkingLabel(content).trim());
     }
 
     if (!steps.length && (thinkingContent.length > 0 || (partialMatch && !text.includes("</thinking>", partialMatch.index)))) {
@@ -554,6 +560,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             const rawText = String(chunk || "");
             const text = rawText.trim();
             if (!text) return;
+            const displayText = stripThinkingLabel(text).trim();
+            const displayRawText = stripThinkingLabel(rawText);
+            if (!displayText) return;
 
             const lastStep = streamSteps[streamSteps.length - 1];
             const isStatusEvent = isStatusThinkingEvent(text);
@@ -563,12 +572,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             if (lastStreamEvent === "thinking" && lastStep?.type === "thinking" && !shouldKeepSeparateThinkingEvent) {
               streamSteps = [
                 ...streamSteps.slice(0, -1),
-                { ...lastStep, content: `${lastStep.content}${rawText}`, status: "active" },
+                { ...lastStep, content: `${lastStep.content}${displayRawText}`, status: "active" },
               ];
             } else {
               streamSteps = [
                 ...streamSteps.map((step) => ({ ...step, status: "complete" as const })),
-                { type: "thinking", content: text, status: "active" },
+                { type: "thinking", content: displayText, status: "active" },
               ];
             }
             streamThought = streamSteps.filter((step) => step.type === "thinking").map((step) => step.content).join("\n\n");

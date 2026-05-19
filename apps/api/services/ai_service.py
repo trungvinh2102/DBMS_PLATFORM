@@ -17,6 +17,7 @@ from .ai.prompt_contracts import build_rag_prompt
 from .ai.query_understanding import query_understanding_service
 from .ai.rag_context import rag_context_builder
 from .ai.stream_parser import TaggedResponseStreamParser
+from .prompts import VIETNAMESE_RESPONSE_POLICY
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,10 @@ class AIService(SqlAIService, AgentAIService):
         # Yield clean text. Frontend will handle wrapping for the UI steps.
         yield "thinking", "Đang khởi tạo bối cảnh..."
         
-        system_prompt = "You are the Supreme SQL Architect. Use English for reasoning steps but respond in the user's language."
+        system_prompt = (
+            "You are QurioDB's SQL-focused database assistant.\n"
+            f"{VIETNAMESE_RESPONSE_POLICY}"
+        )
         if db_id and is_database_request:
             yield "thinking", "Phân tích lược đồ..."
             

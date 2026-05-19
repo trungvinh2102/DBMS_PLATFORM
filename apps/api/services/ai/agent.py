@@ -262,7 +262,7 @@ class AgentAIService(BaseAIService):
         
         if agent_res.get("confidence", 5) <= 2:
             agent_res["type"] = "clarification"
-            agent_res["summary"] = "I'm not sure. Did you mean this? Or can you explain more?"
+            agent_res["summary"] = "Tôi chưa chắc ý của bạn. Bạn có thể nói rõ hơn không?"
         return agent_res
 
     def _clean_json_output(self, text: str) -> str:

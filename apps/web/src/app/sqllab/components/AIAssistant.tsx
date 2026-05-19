@@ -30,6 +30,14 @@ const shouldShowSlashCommands = (value: string) => {
   return trimmed.startsWith("/") && !trimmed.includes(" ");
 };
 
+const VIETNAMESE_RESPONSE_INSTRUCTION =
+  "Hãy trả lời bằng tiếng Việt có dấu. Chỉ dùng ngôn ngữ khác khi người dùng yêu cầu rõ ràng; giữ nguyên SQL, tên bảng/cột và từ khóa kỹ thuật cần thiết.";
+
+const buildVietnamesePrompt = (prompt: string) =>
+  prompt.startsWith(VIETNAMESE_RESPONSE_INSTRUCTION)
+    ? prompt
+    : `${VIETNAMESE_RESPONSE_INSTRUCTION}\n\n${prompt}`;
+
 export function AIAssistant({
   showHistory,
   onShowHistoryChange,
@@ -118,7 +126,7 @@ export function AIAssistant({
     if (lab.fixSQLError) {
       const errorMsg = lab.fixSQLError;
       lab.setFixSQLError(null);
-      const prompt = `I'm getting this SQL error: "${errorMsg}".\n\nHere is my current SQL:\n\`\`\`sql\n${editorSql}\n\`\`\`\n\nPlease analyze and fix this query.`;
+      const prompt = buildVietnamesePrompt(`I'm getting this SQL error: "${errorMsg}".\n\nHere is my current SQL:\n\`\`\`sql\n${editorSql}\n\`\`\`\n\nPlease analyze and fix this query.`);
       startNewChat();
       onShowHistoryChange(false);
       setTimeout(() => _handleSend(prompt), 0);
@@ -158,7 +166,7 @@ export function AIAssistant({
         else if (parsed.command.acceptsArgs && !parsed.args) toast.error(`Usage: ${parsed.command.command} ${parsed.command.argsHint || '<args>'}`);
         return;
       }
-      return _handleSend(prompt);
+      return _handleSend(buildVietnamesePrompt(prompt));
     }
     return _handleSend(currentInput);
   }, [input, editorSql, selectedDatabaseType, selectedSchema, lastError, _handleSend]);
@@ -183,7 +191,7 @@ export function AIAssistant({
           return;
         }
         setInput("");
-        await _handleSend(prompt);
+        await _handleSend(buildVietnamesePrompt(prompt));
       }, 0);
     }
   }, [editorSql, selectedDatabaseType, selectedSchema, lastError, _handleSend]);
@@ -235,7 +243,7 @@ export function AIAssistant({
         schema: selectedSchema,
         modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
       });
-      addAssistantMessage("Here is an optimized version:", res.sql || res.result);
+      addAssistantMessage("Đây là phiên bản đã tối ưu:", res.sql || res.result);
     } finally { setIsTyping(false); }
   }, [selectedDatabaseId, selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
 

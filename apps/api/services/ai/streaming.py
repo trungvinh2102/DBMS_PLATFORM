@@ -33,6 +33,7 @@ STATUS_THINKING_EVENTS = {
 }
 
 LABELED_THINKING_EVENT_PATTERN = re.compile(r"^(Intent|Schema mapping|Strategy):", re.I)
+THINKING_LABEL_PATTERN = re.compile(r"^\s*(Intent|Schema mapping|Strategy):\s*", re.I)
 
 
 def new_response_parts() -> Dict[str, List[str]]:
@@ -127,8 +128,10 @@ def _semantic_events(events: List[Tuple[str, Any]]) -> List[Tuple[str, Any]]:
 
 
 def _append_thinking_event(events: List[Tuple[str, str]], raw_text: str, text: str) -> None:
+    clean_text = _strip_thinking_label(text).strip()
+    clean_raw_text = _strip_thinking_label(raw_text)
     if not events or events[-1][0] != "thinking":
-        events.append(("thinking", text))
+        events.append(("thinking", clean_text))
         return
 
     previous = events[-1][1]
@@ -138,9 +141,9 @@ def _append_thinking_event(events: List[Tuple[str, str]], raw_text: str, text: s
         or _is_labeled_thinking_event(text)
     )
     if should_start_step:
-        events.append(("thinking", text))
+        events.append(("thinking", clean_text))
     else:
-        events[-1] = ("thinking", previous + raw_text)
+        events[-1] = ("thinking", previous + clean_raw_text)
 
 
 def _is_status_thinking_event(text: str) -> bool:
@@ -195,7 +198,7 @@ def _parse_legacy_history_content(content: str, payload: Dict[str, Any]) -> Dict
     working = content
 
     for match in re.finditer(r"<thinking>\s*([\s\S]*?)\s*</thinking>", working, flags=re.I):
-        text = match.group(1).strip()
+        text = _strip_thinking_label(match.group(1).strip()).strip()
         if text:
             payload["thinking"] = _append_text(payload["thinking"], text)
             payload["events"].append({"type": "thinking", "content": text})
@@ -232,6 +235,10 @@ def _append_text(existing: str, text: str) -> str:
     if not existing:
         return text
     return f"{existing}\n\n{text}"
+
+
+def _strip_thinking_label(text: str) -> str:
+    return THINKING_LABEL_PATTERN.sub("", str(text), count=1)
 
 
 def _concat_text(existing: str, text: str) -> str:

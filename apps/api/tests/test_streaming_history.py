@@ -61,8 +61,8 @@ def test_build_history_merges_split_thinking_words_within_same_labeled_step():
     thinking_events = [event for event in payload["events"] if event["type"] == "thinking"]
 
     assert thinking_events == [
-        {"type": "thinking", "content": "Intent: Xác định những người dùng đã sử dụng từ ngữ nhạy cảm."},
-        {"type": "thinking", "content": "Schema mapping: Cột transcription chứa nội dung cần kiểm tra."},
+        {"type": "thinking", "content": "Xác định những người dùng đã sử dụng từ ngữ nhạy cảm."},
+        {"type": "thinking", "content": "Cột transcription chứa nội dung cần kiểm tra."},
     ]
 
 

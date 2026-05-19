@@ -41,9 +41,9 @@ def test_parser_preserves_separate_thinking_events():
     ])
 
     assert events == [
-        ("thinking", "Intent: count users."),
-        ("thinking", "Schema mapping: use public.users."),
-        ("thinking", "Strategy: group by status."),
+        ("thinking", "count users."),
+        ("thinking", "use public.users."),
+        ("thinking", "group by status."),
     ]
 
 

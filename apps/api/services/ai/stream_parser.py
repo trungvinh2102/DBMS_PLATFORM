@@ -6,10 +6,18 @@ the AI Assistant UI.
 """
 
 import json
+import re
 from json import JSONDecodeError
 from typing import Iterable, List, Tuple
 
 StreamEvent = Tuple[str, str]
+
+THINKING_LABEL_PATTERN = re.compile(r"^\s*(Intent|Schema mapping|Strategy):\s*", re.I)
+
+
+def strip_thinking_label(text: str) -> str:
+    """Removes legacy thinking labels from user-visible assistant activity."""
+    return THINKING_LABEL_PATTERN.sub("", str(text), count=1)
 
 
 class TaggedResponseStreamParser:
@@ -207,6 +215,8 @@ class TaggedResponseStreamParser:
         }.get(event_name, ())
         for marker in replacements:
             cleaned = cleaned.replace(marker, "")
+        if event_name == "thinking":
+            cleaned = strip_thinking_label(cleaned)
         return cleaned
 
     def _should_wait_for_more(self) -> bool:

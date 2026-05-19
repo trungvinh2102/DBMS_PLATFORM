@@ -15,6 +15,7 @@ from models import AIChatMessage, AIConversation, AIGeneratedQuery, RagRetrieval
 from ..conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
 from .langchain_runtime import get_ai_api_key, langchain_runtime
+from ..prompts import VIETNAMESE_RESPONSE_POLICY
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,10 @@ class BaseAIService:
         provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         try:
             return langchain_runtime.invoke_text(
-                system_prompt="You are QurioDB's SQL-focused AI assistant.",
+                system_prompt=(
+                    "You are QurioDB's SQL-focused AI assistant.\n"
+                    f"{VIETNAMESE_RESPONSE_POLICY}"
+                ),
                 prompt=combined_prompt,
                 model_id=model_id,
                 user_id=user_id,

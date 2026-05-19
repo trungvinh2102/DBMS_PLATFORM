@@ -44,6 +44,32 @@ export interface ParsedCommand {
   args: string;
 }
 
+const VIETNAMESE_RESPONSE_INSTRUCTION =
+  "Hãy trả lời bằng tiếng Việt có dấu. Chỉ dùng ngôn ngữ khác khi người dùng yêu cầu rõ ràng; giữ nguyên SQL, tên bảng/cột và từ khóa kỹ thuật cần thiết.";
+
+const buildVietnamesePrompt = (prompt: string) =>
+  prompt.startsWith(VIETNAMESE_RESPONSE_INSTRUCTION)
+    ? prompt
+    : `${VIETNAMESE_RESPONSE_INSTRUCTION}\n\n${prompt}`;
+
+const withVietnameseResponse = (command: SlashCommand): SlashCommand => ({
+  ...command,
+  buildPrompt: (context) => {
+    const prompt = command.buildPrompt(context);
+    return prompt ? buildVietnamesePrompt(prompt) : null;
+  },
+});
+
+const filterCommandsByInput = (partialInput: string): SlashCommand[] => {
+  const trimmed = partialInput.trim().toLowerCase();
+  if (!trimmed.startsWith("/")) return [];
+  if (trimmed === "/") return SLASH_COMMANDS;
+
+  return SLASH_COMMANDS.filter((cmd) =>
+    cmd.command.startsWith(trimmed)
+  );
+};
+
 /**
  * Registry of all available slash commands.
  * Order determines display priority in autocomplete.
@@ -57,7 +83,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     acceptsArgs: false,
     buildPrompt: (ctx) => {
       if (!ctx.editorSQL.trim()) return null;
-      return `Explain this SQL query in detail. Break down each part, explain what it does, and describe the expected output:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``;
+      return buildVietnamesePrompt(`Explain this SQL query in detail. Break down each part, explain what it does, and describe the expected output:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``);
     },
   },
   {
@@ -68,7 +94,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     acceptsArgs: false,
     buildPrompt: (ctx) => {
       if (!ctx.editorSQL.trim()) return null;
-      return `Analyze this SQL query for performance issues and suggest optimizations. Consider indexing, query structure, and execution plan impact:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``;
+      return buildVietnamesePrompt(`Analyze this SQL query for performance issues and suggest optimizations. Consider indexing, query structure, and execution plan impact:\n\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\``);
     },
   },
   {
@@ -81,7 +107,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     buildPrompt: (ctx) => {
       if (!ctx.editorSQL.trim()) return null;
       const errorInfo = ctx.args || ctx.lastError || "unknown error";
-      return `I have a SQL error: "${errorInfo}"\n\nHere is my current SQL:\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\`\n\nPlease analyze the error, explain what went wrong, and provide a corrected version.`;
+      return buildVietnamesePrompt(`I have a SQL error: "${errorInfo}"\n\nHere is my current SQL:\n\`\`\`sql\n${ctx.editorSQL}\n\`\`\`\n\nPlease analyze the error, explain what went wrong, and provide a corrected version.`);
     },
   },
   {
@@ -94,7 +120,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     buildPrompt: (ctx) => {
       const tableName = ctx.args.trim();
       if (!tableName) return null;
-      return `Describe the table "${tableName}" in detail. Show its columns, data types, constraints, and relationships. Then show a query to get 5 sample rows and basic statistics (row count, null counts for key columns).`;
+      return buildVietnamesePrompt(`Describe the table "${tableName}" in detail. Show its columns, data types, constraints, and relationships. Then show a query to get 5 sample rows and basic statistics (row count, null counts for key columns).`);
     },
   },
   {
@@ -256,7 +282,7 @@ export function parseSlashCommand(input: string): ParsedCommand | null {
     // Match exact command or command followed by space + args
     if (inputLower === cmdTrigger || inputLower.startsWith(cmdTrigger + " ")) {
       const args = trimmed.slice(cmd.command.length).trim();
-      return { command: cmd, args };
+      return { command: withVietnameseResponse(cmd), args };
     }
   }
 
@@ -268,11 +294,5 @@ export function parseSlashCommand(input: string): ParsedCommand | null {
  * E.g., "/ex" matches "/explain", "/op" matches "/optimize".
  */
 export function filterCommands(partialInput: string): SlashCommand[] {
-  const trimmed = partialInput.trim().toLowerCase();
-  if (!trimmed.startsWith("/")) return [];
-  if (trimmed === "/") return SLASH_COMMANDS; // Show all commands
-
-  return SLASH_COMMANDS.filter((cmd) =>
-    cmd.command.startsWith(trimmed)
-  );
+  return filterCommandsByInput(partialInput).map(withVietnameseResponse);
 }

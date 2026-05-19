@@ -12,6 +12,7 @@ import {
   isLabeledThinkingEvent,
   isStatusThinkingEvent,
   stripInternalToolEnvelopes,
+  stripThinkingLabel,
   useAIChat,
 } from "@/app/sqllab/hooks/useAIChat";
 
@@ -44,6 +45,16 @@ describe("useAIChat stream status handling", () => {
     expect(isLabeledThinkingEvent("Strategy: scan transcripts with a keyword filter.")).toBe(true);
     expect(isLabeledThinkingEvent("Continue the previous sentence.")).toBe(false);
   });
+
+  it("removes thinking labels from assistant-visible activity", () => {
+    expect(stripThinkingLabel("Intent: Xác định người dùng có thể đã sử dụng từ ngữ nhạy cảm.")).toBe(
+      "Xác định người dùng có thể đã sử dụng từ ngữ nhạy cảm.",
+    );
+    expect(stripThinkingLabel("Schema mapping: use voice_message_meta.transcription.")).toBe(
+      "use voice_message_meta.transcription.",
+    );
+  });
+
   it("strips internal tool JSON envelopes from assistant-visible content", () => {
     const content = [
       '{"name": "SchemaContextLoader", "args": {"databaseId": "db-1", "intent": "Xin chào"}}',
@@ -123,5 +134,31 @@ describe("useAIChat stream status handling", () => {
       );
     });
     expect(result.current.conversationId).toBe("conv-stream");
+  });
+
+  it("strips labels from streamed thinking steps", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk, onHeaders) => {
+      onHeaders?.(new Headers({ "X-Conversation-Id": "conv-thinking" }));
+      onChunk("Intent: Xác định người dùng có thể đã sử dụng từ ngữ nhạy cảm.", "thinking");
+      onChunk("Schema mapping: use voice_message_meta.transcription.", "thinking");
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("kiểm tra từ ngữ nhạy cảm");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)?.steps).toEqual([
+        expect.objectContaining({
+          content: "Xác định người dùng có thể đã sử dụng từ ngữ nhạy cảm.",
+        }),
+        expect.objectContaining({
+          content: "use voice_message_meta.transcription.",
+        }),
+      ]);
+    });
   });
 });

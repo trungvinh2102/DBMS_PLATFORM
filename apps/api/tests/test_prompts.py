@@ -6,7 +6,9 @@ Regression tests for QurioDB AI system prompt templates.
 
 from services.prompts import (
     get_agent_prompt,
+    get_general_chat_prompt,
     get_sql_fix_prompt,
+    get_sql_explanation_prompt,
     get_sql_generation_prompt,
     get_sql_optimization_prompt,
 )
@@ -25,10 +27,11 @@ def test_sql_generation_prompt_preserves_streaming_contract():
     prompt = get_sql_generation_prompt(SCHEMA_CONTEXT)
 
     assert "<thinking>" in prompt
-    assert "<thinking>Intent:" in prompt
-    assert "<thinking>Schema mapping:" in prompt
-    assert "<thinking>Strategy:" in prompt
-    assert "Never combine multiple labels in the same <thinking> event" in prompt
+    assert "<thinking>What the user wants.</thinking>" in prompt
+    assert "Do not prefix thinking text with labels" in prompt
+    assert "<thinking>Intent:" not in prompt
+    assert "<thinking>Schema mapping:" not in prompt
+    assert "<thinking>Strategy:" not in prompt
     assert "<confidence>" in prompt
     assert "```sql" in prompt
     assert "### ANALYSIS" in prompt
@@ -70,3 +73,18 @@ def test_repair_and_optimization_prompts_are_schema_grounded():
     assert "Do not introduce tables or columns absent from the schema context" in optimization_prompt
     assert "Verify all identifiers against the schema context" in repair_prompt
     assert "column missing" in repair_prompt
+
+
+def test_ai_prompts_default_user_visible_text_to_vietnamese():
+    prompts = [
+        get_sql_generation_prompt(SCHEMA_CONTEXT),
+        get_general_chat_prompt(),
+        get_sql_explanation_prompt(),
+        get_sql_optimization_prompt(SCHEMA_CONTEXT),
+        get_sql_fix_prompt("column missing", SCHEMA_CONTEXT),
+        get_agent_prompt(SCHEMA_CONTEXT),
+    ]
+
+    for prompt in prompts:
+        assert "Vietnamese is QurioDB's default assistant language" in prompt
+        assert "Vietnamese with diacritics" in prompt
