@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, TypedDict
 from .base import BaseAIService
 from .context import schema_context_service
 from .langchain_runtime import END, START, StateGraph, langchain_runtime
+from .sql_safety import sql_safety_validator
 from ..prompts import get_agent_prompt
 from ..base_service import BaseDatabaseService
 from sqlalchemy import text
@@ -143,10 +144,24 @@ class AgentAIService(BaseAIService):
 
     def _agent_execute_node(self, state: AgentGraphState) -> AgentGraphState:
         sql = state.get("sql") or ""
+        safety = sql_safety_validator.validate(sql)
+        if not safety.isAllowed:
+            retries = int(state.get("retries") or 0) + 1
+            agent_res = dict(state.get("agent_res") or {})
+            agent_res.update({
+                "type": "error",
+                "message": safety.blockedReason,
+                "sql": "",
+                "validation": safety.to_dict(),
+            })
+            return {**state, "agent_res": agent_res, "error": safety.blockedReason, "retries": retries}
+        state = {**state, "sql": safety.sanitizedSql}
         try:
-            exec_res = self._execute_sql_internal(state["db_id"], sql)
+            exec_res = self._execute_sql_internal(state["db_id"], safety.sanitizedSql)
             agent_res = dict(state.get("agent_res") or {})
             agent_res.update(exec_res)
+            agent_res["sql"] = safety.sanitizedSql
+            agent_res["validation"] = safety.to_dict()
             return {**state, "agent_res": agent_res, "error": ""}
         except Exception as e:
             retries = int(state.get("retries") or 0) + 1
@@ -166,7 +181,7 @@ class AgentAIService(BaseAIService):
         logger.warning("LangGraph agent correction triggered (Retry %s/%s)", state.get("retries"), state.get("max_retries"))
         return {
             **state,
-            "current_prompt": f"SQL failed with error: {state.get('error')}\nFAILED SQL: {state.get('sql')}\nPlease FIX and retry.",
+            "current_prompt": f"SQL failed validation or execution with error: {state.get('error')}\nFAILED SQL: {state.get('sql')}\nPlease FIX and retry with one safe read-only SQL statement.",
             "error": "",
         }
 
@@ -211,6 +226,18 @@ class AgentAIService(BaseAIService):
                     agent_res["retrievalTrace"] = context_result.retrieval_trace
                     agent_res["citations"] = context_result.citations
                     return self._finalize_meta_tool(agent_res, prompt, user_id, db_id, conv_id)
+                safety = sql_safety_validator.validate(sql)
+                if not safety.isAllowed:
+                    agent_res.update({
+                        "type": "error",
+                        "message": safety.blockedReason,
+                        "sql": "",
+                        "validation": safety.to_dict(),
+                    })
+                    return agent_res
+                sql = safety.sanitizedSql
+                agent_res["sql"] = sql
+                agent_res["validation"] = safety.to_dict()
                 
                 # Try execution
                 try:

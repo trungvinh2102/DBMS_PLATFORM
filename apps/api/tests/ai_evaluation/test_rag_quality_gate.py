@@ -22,6 +22,7 @@ from services.ai.retrieval.evaluation import (
     first_expected_rank,
 )
 from services.ai.retrieval.index_documents import mask_sensitive_text
+from services.ai.retrieval.index_documents import build_schema_chunks
 from services.ai.retrieval.index_service import RagIndexService
 from services.ai.retrieval.retrieval_service import RagRetrievalService
 
@@ -130,3 +131,23 @@ def test_mask_sensitive_text_preserves_non_secret_content():
 
     assert "abcdefghijk" not in masked
     assert "table orders has total_amount" in masked
+
+
+def test_schema_index_includes_relationship_graph_chunk():
+    chunks = build_schema_chunks(
+        "db-1",
+        "public",
+        {
+            "orders": [{"name": "customer_id", "type": "integer"}],
+            "customers": [{"name": "id", "type": "integer"}],
+        },
+        "postgresql",
+        [{"table": "orders", "column": "customer_id", "foreignTable": "customers", "foreignColumn": "id"}],
+        {},
+    )
+
+    graph = chunks[-1]
+
+    assert graph["chunkType"] == "schema_graph"
+    assert "orders.customer_id -> customers.id" in graph["content"]
+    assert graph["metadataJson"]["citation"] == "database:db-1/schema:public/graph"

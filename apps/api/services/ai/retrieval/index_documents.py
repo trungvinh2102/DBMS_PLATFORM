@@ -57,7 +57,55 @@ def build_schema_chunks(
             },
             "ordinal": ordinal,
         })
+    graph_chunk = build_schema_graph_chunk(database_id, schema, table_columns, db_type, foreign_keys)
+    if graph_chunk:
+        graph_chunk["ordinal"] = len(chunks)
+        chunks.append(graph_chunk)
     return chunks
+
+
+def build_schema_graph_chunk(
+    database_id: str,
+    schema: str,
+    table_columns: Dict[str, List[Dict[str, Any]]],
+    db_type: str,
+    foreign_keys: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Builds a compact relationship graph chunk for join planning."""
+    if not table_columns:
+        return None
+
+    table_names = list(table_columns.keys())
+    edges = []
+    for fk in foreign_keys:
+        source = fk.get("table") or fk.get("source_table") or fk.get("constrained_table")
+        target = fk.get("foreignTable") or fk.get("referred_table") or fk.get("target_table")
+        column = fk.get("column") or fk.get("constrained_column")
+        target_column = fk.get("foreignColumn") or fk.get("referred_column") or fk.get("target_column")
+        if source and target:
+            relation = f"{source}.{column or '?'} -> {target}.{target_column or '?'}"
+            edges.append(relation)
+
+    lines = [
+        f"Schema relationship graph for {schema}",
+        f"Dialect: {db_type}",
+        "Tables:",
+        ", ".join(table_names),
+        "Relationships:",
+        *(edges or ["No foreign keys discovered. Use exact table and column evidence before joining."]),
+    ]
+    return {
+        "chunkType": "schema_graph",
+        "objectName": f"{schema}_relationship_graph",
+        "schemaName": schema,
+        "content": "\n".join(lines),
+        "metadataJson": {
+            "dialect": db_type,
+            "tables": table_names,
+            "relationships": edges,
+            "citation": f"database:{database_id}/schema:{schema}/graph",
+        },
+    }
 
 
 def build_saved_query_chunk(saved_query: SavedQuery) -> Dict[str, Any]:

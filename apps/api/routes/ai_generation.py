@@ -13,8 +13,11 @@ from schemas.ai import (
     FixSqlRequest,
     GenerateSqlRequest,
     OptimizeSqlRequest,
+    ValidateSqlRequest,
 )
 from services.ai.conversation_store import conversation_store
+from services.ai.retrieval.metadata_source import SchemaMetadataSource
+from services.ai.sql_safety import sql_safety_validator
 from services.ai_service import ai_service
 from utils.auth_middleware import get_current_user
 
@@ -79,6 +82,19 @@ def autocomplete_sql(data: CompleteSqlRequest, current_user: dict = Depends(get_
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/validate-sql")
+def validate_sql(data: ValidateSqlRequest, current_user: dict = Depends(get_current_user)):
+    dialect = data.dialect
+    if not dialect and data.databaseId:
+        dialect = SchemaMetadataSource().get_db_type(data.databaseId)
+    return sql_safety_validator.validate(
+        data.sql,
+        dialect=dialect,
+        allow_write=data.allowWrite,
+        max_preview_rows=data.maxPreviewRows,
+    ).to_dict()
 
 
 @router.post("/agent")

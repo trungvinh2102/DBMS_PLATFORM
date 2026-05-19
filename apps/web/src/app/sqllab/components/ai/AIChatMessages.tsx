@@ -19,6 +19,9 @@ interface AIChatMessagesProps {
   conversationId?: string | null;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
+  onApplySql: (sql: string) => void;
+  onPreviewSql: (sql: string) => void;
+  currentSql?: string;
   onSuggestionClick: (suggestion: string) => void;
 }
 
@@ -31,6 +34,9 @@ const AIChatMessagesComponent = ({
   conversationId,
   onExplain,
   onOptimize,
+  onApplySql,
+  onPreviewSql,
+  currentSql,
   onSuggestionClick
 }: AIChatMessagesProps) => (
   <div
@@ -73,6 +79,9 @@ const AIChatMessagesComponent = ({
                     message={m}
                     onExplain={onExplain}
                     onOptimize={onOptimize}
+                    onApplySql={onApplySql}
+                    onPreviewSql={onPreviewSql}
+                    currentSql={currentSql}
                     onSuggestionClick={onSuggestionClick}
                     conversationId={conversationId}
                   />

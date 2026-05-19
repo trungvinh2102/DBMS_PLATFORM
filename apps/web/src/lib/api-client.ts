@@ -213,8 +213,11 @@ export const aiApi = {
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
   fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
+  validateSQL: (data: { sql: string; databaseId?: string; dialect?: string; allowWrite?: boolean; maxPreviewRows?: number }) =>
+    req(api.post("ai/validate-sql", data)),
   completeSql: (data: { databaseId: string, schema: string, prefix: string, suffix: string, modelId?: string }) => req(api.post("ai/complete", data)),
   executeAgent: (data: any) => req(api.post("ai/agent", data)),
+  getDiagnostics: (params?: { databaseId?: string; limit?: number }) => req(api.get("ai/diagnostics", { params })),
   deleteModel: (id: string) => req(api.delete(`ai/models/${id}`)),
   getHistory: (databaseId?: string) => req(api.get("ai/history", { params: { databaseId } })),
   getConversations: (databaseId?: string) => req(api.get("ai/conversations", { params: { databaseId } })),

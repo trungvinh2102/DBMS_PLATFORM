@@ -31,16 +31,23 @@ interface AIMessageProps {
   message: Message;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
+  onApplySql?: (sql: string) => void;
+  onPreviewSql?: (sql: string) => void;
+  currentSql?: string;
   onSuggestionClick?: (suggestion: string) => void;
   conversationId?: string | null;
 }
 
 const noopSuggestionClick = () => {};
+const noopSqlAction = () => {};
 
 const AIMessageComponent = ({
   message,
   onExplain,
   onOptimize,
+  onApplySql = noopSqlAction,
+  onPreviewSql = noopSqlAction,
+  currentSql,
   onSuggestionClick,
   conversationId
 }: AIMessageProps) => {
@@ -248,6 +255,9 @@ const AIMessageComponent = ({
                 copied={isCopied}
                 onExplain={onExplain}
                 onOptimize={onOptimize}
+                onApply={onApplySql}
+                onPreview={onPreviewSql}
+                currentSql={currentSql}
               />
             )}
 

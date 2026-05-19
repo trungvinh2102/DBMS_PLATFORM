@@ -5,10 +5,12 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Activity, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 import { aiApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { useSQLLabContext } from "../context/SQLLabContext";
 import { useAIChat } from "../hooks/useAIChat";
 import { parseSlashCommand, filterCommands, type SlashCommand } from "../utils/slash-commands";
@@ -17,6 +19,7 @@ import { parseSlashCommand, filterCommands, type SlashCommand } from "../utils/s
 import { ConversationHistory } from "./ai/ConversationHistory";
 import { AIChatMessages } from "./ai/AIChatMessages";
 import { AIChatInput, AUTO_MODEL_VALUE } from "./ai/AIChatInput";
+import { AIDiagnosticsPanel } from "./ai/AIDiagnosticsPanel";
 import type { AIRuntimeStatus } from "./ai/types";
 
 interface AIAssistantProps {
@@ -55,6 +58,9 @@ export function AIAssistant({
   const [runtimeStatus, setRuntimeStatus] = useState<AIRuntimeStatus | null>(null);
   const [showCommandMenu, setShowCommandMenu] = useState(false);
   const [commandMenuIndex, setCommandMenuIndex] = useState(0);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [isDiagnosticsLoading, setIsDiagnosticsLoading] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
   const lastNewChatSignalRef = useRef(newChatSignal);
 
@@ -247,6 +253,75 @@ export function AIAssistant({
     } finally { setIsTyping(false); }
   }, [selectedDatabaseId, selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
 
+  const handleApplySql = useCallback((s: string) => {
+    lab.setSql(s);
+    toast.success("SQL đã được đưa vào editor.");
+  }, [lab]);
+
+  const handlePreviewSql = useCallback(async (s: string) => {
+    if (!selectedDatabaseId) {
+      toast.error("Chọn database trước khi preview SQL.");
+      return;
+    }
+    try {
+      const validation = await aiApi.validateSQL({
+        sql: s,
+        databaseId: selectedDatabaseId,
+        dialect: selectedDatabaseType,
+        maxPreviewRows: lab.queryLimit || 500,
+      });
+      if (!validation.isAllowed) {
+        toast.error(validation.blockedReason || "SQL không vượt qua kiểm tra an toàn.");
+        return;
+      }
+      if (validation.limitApplied) {
+        toast.info("Preview đã tự thêm LIMIT để tránh trả quá nhiều dòng.");
+      }
+      lab.setSql(validation.sanitizedSql);
+      await lab.handleRun(validation.sanitizedSql);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể preview SQL.");
+    }
+  }, [lab, selectedDatabaseId, selectedDatabaseType]);
+
+  const refreshDiagnostics = useCallback(async () => {
+    setIsDiagnosticsLoading(true);
+    try {
+      const result = await aiApi.getDiagnostics({ databaseId: selectedDatabaseId, limit: 25 });
+      setDiagnostics(result);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể tải AI trace.");
+    } finally {
+      setIsDiagnosticsLoading(false);
+    }
+  }, [selectedDatabaseId]);
+
+  const handleToggleDiagnostics = useCallback(() => {
+    setShowDiagnostics((current) => {
+      const next = !current;
+      if (next) void refreshDiagnostics();
+      return next;
+    });
+  }, [refreshDiagnostics]);
+
+  const handleAnalyzeResults = useCallback(() => {
+    const rows = Array.isArray(lab.results) ? lab.results.slice(0, 8) : [];
+    if (!rows.length) {
+      toast.error("Chưa có kết quả query để phân tích.");
+      return;
+    }
+    const prompt = buildVietnamesePrompt([
+      "Phân tích kết quả query hiện tại trong SQL Lab.",
+      "Hãy nêu insight chính, bất thường đáng chú ý, và 3 câu hỏi tiếp theo nên hỏi.",
+      "",
+      `SQL hiện tại:\n\`\`\`sql\n${editorSql}\n\`\`\``,
+      "",
+      `Columns: ${JSON.stringify(lab.columns || [])}`,
+      `Sample rows: ${JSON.stringify(rows)}`,
+    ].join("\n"));
+    void _handleSend(prompt);
+  }, [_handleSend, editorSql, lab.columns, lab.results]);
+
   const handleSuggestionClick = useCallback((suggestion: string) => _handleSend(suggestion), [_handleSend]);
 
   const handleSelectConversation = useCallback((id: string) => {
@@ -261,8 +336,11 @@ export function AIAssistant({
   const AIActions = React.useMemo(() => ({
     onExplain: handleExplain,
     onOptimize: handleOptimize,
+    onApplySql: handleApplySql,
+    onPreviewSql: handlePreviewSql,
+    currentSql: editorSql,
     onSuggestionClick: handleSuggestionClick
-  }), [handleExplain, handleOptimize, handleSuggestionClick]);
+  }), [handleExplain, handleOptimize, handleApplySql, handlePreviewSql, editorSql, handleSuggestionClick]);
 
   if (!lab.showAISidebar) return null;
 
@@ -302,6 +380,37 @@ export function AIAssistant({
           conversationId={conversationId}
           {...AIActions}
         />
+
+        {showDiagnostics && (
+          <AIDiagnosticsPanel
+            diagnostics={diagnostics}
+            isLoading={isDiagnosticsLoading}
+            onRefresh={refreshDiagnostics}
+            onClose={() => setShowDiagnostics(false)}
+          />
+        )}
+
+        <div className="flex shrink-0 items-center gap-2 border-t border-border/70 bg-muted/10 px-3 py-2 md:px-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest"
+            onClick={handleAnalyzeResults}
+            disabled={isTyping || !Array.isArray(lab.results) || lab.results.length === 0}
+          >
+            <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+            Analyze Results
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest"
+            onClick={handleToggleDiagnostics}
+          >
+            <Activity className="mr-1.5 h-3.5 w-3.5" />
+            Trace
+          </Button>
+        </div>
 
         <AIChatInput
           input={input}

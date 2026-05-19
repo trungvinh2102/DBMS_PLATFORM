@@ -59,6 +59,14 @@ class ExecuteAgentRequest(BaseModel):
     modelId: Optional[str] = None
 
 
+class ValidateSqlRequest(BaseModel):
+    sql: str
+    databaseId: Optional[str] = None
+    dialect: Optional[str] = None
+    allowWrite: bool = False
+    maxPreviewRows: int = 500
+
+
 class StreamChatRequest(BaseModel):
     text: Optional[str] = None
     messages: Optional[List[Dict[str, str]]] = None
