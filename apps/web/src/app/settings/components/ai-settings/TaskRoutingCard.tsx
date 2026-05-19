@@ -9,12 +9,13 @@ import { Route, Save, SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
 import { AIModel, AITaskAssignment, AITaskCatalogItem } from "./types";
 
 const AUTO_MODEL_VALUE = "__auto__";
+const getModelLabel = (model: AIModel) => `${model.name} / ${model.provider}`;
 
 interface TaskRoutingCardProps {
   catalog: AITaskCatalogItem[];
@@ -183,18 +184,29 @@ interface ModelSelectProps {
 }
 
 function ModelSelect({ label, value, models, onChange }: ModelSelectProps) {
+  const selectedModel = models.find((model) => model.modelId === value);
+  const selectedLabel = selectedModel ? getModelLabel(selectedModel) : "Auto";
+
   return (
     <div className="space-y-1">
       <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</div>
       <Select value={value} onValueChange={(next) => onChange(next === AUTO_MODEL_VALUE ? null : next)}>
-        <SelectTrigger className="h-10 rounded-lg border-border/50 bg-background/70 text-xs">
-          <SelectValue placeholder="Auto" />
+        <SelectTrigger className="min-h-10 h-auto w-full whitespace-normal rounded-lg border-border/50 bg-background/70 py-2 text-xs">
+          <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-4">
+            {selectedLabel}
+          </span>
         </SelectTrigger>
-        <SelectContent side="bottom" alignItemWithTrigger={false} className="rounded-lg border-border/50">
+        <SelectContent
+          side="bottom"
+          alignItemWithTrigger={false}
+          className="w-[min(32rem,calc(100vw-2rem))] rounded-lg border-border/50"
+        >
           <SelectItem value={AUTO_MODEL_VALUE}>Auto</SelectItem>
           {models.map((model) => (
             <SelectItem key={model.id} value={model.modelId}>
-              {model.name} / {model.provider}
+              <span className="whitespace-normal break-words leading-4">
+                {getModelLabel(model)}
+              </span>
             </SelectItem>
           ))}
         </SelectContent>

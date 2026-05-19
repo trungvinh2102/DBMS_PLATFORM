@@ -11,6 +11,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { aiApi, databaseApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -23,6 +29,8 @@ interface RagSource {
   status: string;
   indexed_on?: string | null;
 }
+
+const getDatabaseLabel = (database: any) => database.databaseName || database.name || database.id;
 
 export function RagIndexingCard() {
   const queryClient = useQueryClient();
@@ -96,6 +104,10 @@ export function RagIndexingCard() {
   });
 
   const selectedDatabase = selectedDatabaseId || databaseOptions[0]?.id || "";
+  const selectedDatabaseLabel = useMemo(() => {
+    const database = databaseOptions.find((option: any) => option.id === selectedDatabase);
+    return database ? getDatabaseLabel(database) : "";
+  }, [databaseOptions, selectedDatabase]);
   const canIndexDocument = Boolean(documentTitle.trim() && documentContent.trim());
   const sources = (sourcesQuery.data || []) as RagSource[];
   const vectorStatus = statusQuery.data?.vectorStore;
@@ -121,18 +133,32 @@ export function RagIndexingCard() {
       </CardHeader>
       <CardContent className="space-y-5 pt-2">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
-          <select
+          <Select
             value={selectedDatabase}
-            onChange={(event) => setSelectedDatabaseId(event.target.value)}
-            className="h-10 rounded-xl border border-border/40 bg-muted/20 px-3 text-xs font-medium outline-none focus:ring-2 focus:ring-ring"
-            aria-label="Database for RAG indexing"
+            onValueChange={setSelectedDatabaseId}
+            disabled={!databaseOptions.length}
           >
-            {databaseOptions.map((database: any) => (
-              <option key={database.id} value={database.id}>
-                {database.databaseName || database.name || database.id}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              className="h-10 w-full rounded-xl border-border/40 bg-muted/20 px-3 text-xs font-medium focus:ring-1 focus:ring-primary/20"
+              aria-label="Database for RAG indexing"
+            >
+              <span
+                className={cn(
+                  "flex-1 truncate text-left",
+                  !selectedDatabaseLabel && "text-muted-foreground",
+                )}
+              >
+                {selectedDatabaseLabel || "Select database"}
+              </span>
+            </SelectTrigger>
+            <SelectContent align="start" side="top" sideOffset={8} className="rounded-xl p-1">
+              {databaseOptions.map((database: any) => (
+                <SelectItem key={database.id} value={database.id} className="rounded-lg">
+                  {getDatabaseLabel(database)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             className="gap-2"

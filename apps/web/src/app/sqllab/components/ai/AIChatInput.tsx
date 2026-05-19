@@ -15,7 +15,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import type { AIRuntimeStatus } from "./types";
 
@@ -43,6 +42,9 @@ interface AIChatInputProps {
   onCommandSelect: (cmd: SlashCommand) => void;
 }
 
+const getModelOptionLabel = (model: AIModelOption) =>
+  `${model.name}${model.provider ? ` / ${model.provider}` : ""}`;
+
 const AIChatInputComponent = ({
   input,
   onInputChange,
@@ -63,6 +65,12 @@ const AIChatInputComponent = ({
     if (!provider || !runtimeStatus?.providers) return true;
     return runtimeStatus.providers[provider.toLowerCase()]?.hasApiKey ?? true;
   };
+  const selectedModelOption = availableModels.find((model) => model.modelId === selectedModel);
+  const selectedModelLabel = selectedModelOption
+    ? getModelOptionLabel(selectedModelOption)
+    : selectedModel && selectedModel !== AUTO_MODEL_VALUE
+      ? selectedModel
+      : "Auto Provider";
 
   return (
     <div className="border-t border-border/70 bg-muted/10 p-3 backdrop-blur-3xl md:p-4">
@@ -88,10 +96,15 @@ const AIChatInputComponent = ({
             <div className="flex min-w-0 items-center gap-2">
               <BrainCircuit className="h-3.5 w-3.5 text-primary/70" />
               <Select value={selectedModel || AUTO_MODEL_VALUE} onValueChange={(val) => val && onModelChange(val)}>
-                <SelectTrigger className="h-8 min-w-36 justify-between rounded-lg border-border/70 bg-muted/50 px-3 text-[10px] font-black uppercase tracking-widest shadow-none hover:bg-muted focus:ring-0">
-                  <SelectValue placeholder="Model" />
+                <SelectTrigger className="min-h-8 h-auto min-w-0 max-w-full justify-between whitespace-normal rounded-lg border-border/70 bg-muted/50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest shadow-none hover:bg-muted focus:ring-0 sm:max-w-96">
+                  <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-4">
+                    {selectedModelLabel}
+                  </span>
                 </SelectTrigger>
-                <SelectContent className="glass border-border/50">
+                <SelectContent
+                  alignItemWithTrigger={false}
+                  className="glass w-[min(32rem,calc(100vw-2rem))] border-border/50"
+                >
                   <SelectItem value={AUTO_MODEL_VALUE} disabled={!hasAnyKey} className="text-[10px] font-bold uppercase tracking-wider">
                     Auto Provider
                   </SelectItem>
@@ -102,7 +115,9 @@ const AIChatInputComponent = ({
                       disabled={!providerHasKey(m.provider)}
                       className="text-[10px] font-bold uppercase tracking-wider"
                     >
-                      {m.name}{m.provider ? ` / ${m.provider}` : ""}
+                      <span className="whitespace-normal break-words leading-4">
+                        {getModelOptionLabel(m)}
+                      </span>
                     </SelectItem>
                   ))}
                   {availableModels.length === 0 && (
