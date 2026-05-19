@@ -61,16 +61,19 @@ def test_index_database_schema_writes_generalized_sources_and_chunks(rag_session
     session = rag_session_factory()
     try:
         source = session.get(RagSource, "database_schema:db-1:public")
-        chunk = session.query(RagChunk).one()
+        chunks = session.query(RagChunk).order_by(RagChunk.ordinal.asc()).all()
     finally:
         session.close()
 
     assert result["sourceType"] == "database_schema"
-    assert result["chunkCount"] == 1
+    assert result["chunkCount"] == 2
     assert source.title == "public schema"
-    assert chunk.chunkType == "table"
-    assert chunk.metadataJson["citation"] == "database:db-1/schema:public/table:orders"
-    assert "customer_id INTEGER required foreign key to customers.id" in chunk.content
+    table_chunk = next(chunk for chunk in chunks if chunk.chunkType == "table")
+    graph_chunk = next(chunk for chunk in chunks if chunk.chunkType == "schema_graph")
+    assert table_chunk.metadataJson["citation"] == "database:db-1/schema:public/table:orders"
+    assert "customer_id INTEGER required foreign key to customers.id" in table_chunk.content
+    assert graph_chunk.metadataJson["citation"] == "database:db-1/schema:public/graph"
+    assert "orders.customer_id -> customers.id" in graph_chunk.content
 
 
 def test_rag_retrieve_uses_lexical_fallback_over_generalized_chunks(rag_session_factory, monkeypatch):

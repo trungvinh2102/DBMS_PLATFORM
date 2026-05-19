@@ -31,7 +31,8 @@ OUTPUT FORMAT:
 2. <thinking>Selected tables/chunks and relationships.</thinking>
 3. <thinking>Filters, grouping, ordering, limits, and assumptions.</thinking>
 4. <confidence>: one integer from 1 to 5.
-5. Exactly one SQL markdown block using ```sql, or ```javascript for MongoDB.
+5. If retrieved evidence is sufficient, output exactly one SQL markdown block using ```sql, or ```javascript for MongoDB.
+   If WARNINGS contains insufficient_evidence, do not output SQL; ask one concise clarification question and state the missing evidence.
 6. ### ANALYSIS: include assumptions, safety notes, and relevant citation ids.
 
 RULES:

@@ -14,6 +14,8 @@ from services.ai.retrieval.index_service import rag_index_service
 from services.ai.retrieval.metadata_source import SchemaMetadataSource
 from services.ai.retrieval.retrieval_service import rag_retrieval_service
 
+SQL_RETRIEVAL_INTENTS = {"text_to_sql", "sql_explain", "sql_repair", "sql_optimize"}
+
 
 @dataclass(frozen=True)
 class RagContextPackage:
@@ -48,6 +50,7 @@ class RagContextBuilder:
         trace["rewrittenQuery"] = understanding.retrieval_query
         trace["contextTokenBudget"] = self._max_context_tokens()
         trace["selectedCount"] = len(items)
+        trace["evidenceSufficiency"] = self._evaluate_evidence_sufficiency(understanding, items)
         warnings = self._warnings_for_trace(trace, items)
 
         return RagContextPackage(
@@ -166,9 +169,43 @@ class RagContextBuilder:
             warnings.append(trace["fallbackReason"])
         if not items:
             warnings.append("no_retrieved_evidence")
+        evidence = trace.get("evidenceSufficiency") or {}
+        if evidence and not evidence.get("isSufficient", True):
+            warnings.append("insufficient_evidence")
+            warnings.extend(evidence.get("reasons") or [])
         if any(contains_prompt_injection(str(item.get("content") or "")) for item in items):
             warnings.append("prompt_injection_evidence_detected")
         return warnings
+
+    def _evaluate_evidence_sufficiency(self, understanding: QueryUnderstanding, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Returns deterministic retrieval adequacy signals for prompt and diagnostics."""
+        present_source_types = sorted({str(item.get("sourceType") or "") for item in items if item.get("sourceType")})
+        highest_score = max((float(item.get("score") or 0) for item in items), default=0.0)
+        required_source_types = self._required_source_types(understanding)
+        reasons = []
+
+        if not items:
+            reasons.append("missing_retrieved_evidence")
+
+        missing_source_types = [source_type for source_type in required_source_types if source_type not in present_source_types]
+        for source_type in missing_source_types:
+            reasons.append(f"missing_required_source:{source_type}")
+
+        if items and highest_score <= 0:
+            reasons.append("retrieval_scores_unusable")
+
+        return {
+            "isSufficient": not reasons,
+            "reasons": reasons,
+            "highestScore": round(highest_score, 4),
+            "requiredSourceTypes": required_source_types,
+            "presentSourceTypes": present_source_types,
+        }
+
+    def _required_source_types(self, understanding: QueryUnderstanding) -> List[str]:
+        if understanding.intent in SQL_RETRIEVAL_INTENTS or understanding.intent == "schema_question":
+            return ["database_schema"]
+        return []
 
     def _top_k(self) -> int:
         return self._int_env("QURIODB_RAG_TABLE_BUDGET", 8, minimum=1, maximum=20)

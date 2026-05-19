@@ -95,6 +95,58 @@ def test_rag_context_warns_on_prompt_injection_evidence(monkeypatch):
     assert "Ignore previous instructions" in package.context
 
 
+def test_rag_context_marks_empty_retrieval_as_insufficient(monkeypatch):
+    builder = RagContextBuilder()
+    monkeypatch.setattr(builder.metadata, "get_db_type", lambda *_: "postgresql")
+    monkeypatch.setattr(
+        "services.ai.rag_context.rag_retrieval_service.retrieve",
+        lambda *_args, **_kwargs: {
+            "items": [],
+            "citations": [],
+            "retrievalTrace": {"retrievalMode": "empty"},
+        },
+    )
+    understanding = query_understanding_service.understand("show revenue by customer", database_id="db-1")
+
+    package = builder.build(understanding, user_id="user-1")
+
+    evidence = package.retrieval_trace["evidenceSufficiency"]
+    assert evidence["isSufficient"] is False
+    assert "missing_retrieved_evidence" in evidence["reasons"]
+    assert "missing_required_source:database_schema" in evidence["reasons"]
+    assert "insufficient_evidence" in package.warnings
+    assert "missing_required_source:database_schema" in package.context
+
+
+def test_rag_context_requires_schema_evidence_for_text_to_sql(monkeypatch):
+    builder = RagContextBuilder()
+    monkeypatch.setattr(builder.metadata, "get_db_type", lambda *_: "postgresql")
+    monkeypatch.setattr(
+        "services.ai.rag_context.rag_retrieval_service.retrieve",
+        lambda *_args, **_kwargs: {
+            "items": [{
+                "chunkId": "query-1",
+                "sourceType": "saved_query",
+                "title": "Revenue example",
+                "score": 0.9,
+                "content": "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id",
+                "citation": {"id": "saved-query:query-1", "title": "Revenue example"},
+            }],
+            "citations": [{"id": "saved-query:query-1", "title": "Revenue example"}],
+            "retrievalTrace": {"retrievalMode": "lexical_fallback"},
+        },
+    )
+    understanding = query_understanding_service.understand("generate SQL for revenue by customer", database_id="db-1")
+
+    package = builder.build(understanding, user_id="user-1")
+
+    evidence = package.retrieval_trace["evidenceSufficiency"]
+    assert evidence["isSufficient"] is False
+    assert evidence["presentSourceTypes"] == ["saved_query"]
+    assert "missing_required_source:database_schema" in evidence["reasons"]
+    assert "insufficient_evidence" in package.warnings
+
+
 def test_document_index_masks_obvious_secrets(rag_eval_session_factory, monkeypatch):
     index_service = RagIndexService()
     monkeypatch.setattr(index_service.embeddings, "is_available", lambda: False)
