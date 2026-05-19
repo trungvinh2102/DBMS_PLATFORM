@@ -15,6 +15,7 @@ import { ProviderConfig } from "./ai-settings/ProviderConfig";
 import { ModelLibrary } from "./ai-settings/ModelLibrary";
 import { AddModelDialog } from "./ai-settings/AddModelDialog";
 import { DeleteModelDialog } from "./ai-settings/DeleteModelDialog";
+import { RagIndexingCard } from "./ai-settings/RagIndexingCard";
 import { AIModel, NewAIModel } from "./ai-settings/types";
 
 /**
@@ -176,6 +177,8 @@ export function AISettings() {
               isAdding={addModelMutation.isPending}
             />
           </ModelLibrary>
+
+          <RagIndexingCard />
 
           <DeleteModelDialog 
             isOpen={isDeleteDialogOpen}

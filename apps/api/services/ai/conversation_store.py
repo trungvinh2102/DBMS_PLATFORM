@@ -185,6 +185,9 @@ class AIConversationStore:
             "sql": payload.get("sql") or "",
             "analysis": payload.get("analysis") or "",
             "confidence": payload.get("confidence"),
+            "citations": payload.get("citations") or [],
+            "retrievalTrace": payload.get("retrievalTrace"),
+            "warnings": payload.get("warnings") or [],
             "events": payload.get("events") or [],
         }
 

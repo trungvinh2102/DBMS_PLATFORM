@@ -94,8 +94,8 @@ def test_schema_context_includes_retrieval_notes_and_fk_neighbors(monkeypatch):
 
     context = service.format_schema_context("db-1", "public", intent="orders by customer")
 
-    assert "RETRIEVAL NOTES:" in context
-    assert "- orders: score=0.0200" in context
+    assert "RETRIEVED EVIDENCE" in context
+    assert "[database:db-1/schema:public/table:orders] orders: score=0.0200" in context
     assert 'CREATE TABLE "orders"' in context
     assert 'CREATE TABLE "customers"' in context
     assert "FOREIGN KEY (customer_id) REFERENCES customers(id)" in context
@@ -135,8 +135,11 @@ def test_build_schema_context_returns_safe_retrieval_trace(monkeypatch):
 
     assert "SCHEMA STRUCTURE:" in result.context
     assert result.retrieval_trace["intent"] == "order totals"
+    assert result.retrieval_trace["retrievalMode"] == "hybrid"
     assert result.retrieval_trace["tables"][0]["name"] == "orders"
     assert result.retrieval_trace["tables"][0]["reasons"] == ["matched table orders", "matched column total"]
+    assert result.citations[0]["id"] == "database:db-1/schema:public/table:orders"
+    assert result.citations[0]["title"] == "public.orders"
 
 
 def test_table_search_text_includes_foreign_keys_and_indexes():
@@ -218,31 +221,36 @@ def test_stream_response_skips_schema_retrieval_for_general_chat(monkeypatch):
 
     events = list(service.stream_generate_response("mày là ai", db_id="db-1", schema="public", history=[]))
 
-    assert called["model"] is True
+    assert called["model"] is False
     assert ("thinking", "Phân tích lược đồ...") not in events
     assert "QurioDB copilot" in "".join(chunk for event, chunk in events if event == "message")
 
 
-def test_stream_response_uses_schema_retrieval_for_database_chat(monkeypatch):
-    """Data questions should still use schema retrieval."""
+def test_stream_response_uses_rag_context_for_database_chat(monkeypatch):
+    """Data questions should use the production RAG context builder."""
     service = AIService()
-    called = {"schema": False}
+    called = {"rag": False}
 
-    def build_schema_context(*_args, **_kwargs):
-        called["schema"] = True
+    def build_rag_context(*_args, **_kwargs):
+        called["rag"] = True
         return type(
             "ContextResult",
             (),
-            {"context": "DATABASE DIALECT: POSTGRES", "retrieval_trace": {"tables": []}},
+            {
+                "context": "DATABASE DIALECT: POSTGRES",
+                "retrieval_trace": {"items": []},
+                "citations": [],
+                "warnings": [],
+            },
         )()
 
-    monkeypatch.setattr("services.ai_service.schema_context_service.build_schema_context", build_schema_context)
+    monkeypatch.setattr("services.ai_service.rag_context_builder.build", build_rag_context)
     monkeypatch.setattr("services.ai_service.feedback_context_service.get_feedback_context", lambda *_: "")
     monkeypatch.setattr("services.ai_service.langchain_runtime.stream_text", lambda **_: iter(["done"]))
 
     list(service.stream_generate_response("Những người dùng nào dùng từ ngữ nhạy cảm", db_id="db-1", schema="public", history=[]))
 
-    assert called["schema"] is True
+    assert called["rag"] is True
 
 
 def test_rewrite_retrieval_intent_uses_previous_sql_for_followups():

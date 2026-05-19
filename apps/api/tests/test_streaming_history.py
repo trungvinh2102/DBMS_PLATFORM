@@ -84,6 +84,28 @@ def test_build_history_preserves_stream_order_and_unknown_events():
     assert payload["events"][3]["content"] == "Actual reasoning"
 
 
+def test_build_history_preserves_rag_metadata_fields():
+    parts = new_response_parts()
+    citations = [{
+        "id": "database:db-1/schema:public/table:orders",
+        "sourceType": "database_schema",
+        "title": "public.orders",
+    }]
+    trace = {"intent": "show orders", "retrievalMode": "lexical_fallback", "selectedCount": 1}
+
+    append_stream_part(parts, "retrieval_trace", trace)
+    append_stream_part(parts, "citations", citations)
+    append_stream_part(parts, "warnings", ["embedding_provider_unavailable"])
+    append_stream_part(parts, "message", "Here is the query.")
+
+    payload = parse_assistant_history_content(build_assistant_history_content(parts))
+
+    assert payload["retrievalTrace"] == trace
+    assert payload["citations"] == citations
+    assert payload["warnings"] == ["embedding_provider_unavailable"]
+    assert [event["type"] for event in payload["events"]] == ["retrieval_trace", "citations", "warnings", "message"]
+
+
 def test_clean_history_removes_internal_tool_call_blocks():
     content = clean_assistant_history_content(
         '<tool_call>{"name": "SchemaContextLoader", "args": {}}</tool_call>\n\n'
@@ -133,6 +155,9 @@ def test_conversation_message_dict_returns_structured_assistant_fields():
     assert result["sql"] == "SELECT 1;"
     assert result["analysis"] == "Reads a constant."
     assert result["confidence"] == 5
+    assert result["citations"] == []
+    assert result["retrievalTrace"] is None
+    assert result["warnings"] == []
     assert result["created_on"] == "2026-05-18T00:00:00Z"
     assert [event["type"] for event in result["events"]] == ["message", "thinking", "confidence", "sql", "analysis"]
 

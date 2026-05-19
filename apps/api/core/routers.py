@@ -14,6 +14,7 @@ from routes.dashboard_routes import dashboard_bp
 from routes.execution_routes import execution_bp
 from routes.import_routes import import_bp
 from routes.metadata_routes import metadata_bp
+from routes.rag import router as rag_router
 from routes.user import user_bp
 
 
@@ -26,5 +27,6 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(user_bp, prefix="/api/user")
     app.include_router(ai_bp, prefix="/api/ai")
     app.include_router(ai_config_bp, prefix="/api/ai-config")
+    app.include_router(rag_router, prefix="/api/rag")
     app.include_router(dashboard_bp, prefix="/api/database/dashboard")
     app.include_router(import_bp, prefix="/api/database")

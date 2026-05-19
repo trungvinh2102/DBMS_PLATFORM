@@ -221,6 +221,24 @@ export const aiApi = {
   getConversationMessages: (id: string) => req(api.get(`ai/conversations/${id}`)),
   updateConversation: (id: string, data: any) => req(api.put(`ai/conversations/${id}`, data)),
   deleteConversation: (id: string) => req(api.delete(`ai/conversations/${id}`)),
+  getRagStatus: () => req(api.get("rag/status")),
+  getRagSources: (params?: { databaseId?: string; sourceType?: string }) => req(api.get("rag/sources", { params })),
+  getRagSource: (id: string) => req(api.get(`rag/sources/${id}`)),
+  deleteRagSource: (id: string) => req(api.delete(`rag/sources/${id}`)),
+  indexRagDatabase: (databaseId: string, schema: string = "public") =>
+    req(api.post(`rag/index/database/${databaseId}`, null, { params: { schema } })),
+  indexRagSavedQueries: (databaseId: string) => req(api.post("rag/index/saved-queries", { databaseId })),
+  indexRagQueryHistory: (data: { databaseId: string; includeFailed?: boolean; limit?: number }) =>
+    req(api.post("rag/index/query-history", data)),
+  indexRagSource: (data: {
+    title: string;
+    content: string;
+    sourceType?: string;
+    databaseId?: string;
+    uri?: string;
+    sourceId?: string;
+    accessScope?: string;
+  }) => req(api.post("rag/index/source", data)),
   streamChat: async (data: any, onChunk: (chunk: string, event?: string) => void, onHeaders?: (headers: Headers) => void) => {
     const token = useAuth.getState().token;
     const headers: Record<string, string> = {

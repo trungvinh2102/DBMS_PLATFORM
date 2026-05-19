@@ -13,6 +13,9 @@ from .ai.agent import AgentAIService
 from .ai.context import schema_context_service
 from .ai.feedback_context import feedback_context_service
 from .ai.langchain_runtime import langchain_runtime
+from .ai.prompt_contracts import build_rag_prompt
+from .ai.query_understanding import query_understanding_service
+from .ai.rag_context import rag_context_builder
 from .ai.stream_parser import TaggedResponseStreamParser
 
 logger = logging.getLogger(__name__)
@@ -98,7 +101,8 @@ class AIService(SqlAIService, AgentAIService):
     def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None, conv_id: Optional[str] = None):
         """Streams responses for chat interfaces using SSE events."""
         history = history or []
-        is_database_request = self._is_database_assistant_request(prompt, history)
+        understanding = query_understanding_service.understand(prompt, history, db_id, schema)
+        is_database_request = understanding.needs_retrieval
         quick_response = self._quick_general_response(prompt) if not is_database_request else ""
         if quick_response:
             yield "message", quick_response
@@ -111,10 +115,13 @@ class AIService(SqlAIService, AgentAIService):
         if db_id and is_database_request:
             yield "thinking", "Phân tích lược đồ..."
             
-            retrieval_intent = self._rewrite_retrieval_intent(prompt, history)
-
-            context_result = schema_context_service.build_schema_context(db_id, schema, intent=retrieval_intent)
-            context = context_result.context
+            context_result = rag_context_builder.build(understanding, user_id=user_id)
+            if context_result.retrieval_trace:
+                yield "retrieval_trace", context_result.retrieval_trace
+            if context_result.citations:
+                yield "citations", context_result.citations
+            if context_result.warnings:
+                yield "warnings", context_result.warnings
 
             # Fetch feedback context if user_id is available
             feedback = ""
@@ -122,8 +129,7 @@ class AIService(SqlAIService, AgentAIService):
                 yield "thinking", "Học hỏi từ phản hồi của các bạn..."
                 feedback = feedback_context_service.get_feedback_context(db_id, user_id)
 
-            from .prompts import get_sql_generation_prompt
-            system_prompt = get_sql_generation_prompt(context, feedback_context=feedback)
+            system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
             yield "thinking", "Sẵn sàng."
         elif db_id:
             from .prompts import get_general_chat_prompt

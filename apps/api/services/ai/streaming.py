@@ -14,6 +14,9 @@ STREAM_RESPONSE_PARTS = {
     "message": [],
     "sql": [],
     "analysis": [],
+    "citations": [],
+    "retrieval_trace": [],
+    "warnings": [],
 }
 
 STATUS_THINKING_EVENTS = {
@@ -44,12 +47,12 @@ def encode_sse_event(event: str, chunk) -> str:
     return f"event: {event}\ndata: {json.dumps(chunk)}\n\n"
 
 
-def append_stream_part(parts: Dict[str, List[str]], event: str, chunk: str) -> None:
+def append_stream_part(parts: Dict[str, List[Any]], event: str, chunk: Any) -> None:
     """Stores every emitted stream event for chat history persistence."""
     event_name = str(event or "message")
-    text = str(chunk)
-    parts.setdefault(event_name, []).append(text)
-    parts.setdefault("_events", []).append((event_name, text))
+    content = chunk
+    parts.setdefault(event_name, []).append(content)
+    parts.setdefault("_events", []).append((event_name, content))
 
 
 def build_assistant_history_content(parts: Dict[str, List[str]]) -> str:
@@ -69,6 +72,9 @@ def build_assistant_history_payload(parts: Dict[str, List[str]]) -> Dict[str, An
         "sql": "",
         "analysis": "",
         "confidence": None,
+        "citations": [],
+        "retrievalTrace": None,
+        "warnings": [],
         "events": [],
     }
 
@@ -85,15 +91,25 @@ def build_assistant_history_payload(parts: Dict[str, List[str]]) -> Dict[str, An
             payload["analysis"] = _concat_text(payload["analysis"], content)
         elif event == "confidence":
             payload["confidence"] = _parse_confidence(content)
+        elif event == "citations":
+            payload["citations"] = _parse_jsonish(content, [])
+        elif event == "retrieval_trace":
+            payload["retrievalTrace"] = _parse_jsonish(content, None)
+        elif event == "warnings":
+            payload["warnings"] = _parse_jsonish(content, [])
         payload["events"].append({"type": event, "content": content})
 
     return payload
 
 
-def _semantic_events(events: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
-    semantic_events: List[Tuple[str, str]] = []
+def _semantic_events(events: List[Tuple[str, Any]]) -> List[Tuple[str, Any]]:
+    semantic_events: List[Tuple[str, Any]] = []
     for event, chunk in events:
         event_name = str(event or "message")
+        if event_name in {"citations", "retrieval_trace", "warnings"}:
+            semantic_events.append((event_name, chunk))
+            continue
+
         raw_text = str(chunk)
         text = raw_text.strip()
         if not text:
@@ -144,6 +160,9 @@ def parse_assistant_history_content(content: str) -> Dict[str, Any]:
         "sql": "",
         "analysis": "",
         "confidence": None,
+        "citations": [],
+        "retrievalTrace": None,
+        "warnings": [],
         "events": [],
     }
     if not cleaned:
@@ -224,6 +243,16 @@ def _parse_confidence(content: str):
         return int(str(content).strip())
     except ValueError:
         return content
+
+
+def _parse_jsonish(content: Any, fallback: Any) -> Any:
+    """Parses structured stream metadata while accepting already-decoded values."""
+    if isinstance(content, (dict, list)):
+        return content
+    try:
+        return json.loads(str(content))
+    except (TypeError, json.JSONDecodeError):
+        return fallback
 
 
 def _events_from_legacy_parts(parts: Dict[str, List[str]]) -> List[Tuple[str, str]]:

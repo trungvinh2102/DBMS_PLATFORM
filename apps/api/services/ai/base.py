@@ -8,9 +8,10 @@ import re
 import uuid
 import logging
 import datetime
+import hashlib
 from typing import Dict, Any, Optional
 
-from models import AIChatMessage, AIConversation, AIGeneratedQuery, SessionLocal, UserAIConfig
+from models import AIChatMessage, AIConversation, AIGeneratedQuery, RagRetrievalEvent, SessionLocal, UserAIConfig
 from ..conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
 from .langchain_runtime import get_ai_api_key, langchain_runtime
@@ -104,6 +105,41 @@ class BaseAIService:
             session.commit()
         except Exception as e:
             logger.error(f"Failed to save AI generated query: {e}")
+            session.rollback()
+        finally:
+            if session:
+                session.close()
+
+    def _save_retrieval_event(
+        self,
+        trace: Optional[Dict[str, Any]],
+        query_text: str,
+        db_id: Optional[str] = None,
+        message_id: Optional[str] = None,
+        conv_id: Optional[str] = None,
+        latency_ms: int = 0,
+    ) -> None:
+        """Persists safe RAG telemetry without storing full user text."""
+        if not trace:
+            return
+
+        session = SessionLocal()
+        try:
+            session.add(RagRetrievalEvent(
+                id=str(uuid.uuid4()),
+                conversationId=conv_id,
+                messageId=message_id,
+                databaseId=db_id or trace.get("databaseId"),
+                queryTextHash=hashlib.sha256(str(query_text or "").encode("utf-8")).hexdigest(),
+                retrievalMode=trace.get("retrievalMode") or "unknown",
+                candidateCount=int(trace.get("candidateBudget") or 0),
+                selectedCount=int(trace.get("selectedCount") or len(trace.get("tables") or [])),
+                latencyMs=latency_ms,
+                trace=trace,
+            ))
+            session.commit()
+        except Exception as e:
+            logger.warning("Failed to save RAG retrieval event: %s", e)
             session.rollback()
         finally:
             if session:

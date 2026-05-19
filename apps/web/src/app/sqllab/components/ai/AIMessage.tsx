@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Check, Clipboard, FileSearch, MessageSquare, User, BrainCircuit } from "lucide-react";
+import { Check, Clipboard, Database, FileSearch, MessageSquare, User, BrainCircuit } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
@@ -254,6 +254,32 @@ const AIMessageComponent = ({
                   isDark={isDark}
                   role="assistant"
                 />
+              </div>
+            )}
+
+            {message.citations && message.citations.length > 0 && (
+              <div className={cn(
+                "rounded-lg border p-3 text-[12px] leading-5 shadow-sm",
+                isDark ? "bg-card/70 border-white/10" : "bg-white border-slate-200"
+              )}>
+                <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <Database className="h-3.5 w-3.5" /> Sources
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {message.citations.slice(0, 8).map((citation) => (
+                    <span
+                      key={citation.id}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground"
+                      title={citation.reasons?.join(", ") || citation.id}
+                    >
+                      <Database className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{citation.title}</span>
+                      {citation.score !== undefined && (
+                        <span className="text-[10px] tabular-nums text-muted-foreground/80">{citation.score.toFixed(3)}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -126,9 +126,28 @@ def _persist_stream_snapshot(parts: dict, message_id: str | None, user_id: str, 
         if conversation:
             conversation.changed_on = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
         session.commit()
+        _persist_retrieval_event_once(parts, message_id, database_id, conversation_id)
         return message_id
     except Exception:
         session.rollback()
         return message_id
     finally:
         session.close()
+
+
+def _persist_retrieval_event_once(parts: dict, message_id: str | None, database_id: str, conversation_id: str) -> None:
+    if not message_id or parts.get("_retrieval_event_saved"):
+        return
+    traces = parts.get("retrieval_trace") or []
+    if not traces:
+        return
+
+    trace = traces[-1]
+    ai_service._save_retrieval_event(
+        trace if isinstance(trace, dict) else None,
+        str(trace.get("intent", "")) if isinstance(trace, dict) else "",
+        database_id,
+        message_id=message_id,
+        conv_id=conversation_id,
+    )
+    parts["_retrieval_event_saved"] = True

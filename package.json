@@ -30,7 +30,8 @@
     "db:down": "docker compose down",
 
     "dev:backend": "cd apps/api && venv/Scripts/python app.py",
-    "start:backend": "cd apps/api && venv/Scripts/python -m gunicorn app:app"
+    "start:backend": "cd apps/api && venv/Scripts/python -m gunicorn app:app",
+    "test:rag": "cd apps/api && python -m pytest tests/ai_evaluation/test_rag_quality_gate.py tests/test_rag_phase3.py tests/test_rag_index.py tests/test_schema_retriever.py tests/test_streaming_history.py tests/test_ai_stream_conversation.py tests/test_langchain_runtime.py"
   },
 
   "devDependencies": {

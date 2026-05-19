@@ -11,6 +11,17 @@ export interface AIStep {
   status?: "active" | "complete";
 }
 
+export interface AICitation {
+  id: string;
+  sourceType: string;
+  title: string;
+  objectName?: string;
+  schemaName?: string;
+  score?: number;
+  matchedTerms?: string[];
+  reasons?: string[];
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -24,6 +35,9 @@ export interface Message {
   data?: any[];
   isActionable?: boolean;
   suggestions?: string[];
+  citations?: AICitation[];
+  retrievalTrace?: Record<string, any>;
+  warnings?: string[];
   steps?: AIStep[];
   isStreaming?: boolean;
 }

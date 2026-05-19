@@ -27,6 +27,7 @@ class AgentGraphState(TypedDict, total=False):
     conv_id: Optional[str]
     system_prompt: str
     retrieval_trace: Dict[str, Any]
+    citations: list[Dict[str, Any]]
     current_prompt: str
     raw_response: str
     agent_res: Dict[str, Any]
@@ -88,11 +89,14 @@ class AgentAIService(BaseAIService):
         agent_res = state.get("agent_res") or {}
         if state.get("retrieval_trace"):
             agent_res["retrievalTrace"] = state["retrieval_trace"]
+        if state.get("citations"):
+            agent_res["citations"] = state["citations"]
         if not agent_res.get("sql"):
             return self._finalize_meta_tool(agent_res, prompt, user_id, db_id, conv_id)
 
         self._save_chat("user", prompt, user_id, db_id, conv_id=conv_id)
         aid = self._save_chat("assistant", json.dumps(agent_res), user_id, db_id, conv_id=conv_id)
+        self._save_retrieval_event(state.get("retrieval_trace"), prompt, db_id, message_id=aid, conv_id=conv_id)
         self._save_generated_query(agent_res.get("sql"), prompt, agent_res.get("summary"), user_id, db_id)
         agent_res["messageId"] = aid
         return agent_res
@@ -108,6 +112,7 @@ class AgentAIService(BaseAIService):
             **state,
             "system_prompt": system_prompt,
             "retrieval_trace": context_result.retrieval_trace,
+            "citations": context_result.citations,
             "current_prompt": f"Natural Request: {state['prompt']}",
         }
 
@@ -204,6 +209,7 @@ class AgentAIService(BaseAIService):
                 sql = agent_res.get("sql")
                 if not sql:
                     agent_res["retrievalTrace"] = context_result.retrieval_trace
+                    agent_res["citations"] = context_result.citations
                     return self._finalize_meta_tool(agent_res, prompt, user_id, db_id, conv_id)
                 
                 # Try execution
@@ -213,10 +219,12 @@ class AgentAIService(BaseAIService):
                     
                     self._save_chat("user", prompt, user_id, db_id, conv_id=conv_id)
                     aid = self._save_chat("assistant", json.dumps(agent_res), user_id, db_id, conv_id=conv_id)
+                    self._save_retrieval_event(context_result.retrieval_trace, prompt, db_id, message_id=aid, conv_id=conv_id)
                     self._save_generated_query(sql, prompt, agent_res.get("summary"), user_id, db_id)
                     
                     agent_res["messageId"] = aid
                     agent_res["retrievalTrace"] = context_result.retrieval_trace
+                    agent_res["citations"] = context_result.citations
                     return agent_res
                     
                 except Exception as e:
@@ -249,6 +257,7 @@ class AgentAIService(BaseAIService):
         agent_res["type"] = "success"
         self._save_chat("user", prompt, user_id, db_id, conv_id=conv_id)
         cid = self._save_chat("assistant", json.dumps(agent_res), user_id, db_id, conv_id=conv_id)
+        self._save_retrieval_event(agent_res.get("retrievalTrace"), prompt, db_id, message_id=cid, conv_id=conv_id)
         agent_res["messageId"] = cid
         
         if agent_res.get("confidence", 5) <= 2:

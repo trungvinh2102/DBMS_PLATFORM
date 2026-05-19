@@ -14,6 +14,10 @@ from .database import DATABASE_URL, SessionLocal, engine
 from .db import Db
 from .enums import Environment, SSLMode
 from .query_history import QueryHistory
+from .rag_chunk import RagChunk
+from .rag_embedding import RagEmbedding
+from .rag_retrieval_event import RagRetrievalEvent
+from .rag_source import RagSource
 from .role import Role
 from .saved_query import SavedQuery
 from .schema_embedding import SchemaEmbedding
@@ -32,6 +36,10 @@ __all__ = [
     "Db",
     "Environment",
     "QueryHistory",
+    "RagChunk",
+    "RagEmbedding",
+    "RagRetrievalEvent",
+    "RagSource",
     "Role",
     "SSLMode",
     "SavedQuery",

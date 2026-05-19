@@ -4,6 +4,6 @@ __init__.py
 Retrieval helpers for QurioDB AI schema RAG.
 """
 
-from .types import TableRetrievalResult
+from .types import RagRetrievalResult, TableRetrievalResult
 
-__all__ = ["TableRetrievalResult"]
+__all__ = ["RagRetrievalResult", "TableRetrievalResult"]

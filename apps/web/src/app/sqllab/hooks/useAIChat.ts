@@ -158,6 +158,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         columns: message.columns,
         data: message.data,
         suggestions: message.suggestions,
+        citations: message.citations,
+        retrievalTrace: message.retrievalTrace,
+        warnings: message.warnings,
         steps,
       };
     }
@@ -182,6 +185,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           columns: data.columns,
           data: data.data,
           suggestions: data.suggestions,
+          citations: data.citations,
+          retrievalTrace: data.retrievalTrace,
+          warnings: data.warnings,
           steps: Array.isArray(data.events) ? toThinkingSteps(data.events) : undefined,
         };
       } catch (e) {
@@ -381,6 +387,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let sqlContent = "";
     let analysisContent = "";
     let confidenceScore: number | undefined;
+    let citations: Message["citations"] = [];
+    let retrievalTrace: Message["retrievalTrace"];
+    let warnings: string[] = [];
     let streamSteps: AIStep[] = [];
     let lastStreamEvent = "";
     try {
@@ -439,6 +448,18 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             analysisContent += String(chunk || "");
             streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
             lastStreamEvent = "analysis";
+          } else if (event === "citations") {
+            citations = Array.isArray(chunk) ? chunk : [];
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = "citations";
+          } else if (event === "retrieval_trace") {
+            retrievalTrace = chunk && typeof chunk === "object" ? chunk as Record<string, any> : undefined;
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = "retrieval_trace";
+          } else if (event === "warnings") {
+            warnings = Array.isArray(chunk) ? chunk.map(String) : [];
+            streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
+            lastStreamEvent = "warnings";
           } else if (event !== "error") {
             responseContent += String(chunk || "");
             streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
@@ -465,6 +486,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
               sql: parsed.sql || sqlContent.trim(),
               analysis: parsed.analysis || analysisContent.trim(),
               confidence: parsed.confidence ?? confidenceScore,
+              citations,
+              retrievalTrace,
+              warnings,
               thought: streamSteps.filter((step) => step.type === "thinking").map((step) => step.content).join("\n\n"),
               steps: streamSteps,
               isStreaming: true,

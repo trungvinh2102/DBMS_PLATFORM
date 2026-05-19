@@ -69,6 +69,12 @@ class SchemaRetriever:
                 session.add(embedding_entry)
             
             session.commit()
+            try:
+                from .ai.retrieval.index_service import rag_index_service
+
+                rag_index_service.index_database_schema(database_id, schema)
+            except Exception as rag_exc:
+                logger.warning("Generalized RAG schema indexing failed for %s: %s", database_id, rag_exc)
             logger.info(f"Indexed {len(table_columns)} tables for database {database_id}")
             return True
         except Exception as e:
