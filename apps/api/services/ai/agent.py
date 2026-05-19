@@ -122,6 +122,8 @@ class AgentAIService(BaseAIService):
             f"{state['system_prompt']}\n\n{state['current_prompt']}",
             model_id=state.get("model_id"),
             user_id=state.get("user_id"),
+            task_key="agent.sql_readonly",
+            db_id=state.get("db_id"),
         )
         if not response or response.startswith("AI Error:"):
             return {**state, "error": response or "AI Failed"}
@@ -210,7 +212,13 @@ class AgentAIService(BaseAIService):
         max_retries = 2
         
         while retries <= max_retries:
-            response = self._generate_response(f"{system_prompt}\n\n{current_prompt}", model_id=model_id, user_id=user_id)
+            response = self._generate_response(
+                f"{system_prompt}\n\n{current_prompt}",
+                model_id=model_id,
+                user_id=user_id,
+                task_key="agent.sql_readonly",
+                db_id=db_id,
+            )
             if not response or response.startswith("AI Error:"):
                 return {"type": "error", "message": response or "AI Failed"}
             

@@ -11,6 +11,7 @@ __all__ = [
     "ai_generation",
     "ai_models",
     "ai_stream",
+    "ai_task_assignments",
     "auth",
     "connection_routes",
     "dashboard_routes",

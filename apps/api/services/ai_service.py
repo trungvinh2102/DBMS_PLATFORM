@@ -17,6 +17,7 @@ from .ai.prompt_contracts import build_rag_prompt
 from .ai.query_understanding import query_understanding_service
 from .ai.rag_context import rag_context_builder
 from .ai.stream_parser import TaggedResponseStreamParser
+from .ai.task_model_router import task_model_router
 from .prompts import VIETNAMESE_RESPONSE_POLICY
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ class AIService(SqlAIService, AgentAIService):
         )
         
         prompt = f"PREFIX:\n{prefix}\n\nSUFFIX:\n{suffix}\n\nCOMPLETION:"
+        model_id = task_model_router.resolve_model_id("sql.autocomplete", user_id, model_id, db_id)
         provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         try:
             completion = langchain_runtime.invoke_text(
@@ -99,7 +101,17 @@ class AIService(SqlAIService, AgentAIService):
         return completion
 
     # --- Streaming Logic ---
-    def stream_generate_response(self, prompt: str, db_id: Optional[str] = None, schema: str = "public", model_id: Optional[str] = None, user_id: Optional[str] = None, history: Optional[list] = None, conv_id: Optional[str] = None):
+    def stream_generate_response(
+        self,
+        prompt: str,
+        db_id: Optional[str] = None,
+        schema: str = "public",
+        model_id: Optional[str] = None,
+        task_key: Optional[str] = None,
+        user_id: Optional[str] = None,
+        history: Optional[list] = None,
+        conv_id: Optional[str] = None,
+    ):
         """Streams responses for chat interfaces using SSE events."""
         history = history or []
         understanding = query_understanding_service.understand(prompt, history, db_id, schema)
@@ -147,6 +159,8 @@ class AIService(SqlAIService, AgentAIService):
             if conv_id and not langchain_history:
                 langchain_history = self._load_langchain_history(conv_id)
 
+            resolved_task_key = task_key or ("chat.database" if is_database_request else "chat.general")
+            model_id = task_model_router.resolve_model_id(resolved_task_key, user_id, model_id, db_id)
             provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             parser = TaggedResponseStreamParser()
             for chunk in langchain_runtime.stream_text(

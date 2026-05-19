@@ -176,6 +176,10 @@ export const stripInternalToolEnvelopes = (text: string) => {
   return cleaned.trim();
 };
 
+interface SendAIMessageOptions {
+  taskKey?: string;
+}
+
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -427,7 +431,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     setMessages([]);
   }, [databaseId]);
 
-  const handleSend = useCallback(async (input: string) => {
+  const handleSend = useCallback(async (input: string, options?: SendAIMessageOptions) => {
     if (!input.trim() || isTyping || !databaseId) {
       if (!databaseId) toast.error("Connect a database first.");
       return;
@@ -553,6 +557,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           databaseId,
           schema: schema || "public",
           modelId: selectedModel || undefined,
+          taskKey: options?.taskKey,
           conversationId: conversationId || undefined,
         },
         (chunk, event) => {

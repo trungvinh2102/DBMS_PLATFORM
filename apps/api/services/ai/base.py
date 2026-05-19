@@ -15,6 +15,7 @@ from models import AIChatMessage, AIConversation, AIGeneratedQuery, RagRetrieval
 from ..conversation_context import ConversationContextManager
 from routes.ai_config import decrypt_key
 from .langchain_runtime import get_ai_api_key, langchain_runtime
+from .task_model_router import task_model_router
 from ..prompts import VIETNAMESE_RESPONSE_POLICY
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,16 @@ class BaseAIService:
         self.model_name = model_name
         self._context_mgr = ConversationContextManager()
 
-    def _generate_response(self, combined_prompt: str, model_id: Optional[str] = None, user_id: Optional[str] = None) -> str:
+    def _generate_response(
+        self,
+        combined_prompt: str,
+        model_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        task_key: Optional[str] = None,
+        db_id: Optional[str] = None,
+    ) -> str:
         """Internal helper to communicate with every supported provider through LangChain."""
+        model_id = task_model_router.resolve_model_id(task_key, user_id, model_id, db_id)
         provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         try:
             return langchain_runtime.invoke_text(

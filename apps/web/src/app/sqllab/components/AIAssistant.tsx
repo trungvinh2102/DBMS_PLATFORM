@@ -319,7 +319,7 @@ export function AIAssistant({
       `Columns: ${JSON.stringify(lab.columns || [])}`,
       `Sample rows: ${JSON.stringify(rows)}`,
     ].join("\n"));
-    void _handleSend(prompt);
+    void _handleSend(prompt, { taskKey: "results.analyze" });
   }, [_handleSend, editorSql, lab.columns, lab.results]);
 
   const handleSuggestionClick = useCallback((suggestion: string) => _handleSend(suggestion), [_handleSend]);

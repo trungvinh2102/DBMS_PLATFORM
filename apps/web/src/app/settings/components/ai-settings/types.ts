@@ -11,6 +11,7 @@ export interface AIModel {
   description: string;
   isActive: boolean;
   isDefault: boolean;
+  capabilities?: Record<string, boolean | string | number | null>;
 }
 
 export interface NewAIModel {
@@ -23,4 +24,23 @@ export interface NewAIModel {
 export interface AIConfig {
   apiKey: string;
   provider: string;
+}
+
+export interface AITaskCatalogItem {
+  key: string;
+  name: string;
+  description: string;
+  requiredCapabilities: string[];
+  recommendedCapabilities: string[];
+}
+
+export interface AITaskAssignment {
+  id?: string;
+  taskKey: string;
+  modelId?: string | null;
+  fallbackModelId?: string | null;
+  databaseId?: string | null;
+  temperature?: number | null;
+  maxTokens?: number | null;
+  enabled: boolean;
 }

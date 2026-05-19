@@ -67,6 +67,7 @@ def _stream_response(data: StreamChatRequest, user_id: str, last_message: str, c
             db_id=data.databaseId,
             schema=data.schema_name,
             model_id=data.modelId,
+            task_key=data.taskKey,
             user_id=user_id,
             history=history,
             conv_id=conversation_id,

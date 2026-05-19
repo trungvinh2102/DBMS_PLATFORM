@@ -9,6 +9,7 @@ from .ai_conversation import AIConversation
 from .ai_feedback import AIFeedback
 from .ai_generated_query import AIGeneratedQuery
 from .ai_model import AIModel
+from .ai_task_assignment import AITaskAssignment
 from .base import Base
 from .database import DATABASE_URL, SessionLocal, engine
 from .db import Db
@@ -31,6 +32,7 @@ __all__ = [
     "AIFeedback",
     "AIGeneratedQuery",
     "AIModel",
+    "AITaskAssignment",
     "Base",
     "DATABASE_URL",
     "Db",

@@ -74,6 +74,7 @@ class StreamChatRequest(BaseModel):
     schema_name: Optional[str] = None
     conversationId: Optional[str] = None
     modelId: Optional[str] = None
+    taskKey: Optional[str] = None
 
 
 class UpdateConversationRequest(BaseModel):
@@ -86,3 +87,17 @@ class SubmitFeedbackRequest(BaseModel):
     rating: int
     correction: Optional[str] = ""
     conversationId: Optional[str] = None
+
+
+class AITaskAssignmentRequest(BaseModel):
+    taskKey: str
+    modelId: Optional[str] = None
+    fallbackModelId: Optional[str] = None
+    databaseId: Optional[str] = None
+    temperature: Optional[float] = None
+    maxTokens: Optional[int] = None
+    enabled: bool = True
+
+
+class SaveAITaskAssignmentsRequest(BaseModel):
+    assignments: List[AITaskAssignmentRequest]

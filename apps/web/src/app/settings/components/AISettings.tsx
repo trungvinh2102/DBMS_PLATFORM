@@ -16,7 +16,8 @@ import { ModelLibrary } from "./ai-settings/ModelLibrary";
 import { AddModelDialog } from "./ai-settings/AddModelDialog";
 import { DeleteModelDialog } from "./ai-settings/DeleteModelDialog";
 import { RagIndexingCard } from "./ai-settings/RagIndexingCard";
-import { AIModel, NewAIModel } from "./ai-settings/types";
+import { TaskRoutingCard } from "./ai-settings/TaskRoutingCard";
+import { AIModel, AITaskAssignment, AITaskCatalogItem, NewAIModel } from "./ai-settings/types";
 
 /**
  * Main AI Settings component.
@@ -46,6 +47,21 @@ export function AISettings() {
   const modelsQuery = useQuery({
     queryKey: ["ai-models"],
     queryFn: () => aiApi.getModels(),
+  });
+
+  const statusQuery = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: () => aiApi.getAIStatus(),
+  });
+
+  const taskCatalogQuery = useQuery({
+    queryKey: ["ai-task-catalog"],
+    queryFn: () => aiApi.getTaskCatalog(),
+  });
+
+  const taskAssignmentsQuery = useQuery({
+    queryKey: ["ai-task-assignments"],
+    queryFn: () => aiApi.getTaskAssignments(),
   });
 
   // Synchronize local state with fetched config
@@ -113,6 +129,15 @@ export function AISettings() {
     onError: (err: any) => toast.error(`De-registration failed: ${err.message}`),
   });
 
+  const saveTaskAssignmentsMutation = useMutation({
+    mutationFn: (assignments: AITaskAssignment[]) => aiApi.saveTaskAssignments(assignments),
+    onSuccess: () => {
+      toast.success("AI task routing saved.");
+      queryClient.invalidateQueries({ queryKey: ["ai-task-assignments"] });
+    },
+    onError: (err: any) => toast.error(`Routing save failed: ${err.message}`),
+  });
+
   // Mutation: Reveal API Key
   const revealKeyMutation = useMutation({
     mutationFn: () => aiApi.getAIConfig(true, provider),
@@ -177,6 +202,16 @@ export function AISettings() {
               isAdding={addModelMutation.isPending}
             />
           </ModelLibrary>
+
+          <TaskRoutingCard
+            catalog={(taskCatalogQuery.data as AITaskCatalogItem[]) || []}
+            assignments={(taskAssignmentsQuery.data as AITaskAssignment[]) || []}
+            models={(modelsQuery.data as AIModel[]) || []}
+            runtimeStatus={statusQuery.data}
+            isLoading={taskCatalogQuery.isLoading || taskAssignmentsQuery.isLoading || modelsQuery.isLoading}
+            isSaving={saveTaskAssignmentsMutation.isPending}
+            onSave={(assignments) => saveTaskAssignmentsMutation.mutate(assignments)}
+          />
 
           <RagIndexingCard />
 

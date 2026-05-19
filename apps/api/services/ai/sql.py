@@ -30,7 +30,13 @@ class SqlAIService(BaseAIService):
             
         system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
         
-        response = self._generate_response(f"{system_prompt}\n\nUser Intent: {prompt}", model_id=model_id, user_id=user_id)
+        response = self._generate_response(
+            f"{system_prompt}\n\nUser Intent: {prompt}",
+            model_id=model_id,
+            user_id=user_id,
+            task_key="sql.generate",
+            db_id=db_id,
+        )
         if not response or response.startswith("AI Error:"):
             return {"error": response or "Failed to generate"}
             
@@ -52,7 +58,12 @@ class SqlAIService(BaseAIService):
         self._save_chat("user", f"Explain this SQL: {sql}", user_id)
         system_prompt = get_sql_explanation_prompt()
         
-        response = self._generate_response(f"{system_prompt}\n\nSQL:\n{sql}", model_id=model_id, user_id=user_id)
+        response = self._generate_response(
+            f"{system_prompt}\n\nSQL:\n{sql}",
+            model_id=model_id,
+            user_id=user_id,
+            task_key="sql.explain",
+        )
         if not response or response.startswith("AI Error:"):
             return {"error": response or "Failed to explain"}
             
@@ -67,7 +78,13 @@ class SqlAIService(BaseAIService):
         context_result = rag_context_builder.build(understanding, user_id=user_id)
         system_prompt = build_rag_prompt(context_result.context, understanding)
         
-        response = self._generate_response(f"{system_prompt}\n\nCURRENT SQL:\n{sql}", model_id=model_id, user_id=user_id)
+        response = self._generate_response(
+            f"{system_prompt}\n\nCURRENT SQL:\n{sql}",
+            model_id=model_id,
+            user_id=user_id,
+            task_key="sql.optimize",
+            db_id=db_id,
+        )
         if not response or response.startswith("AI Error:"):
             return {"error": response or "Failed to optimize"}
             
@@ -93,7 +110,13 @@ class SqlAIService(BaseAIService):
         context_result = rag_context_builder.build(understanding, user_id=user_id)
         system_prompt = build_rag_prompt(context_result.context, understanding)
         
-        response = self._generate_response(f"{system_prompt}\n\nFAILED SQL:\n{sql}", model_id=model_id, user_id=user_id)
+        response = self._generate_response(
+            f"{system_prompt}\n\nFAILED SQL:\n{sql}",
+            model_id=model_id,
+            user_id=user_id,
+            task_key="sql.fix",
+            db_id=db_id,
+        )
         if not response or response.startswith("AI Error:"):
             return {"error": response or "Failed to fix"}
             
