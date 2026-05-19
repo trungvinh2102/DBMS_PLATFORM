@@ -3,11 +3,23 @@
  * @description Regression tests for SQL Lab AI chat stream status handling.
  */
 
-import { describe, expect, it } from "vitest";
+import { act, renderHook, waitFor } from "../test-utils";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { isLabeledThinkingEvent, isStatusThinkingEvent, stripInternalToolEnvelopes } from "@/app/sqllab/hooks/useAIChat";
+import { aiApi } from "@/lib/api-client";
+import {
+  getActiveAIConversationStorageKey,
+  isLabeledThinkingEvent,
+  isStatusThinkingEvent,
+  stripInternalToolEnvelopes,
+  useAIChat,
+} from "@/app/sqllab/hooks/useAIChat";
 
 describe("useAIChat stream status handling", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it("recognizes localized startup statuses so they render as separate activity steps", () => {
     expect(isStatusThinkingEvent("Đang khởi tạo bối cảnh...")).toBe(true);
     expect(isStatusThinkingEvent("Phân tích lược đồ...")).toBe(true);
@@ -36,5 +48,50 @@ describe("useAIChat stream status handling", () => {
     ].join("\n");
 
     expect(stripInternalToolEnvelopes(content)).toBe("Xin chào! Tôi là QurioDB copilot.");
+  });
+
+  it("restores the active conversation after the assistant remounts", async () => {
+    window.localStorage.setItem(getActiveAIConversationStorageKey("db-1"), "conv-1");
+    const getConversationMessages = vi.spyOn(aiApi, "getConversationMessages").mockResolvedValue({
+      id: "conv-1",
+      messages: [{ id: "msg-1", role: "user", content: "SELECT 1;" }],
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await waitFor(() => {
+      expect(result.current.conversationId).toBe("conv-1");
+    });
+    expect(getConversationMessages).toHaveBeenCalledWith("conv-1");
+    expect(result.current.messages).toEqual([
+      {
+        id: "msg-1",
+        role: "user",
+        content: "SELECT 1;",
+        isActionable: false,
+      },
+    ]);
+  });
+
+  it("stores loaded conversations and clears them when starting a new chat", async () => {
+    vi.spyOn(aiApi, "getConversationMessages").mockResolvedValue({
+      id: "conv-2",
+      messages: [],
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.loadConversation("conv-2");
+    });
+
+    expect(window.localStorage.getItem(getActiveAIConversationStorageKey("db-1"))).toBe("conv-2");
+
+    act(() => {
+      result.current.startNewChat();
+    });
+
+    expect(window.localStorage.getItem(getActiveAIConversationStorageKey("db-1"))).toBeNull();
+    expect(result.current.conversationId).toBeNull();
   });
 });

@@ -3,10 +3,46 @@
  * @description Custom hook for managing AI chat state, streaming responses, and parsing content.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { aiApi } from "../../../lib/api-client";
 import { toast } from "sonner";
 import { Message, AIStep } from "../components/ai/types";
+
+const ACTIVE_CONVERSATION_STORAGE_PREFIX = "sqllab_ai_active_conversation";
+
+export const getActiveAIConversationStorageKey = (databaseId?: string) =>
+  `${ACTIVE_CONVERSATION_STORAGE_PREFIX}:${databaseId || "global"}`;
+
+const getStoredActiveConversationId = (databaseId?: string) => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    return window.localStorage.getItem(getActiveAIConversationStorageKey(databaseId));
+  } catch (error) {
+    console.error("Failed to read active AI conversation", error);
+    return null;
+  }
+};
+
+const storeActiveConversationId = (databaseId: string | undefined, id: string) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(getActiveAIConversationStorageKey(databaseId), id);
+  } catch (error) {
+    console.error("Failed to store active AI conversation", error);
+  }
+};
+
+const clearStoredActiveConversationId = (databaseId?: string) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(getActiveAIConversationStorageKey(databaseId));
+  } catch (error) {
+    console.error("Failed to clear active AI conversation", error);
+  }
+};
 
 const serializeMessageContent = (message: Message) => {
   const parts = [message.content, message.sql ? `\`\`\`sql\n${message.sql}\n\`\`\`` : "", message.analysis].filter(Boolean);
@@ -141,6 +177,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
+  const restoredConversationRef = useRef<string | null>(null);
 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
     if (message.role === "user") return { content: message.content };
@@ -341,6 +378,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     try {
       const res = await aiApi.getConversationMessages(id);
       setConversationId(res.id);
+      storeActiveConversationId(databaseId, res.id);
       if (res.messages) {
         setMessages(res.messages.map((m: any) => ({
           id: m.id,
@@ -350,16 +388,33 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         } as Message)));
       }
     } catch (e) {
+      clearStoredActiveConversationId(databaseId);
+      setConversationId(null);
       toast.error("Failed to load conversation");
     } finally {
       setIsFetchingConversation(false);
     }
-  }, [parseMessageContent]);
+  }, [databaseId, parseMessageContent]);
+
+  useEffect(() => {
+    const activeConversationId = getStoredActiveConversationId(databaseId);
+    if (!activeConversationId) {
+      restoredConversationRef.current = null;
+      return;
+    }
+
+    if (conversationId === activeConversationId || restoredConversationRef.current === activeConversationId) return;
+
+    restoredConversationRef.current = activeConversationId;
+    loadConversation(activeConversationId);
+  }, [conversationId, databaseId, loadConversation]);
 
   const startNewChat = useCallback(() => {
+    clearStoredActiveConversationId(databaseId);
+    restoredConversationRef.current = null;
     setConversationId(null);
     setMessages([]);
-  }, []);
+  }, [databaseId]);
 
   const handleSend = useCallback(async (input: string) => {
     if (!input.trim() || isTyping || !databaseId) {
@@ -500,6 +555,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           const cid = headers.get("X-Conversation-Id");
           if (cid && !conversationId) {
             setConversationId(cid);
+            storeActiveConversationId(databaseId, cid);
             loadConversations(databaseId);
           }
         }
