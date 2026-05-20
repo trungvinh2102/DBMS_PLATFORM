@@ -163,7 +163,6 @@ export function AIAssistant({
         editorSQL: editorSql,
         args: parsed.args,
         databaseType: selectedDatabaseType,
-        schema: selectedSchema,
         lastError,
       });
 
@@ -189,7 +188,6 @@ export function AIAssistant({
           editorSQL: editorSql,
           args: "",
           databaseType: selectedDatabaseType,
-          schema: selectedSchema,
           lastError,
         });
         if (!prompt) {
