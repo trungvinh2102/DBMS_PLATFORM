@@ -13,7 +13,7 @@ import { aiApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 // Types
-import { Message } from "./types";
+import { Message, SqlDataPreview } from "./types";
 
 // Sub-components
 import { DataTablePreview } from "./DataTablePreview";
@@ -31,23 +31,19 @@ interface AIMessageProps {
   message: Message;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
-  onApplySql?: (sql: string) => void;
-  onPreviewSql?: (sql: string) => void;
-  currentSql?: string;
+  onShowSqlData?: (sql: string) => Promise<SqlDataPreview>;
   onSuggestionClick?: (suggestion: string) => void;
   conversationId?: string | null;
 }
 
 const noopSuggestionClick = () => {};
-const noopSqlAction = () => {};
+const noopShowSqlData = async (): Promise<SqlDataPreview> => ({ columns: [], data: [] });
 
 const AIMessageComponent = ({
   message,
   onExplain,
   onOptimize,
-  onApplySql = noopSqlAction,
-  onPreviewSql = noopSqlAction,
-  currentSql,
+  onShowSqlData = noopShowSqlData,
   onSuggestionClick,
   conversationId
 }: AIMessageProps) => {
@@ -59,6 +55,9 @@ const AIMessageComponent = ({
   const [shouldShowCorrection, setShouldShowCorrection] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
   const [isFeedbackSubmitted, setIsFeedbackSubmitted] = useState(false);
+  const [sqlPreview, setSqlPreview] = useState<SqlDataPreview | null>(null);
+  const [sqlPreviewError, setSqlPreviewError] = useState("");
+  const [isSqlPreviewLoading, setIsSqlPreviewLoading] = useState(false);
 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -153,6 +152,20 @@ const AIMessageComponent = ({
     toast.success("Response copied");
     setTimeout(() => setIsResponseCopied(false), 2000);
   }, [cleaned, message.content, message.explanation]);
+
+  const handleShowSqlData = useCallback(async (sql: string) => {
+    setIsSqlPreviewLoading(true);
+    setSqlPreviewError("");
+    try {
+      const preview = await onShowSqlData(sql);
+      setSqlPreview(preview);
+    } catch (error: any) {
+      setSqlPreview(null);
+      setSqlPreviewError(error.message || "Khong the hien thi du lieu.");
+    } finally {
+      setIsSqlPreviewLoading(false);
+    }
+  }, [onShowSqlData]);
 
   return (
     <div className={cn(
@@ -255,10 +268,31 @@ const AIMessageComponent = ({
                 copied={isCopied}
                 onExplain={onExplain}
                 onOptimize={onOptimize}
-                onApply={onApplySql}
-                onPreview={onPreviewSql}
-                currentSql={currentSql}
+                onShowData={handleShowSqlData}
+                isShowingData={isSqlPreviewLoading}
               />
+            )}
+
+            {sqlPreview && (
+              sqlPreview.data.length > 0 ? (
+                <DataTablePreview columns={sqlPreview.columns} data={sqlPreview.data} />
+              ) : (
+                <div className={cn(
+                  "rounded-xl border px-3 py-2 text-[12px] text-muted-foreground",
+                  isDark ? "border-white/10 bg-card/70" : "border-slate-200 bg-white"
+                )}>
+                  Query chạy thành công nhưng không trả về dòng dữ liệu nào.
+                  {sqlPreview.executionTime !== undefined && (
+                    <span className="ml-1 tabular-nums">({sqlPreview.executionTime}ms)</span>
+                  )}
+                </div>
+              )
+            )}
+
+            {sqlPreviewError && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+                {sqlPreviewError}
+              </div>
             )}
 
             {message.columns && message.data && message.data.length > 0 && (

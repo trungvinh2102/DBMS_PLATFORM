@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Activity, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
-import { aiApi } from "@/lib/api-client";
+import { aiApi, databaseApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useSQLLabContext } from "../context/SQLLabContext";
@@ -251,36 +251,44 @@ export function AIAssistant({
     } finally { setIsTyping(false); }
   }, [selectedDatabaseId, selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
 
-  const handleApplySql = useCallback((s: string) => {
-    lab.setSql(s);
-    toast.success("SQL đã được đưa vào editor.");
-  }, [lab]);
-
-  const handlePreviewSql = useCallback(async (s: string) => {
+  const handleShowSqlData = useCallback(async (s: string) => {
     if (!selectedDatabaseId) {
-      toast.error("Chọn database trước khi preview SQL.");
-      return;
+      throw new Error("Chọn database trước khi hiển thị dữ liệu.");
     }
-    try {
-      const validation = await aiApi.validateSQL({
-        sql: s,
-        databaseId: selectedDatabaseId,
-        dialect: selectedDatabaseType,
-        maxPreviewRows: lab.queryLimit || 500,
-      });
-      if (!validation.isAllowed) {
-        toast.error(validation.blockedReason || "SQL không vượt qua kiểm tra an toàn.");
-        return;
-      }
-      if (validation.limitApplied) {
-        toast.info("Preview đã tự thêm LIMIT để tránh trả quá nhiều dòng.");
-      }
-      lab.setSql(validation.sanitizedSql);
-      await lab.handleRun(validation.sanitizedSql);
-    } catch (err: any) {
-      toast.error(err.message || "Không thể preview SQL.");
+
+    const previewLimit = lab.queryLimit || 500;
+    const validation = await aiApi.validateSQL({
+      sql: s,
+      databaseId: selectedDatabaseId,
+      dialect: selectedDatabaseType,
+      maxPreviewRows: previewLimit,
+    });
+
+    if (!validation.isAllowed) {
+      throw new Error(validation.blockedReason || "SQL không vượt qua kiểm tra an toàn.");
     }
-  }, [lab, selectedDatabaseId, selectedDatabaseType]);
+
+    if (validation.limitApplied) {
+      toast.info("Đã tự thêm LIMIT để tránh trả quá nhiều dòng.");
+    }
+
+    const result = await databaseApi.execute(
+      selectedDatabaseId,
+      validation.sanitizedSql,
+      false,
+      previewLimit,
+    );
+
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    return {
+      columns: Array.isArray(result.columns) ? result.columns : [],
+      data: Array.isArray(result.data) ? result.data : [],
+      executionTime: result.executionTime,
+    };
+  }, [lab.queryLimit, selectedDatabaseId, selectedDatabaseType]);
 
   const refreshDiagnostics = useCallback(async () => {
     setIsDiagnosticsLoading(true);
@@ -337,11 +345,9 @@ export function AIAssistant({
   const AIActions = React.useMemo(() => ({
     onExplain: handleExplain,
     onOptimize: handleOptimize,
-    onApplySql: handleApplySql,
-    onPreviewSql: handlePreviewSql,
-    currentSql: editorSql,
+    onShowSqlData: handleShowSqlData,
     onSuggestionClick: handleSuggestionClick
-  }), [handleExplain, handleOptimize, handleApplySql, handlePreviewSql, editorSql, handleSuggestionClick]);
+  }), [handleExplain, handleOptimize, handleShowSqlData, handleSuggestionClick]);
 
   if (!lab.showAISidebar) return null;
 

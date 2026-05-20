@@ -58,7 +58,7 @@ describe("AIMessage", () => {
     expect(screen.getByRole("button", { name: /response copied/i })).toBeInTheDocument();
   });
 
-  it("does not render an apply-to-editor action for assistant SQL", () => {
+  it("replaces SQL apply, preview, and diff actions with show data", () => {
     render(
       <AIMessage
         message={{
@@ -72,7 +72,37 @@ describe("AIMessage", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: /apply to editor/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^apply$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^preview$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^diff$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /hiển thị dữ liệu/i })).toBeInTheDocument();
+  });
+
+  it("renders queried SQL data inside the assistant message", async () => {
+    const onShowSqlData = vi.fn().mockResolvedValue({
+      columns: ["id", "name"],
+      data: [{ id: 1, name: "Alice" }],
+      executionTime: 12,
+    });
+
+    render(
+      <AIMessage
+        message={{
+          id: "assistant-sql-preview",
+          role: "assistant",
+          content: "",
+          sql: "SELECT * FROM users;",
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+        onShowSqlData={onShowSqlData}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /hiển thị dữ liệu/i }));
+
+    expect(onShowSqlData).toHaveBeenCalledWith("SELECT * FROM users;");
+    expect(await screen.findByText("Alice")).toBeInTheDocument();
   });
 
   it("shows saved thinking activity even when the assistant message has SQL", () => {

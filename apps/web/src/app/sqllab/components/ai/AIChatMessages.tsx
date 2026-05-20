@@ -8,7 +8,7 @@ import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIMessage } from "./AIMessage";
-import { Message } from "./types";
+import { Message, SqlDataPreview } from "./types";
 
 interface AIChatMessagesProps {
   messages: Message[];
@@ -18,9 +18,7 @@ interface AIChatMessagesProps {
   conversationId?: string | null;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
-  onApplySql: (sql: string) => void;
-  onPreviewSql: (sql: string) => void;
-  currentSql?: string;
+  onShowSqlData: (sql: string) => Promise<SqlDataPreview>;
   onSuggestionClick: (suggestion: string) => void;
 }
 
@@ -32,9 +30,7 @@ const AIChatMessagesComponent = ({
   conversationId,
   onExplain,
   onOptimize,
-  onApplySql,
-  onPreviewSql,
-  currentSql,
+  onShowSqlData,
   onSuggestionClick
 }: AIChatMessagesProps) => (
   <div
@@ -62,9 +58,7 @@ const AIChatMessagesComponent = ({
             message={m}
             onExplain={onExplain}
             onOptimize={onOptimize}
-            onApplySql={onApplySql}
-            onPreviewSql={onPreviewSql}
-            currentSql={currentSql}
+            onShowSqlData={onShowSqlData}
             onSuggestionClick={onSuggestionClick}
             conversationId={conversationId}
           />

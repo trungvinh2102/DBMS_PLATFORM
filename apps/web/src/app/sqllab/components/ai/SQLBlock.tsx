@@ -1,10 +1,10 @@
 /**
  * @file SQLBlock.tsx
- * @description Syntax-highlighted SQL code block with interactive tools for copy, explain, and optimize actions.
+ * @description Syntax-highlighted SQL code block with interactive tools for copy, data preview, explain, and optimize actions.
  */
 
-import React, { useMemo, useState } from "react";
-import { Copy, Check, Sparkles, FileSearch, Wand2, GitCompare, Play, PenLine } from "lucide-react";
+import React from "react";
+import { Copy, Check, Sparkles, FileSearch, Wand2, Table2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +21,8 @@ interface SQLBlockProps {
   copied: boolean;
   onExplain: (sql: string) => void;
   onOptimize: (sql: string) => void;
-  onApply: (sql: string) => void;
-  onPreview: (sql: string) => void;
-  currentSql?: string;
+  onShowData: (sql: string) => void;
+  isShowingData?: boolean;
 }
 
 export const SQLBlock = React.memo(({
@@ -33,14 +32,9 @@ export const SQLBlock = React.memo(({
   copied,
   onExplain,
   onOptimize,
-  onApply,
-  onPreview,
-  currentSql = "",
+  onShowData,
+  isShowingData = false,
 }: SQLBlockProps) => {
-  const [showDiff, setShowDiff] = useState(false);
-  const hasEditorSql = currentSql.trim().length > 0;
-  const diffStats = useMemo(() => summarizeSqlDiff(currentSql, sql), [currentSql, sql]);
-
   return (
     <div className={cn(
       "w-full rounded-2xl border shadow-lg overflow-hidden group/sql transition-all hover:border-primary/30",
@@ -94,45 +88,20 @@ export const SQLBlock = React.memo(({
         </React.Suspense>
       </div>
 
-      {showDiff && (
-        <div className={cn("grid gap-2 border-t p-2 md:grid-cols-2", isDark ? "border-white/10" : "border-slate-200")}>
-          <DiffPane title="Editor" sql={currentSql || "-- empty editor"} isDark={isDark} />
-          <DiffPane title={`AI +${diffStats.added} / -${diffStats.removed}`} sql={sql} isDark={isDark} />
-        </div>
-      )}
-
       <div className={cn(
         "p-2 flex flex-col gap-2",
         isDark ? "bg-slate-900/40" : "bg-slate-50/50"
       )}>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <Button
             variant="outline"
-            className="h-8 rounded-xl text-[9px] font-bold uppercase tracking-widest"
-            onClick={() => onApply(sql)}
+            className="h-8 rounded-xl px-2 text-[10px] font-bold"
+            onClick={() => onShowData(sql)}
+            disabled={isShowingData}
           >
-            <PenLine className="h-3.5 w-3.5 mr-1.5" />
-            Apply
+            {isShowingData ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Table2 className="h-3.5 w-3.5 mr-1.5" />}
+            Hiển thị dữ liệu
           </Button>
-          <Button
-            variant="outline"
-            className="h-8 rounded-xl text-[9px] font-bold uppercase tracking-widest"
-            onClick={() => onPreview(sql)}
-          >
-            <Play className="h-3.5 w-3.5 mr-1.5" />
-            Preview
-          </Button>
-          <Button
-            variant="ghost"
-            className="h-8 rounded-xl text-[9px] font-bold uppercase tracking-widest text-slate-600 transition-all hover:bg-primary/5 hover:text-primary dark:text-slate-300"
-            onClick={() => setShowDiff((current) => !current)}
-            disabled={!hasEditorSql}
-          >
-            <GitCompare className="h-3.5 w-3.5 mr-1.5" />
-            Diff
-          </Button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
           <Button
             variant="ghost"
             className="h-8 text-[9px] font-bold uppercase tracking-widest transition-all text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 rounded-xl"
@@ -160,30 +129,3 @@ export const SQLBlock = React.memo(({
     </div>
   );
 });
-
-function DiffPane({ title, sql, isDark }: { title: string; sql: string; isDark: boolean }) {
-  return (
-    <div className={cn("min-w-0 rounded-lg border", isDark ? "border-white/10 bg-black/20" : "border-slate-200 bg-white")}>
-      <div className="border-b border-border/60 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-        {title}
-      </div>
-      <pre className="max-h-44 overflow-auto p-2 text-[10px] leading-5 text-muted-foreground">
-        <code>{sql}</code>
-      </pre>
-    </div>
-  );
-}
-
-function summarizeSqlDiff(before: string, after: string) {
-  const beforeLines = new Set(before.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
-  const afterLines = new Set(after.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
-  let added = 0;
-  let removed = 0;
-  afterLines.forEach((line) => {
-    if (!beforeLines.has(line)) added += 1;
-  });
-  beforeLines.forEach((line) => {
-    if (!afterLines.has(line)) removed += 1;
-  });
-  return { added, removed };
-}

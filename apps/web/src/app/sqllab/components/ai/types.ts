@@ -48,6 +48,12 @@ export interface Message {
   isStreaming?: boolean;
 }
 
+export interface SqlDataPreview {
+  columns: string[];
+  data: any[];
+  executionTime?: number;
+}
+
 export interface AIProviderStatus {
   hasApiKey: boolean;
 }
