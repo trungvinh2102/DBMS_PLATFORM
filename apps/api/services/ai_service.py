@@ -13,7 +13,7 @@ from .ai.agent import AgentAIService
 from .ai.context import schema_context_service
 from .ai.feedback_context import feedback_context_service
 from .ai.langchain_runtime import langchain_runtime
-from .ai.prompt_contracts import build_rag_prompt
+from .ai.prompt_contracts import build_rag_prompt, build_results_analysis_prompt
 from .ai.query_understanding import query_understanding_service
 from .ai.rag_context import rag_context_builder
 from .ai.stream_parser import TaggedResponseStreamParser
@@ -145,7 +145,10 @@ class AIService(SqlAIService, AgentAIService):
                 yield "thinking", "Học hỏi từ phản hồi của các bạn..."
                 feedback = feedback_context_service.get_feedback_context(db_id, user_id)
 
-            system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
+            if task_key == "results.analyze":
+                system_prompt = build_results_analysis_prompt(context_result.context, understanding)
+            else:
+                system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
             yield "thinking", "Sẵn sàng."
         elif db_id:
             from .prompts import get_general_chat_prompt

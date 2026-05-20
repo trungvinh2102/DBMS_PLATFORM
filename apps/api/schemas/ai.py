@@ -69,6 +69,7 @@ class ValidateSqlRequest(BaseModel):
 
 class StreamChatRequest(BaseModel):
     text: Optional[str] = None
+    displayText: Optional[str] = None
     messages: Optional[List[Dict[str, str]]] = None
     databaseId: str
     schema_name: Optional[str] = None

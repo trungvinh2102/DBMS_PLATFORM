@@ -4,10 +4,13 @@
  */
 
 import React from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { AISuggestion } from "./types";
 
 interface SuggestionListProps {
-  suggestions: string[];
+  suggestions: AISuggestion[];
   onSuggestionClick: (suggestion: string) => void;
 }
 
@@ -18,16 +21,23 @@ export const SuggestionList = React.memo(({
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2 duration-700">
+    <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
       {suggestions.map((suggestion, i) => (
         <button
           key={i}
-          onClick={() => onSuggestionClick(suggestion)}
-          className="px-3 py-1.5 rounded-xl border border-primary/20 bg-primary/5 hover:bg-primary/10 text-[10px] font-medium text-primary transition-all hover:scale-105 active:scale-95 flex items-center gap-2 group/sug"
+          type="button"
+          onClick={() => onSuggestionClick(suggestion.prompt)}
+          className={cn(
+            "group/sug inline-flex max-w-full items-start gap-1.5 rounded-md border border-border/80 bg-muted/20 px-2.5 py-1.5",
+            "text-left text-[11px] font-medium leading-4 text-muted-foreground transition-colors",
+            "hover:border-primary/40 hover:bg-primary/5 hover:text-primary",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          )}
+          aria-label={`Ask: ${suggestion.prompt}`}
+          title={suggestion.prompt}
         >
-          <div className="w-1 h-1 bg-primary rounded-full animate-pulse group-hover/sug:animate-bounce" />
-          {suggestion}
-          <ArrowRight className="h-2.5 w-2.5 opacity-0 -translate-x-1 group-hover/sug:opacity-100 group-hover/sug:translate-x-0 transition-all" />
+          <span className="min-w-0 break-words">{suggestion.label}</span>
+          <ArrowUpRight className="mt-0.5 h-3 w-3 shrink-0 opacity-60 transition-opacity group-hover/sug:opacity-100" />
         </button>
       ))}
     </div>

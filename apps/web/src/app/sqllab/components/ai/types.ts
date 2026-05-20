@@ -22,6 +22,12 @@ export interface AICitation {
   reasons?: string[];
 }
 
+export interface AISuggestion {
+  label: string;
+  prompt: string;
+  intent?: "drilldown" | "compare" | "filter" | "explain" | "optimize" | "fix" | "visualize" | "other";
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
@@ -34,7 +40,7 @@ export interface Message {
   columns?: string[];
   data?: any[];
   isActionable?: boolean;
-  suggestions?: string[];
+  suggestions?: AISuggestion[];
   citations?: AICitation[];
   retrievalTrace?: Record<string, any>;
   warnings?: string[];

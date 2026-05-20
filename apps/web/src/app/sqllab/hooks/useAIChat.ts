@@ -6,7 +6,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { aiApi } from "../../../lib/api-client";
 import { toast } from "sonner";
-import { Message, AIStep } from "../components/ai/types";
+import { AISuggestion, Message, AIStep } from "../components/ai/types";
 
 const ACTIVE_CONVERSATION_STORAGE_PREFIX = "sqllab_ai_active_conversation";
 
@@ -141,6 +141,68 @@ const isInternalToolEnvelope = (value: unknown) => {
   return typeof payload.name === "string" && INTERNAL_TOOL_NAMES.has(payload.name) && Boolean(payload.args);
 };
 
+const normalizeSuggestions = (value: unknown): AISuggestion[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.reduce<AISuggestion[]>((items, item) => {
+    if (typeof item === "string") {
+      const text = item.trim();
+      if (text) items.push({ label: text, prompt: text, intent: "other" });
+      return items;
+    }
+
+    if (!item || typeof item !== "object") return items;
+
+    const candidate = item as Partial<AISuggestion>;
+    const prompt = typeof candidate.prompt === "string" ? candidate.prompt.trim() : "";
+    const label = typeof candidate.label === "string" ? candidate.label.trim() : prompt;
+    if (!prompt || !label) return items;
+
+    items.push({
+      label,
+      prompt,
+      intent: candidate.intent || "other",
+    });
+    return items;
+  }, []).slice(0, 4);
+};
+
+const stripSuggestionCodeFence = (value: string) => {
+  const text = value.trim();
+  const fenceMatch = text.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenceMatch ? fenceMatch[1].trim() : text;
+};
+
+const parseSuggestionJson = (value: string): unknown => {
+  const text = stripSuggestionCodeFence(value);
+  const arrayStart = text.indexOf("[");
+  const arrayEnd = text.lastIndexOf("]");
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    return JSON.parse(text.slice(arrayStart, arrayEnd + 1));
+  }
+  return JSON.parse(text);
+};
+
+const parseSuggestionsContent = (value: string): AISuggestion[] => {
+  const text = value.trim();
+  if (!text) return [];
+
+  try {
+    return normalizeSuggestions(parseSuggestionJson(text));
+  } catch {
+    return [];
+  }
+};
+
+const normalizeUserMessageContent = (content: string) => {
+  const text = String(content || "");
+  const isAnalyzeResultsPrompt =
+    text.includes("Phân tích kết quả query hiện tại trong SQL Lab") ||
+    (text.includes("Sample rows:") && text.includes("Columns:") && text.includes("SQL hiện tại:"));
+
+  return isAnalyzeResultsPrompt ? "Phân tích kết quả query hiện tại trong SQL Lab" : text;
+};
+
 export const stripInternalToolEnvelopes = (text: string) => {
   let cleaned = "";
   let index = 0;
@@ -178,6 +240,7 @@ export const stripInternalToolEnvelopes = (text: string) => {
 
 interface SendAIMessageOptions {
   taskKey?: string;
+  displayContent?: string;
 }
 
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
@@ -195,7 +258,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, [messages]);
 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
-    if (message.role === "user") return { content: message.content };
+    if (message.role === "user") return { content: normalizeUserMessageContent(message.content) };
 
     if (message.events || message.sql || message.analysis || message.thought || message.confidence !== undefined) {
       const steps = Array.isArray(message.events) ? toThinkingSteps(message.events) : undefined;
@@ -209,7 +272,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         confidence: message.confidence,
         columns: message.columns,
         data: message.data,
-        suggestions: message.suggestions,
+        suggestions: normalizeSuggestions(message.suggestions),
         citations: message.citations,
         retrievalTrace: message.retrievalTrace,
         warnings: message.warnings,
@@ -236,7 +299,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           confidence: data.confidence,
           columns: data.columns,
           data: data.data,
-          suggestions: data.suggestions,
+          suggestions: normalizeSuggestions(data.suggestions),
           citations: data.citations,
           retrievalTrace: data.retrievalTrace,
           warnings: data.warnings,
@@ -439,7 +502,11 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
 
     setIsTyping(true);
 
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input };
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: options?.displayContent || input,
+    };
     const assistantMsgId = (Date.now() + 1).toString();
     const initialAssistantMsg: Message = {
       id: assistantMsgId,
@@ -459,6 +526,8 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let citations: Message["citations"] = [];
     let retrievalTrace: Message["retrievalTrace"];
     let warnings: string[] = [];
+    let suggestions: AISuggestion[] = [];
+    let suggestionsContent = "";
     let streamSteps: AIStep[] = [];
     let lastStreamEvent = "";
     let lastParsedContent = "";
@@ -515,6 +584,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           citations,
           retrievalTrace,
           warnings,
+          suggestions: parsed.suggestions?.length ? parsed.suggestions : suggestions,
           thought: streamThought,
           steps: streamSteps,
           isStreaming: true,
@@ -558,6 +628,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           schema: schema || "public",
           modelId: selectedModel || undefined,
           taskKey: options?.taskKey,
+          displayText: options?.displayContent,
           conversationId: conversationId || undefined,
         },
         (chunk, event) => {
@@ -612,6 +683,11 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             warnings = Array.isArray(chunk) ? chunk.map(String) : [];
             completeStreamSteps();
             lastStreamEvent = "warnings";
+          } else if (event === "suggestions") {
+            suggestionsContent += String(chunk || "");
+            suggestions = parseSuggestionsContent(suggestionsContent);
+            completeStreamSteps();
+            lastStreamEvent = "suggestions";
           } else if (event !== "error") {
             responseContent += String(chunk || "");
             completeStreamSteps();

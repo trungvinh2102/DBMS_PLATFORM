@@ -188,6 +188,7 @@ class AIConversationStore:
             "citations": payload.get("citations") or [],
             "retrievalTrace": payload.get("retrievalTrace"),
             "warnings": payload.get("warnings") or [],
+            "suggestions": payload.get("suggestions") or [],
             "events": payload.get("events") or [],
         }
 

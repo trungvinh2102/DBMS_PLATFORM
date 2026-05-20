@@ -23,7 +23,7 @@ def strip_thinking_label(text: str) -> str:
 class TaggedResponseStreamParser:
     """Parses model output tags into stable SSE event names."""
 
-    DEFAULT_MARKERS = ("<thinking>", "<confidence>", "```sql", "### ANALYSIS:")
+    DEFAULT_MARKERS = ("<thinking>", "<confidence>", "```sql", "### ANALYSIS:", "### SUGGESTIONS:")
     INTERNAL_TOOL_NAMES = {"SchemaContextLoader", "RetrievalTrace"}
     CLOSE_MARKERS = {
         "thinking": "</thinking>",
@@ -151,6 +151,14 @@ class TaggedResponseStreamParser:
 
     def _drain_mode(self) -> List[StreamEvent]:
         close_marker = self.CLOSE_MARKERS.get(self.mode)
+        if self.mode == "analysis":
+            suggestions_index = self.buffer.find("### SUGGESTIONS:")
+            if suggestions_index >= 0:
+                text = self.buffer[:suggestions_index]
+                self.buffer = self.buffer[suggestions_index + len("### SUGGESTIONS:"):]
+                self.mode = "suggestions"
+                return [("analysis", text)]
+
         if not close_marker:
             text = self.buffer
             self.buffer = ""
@@ -194,6 +202,10 @@ class TaggedResponseStreamParser:
                 self.buffer = self.buffer[1:]
         elif marker == "### ANALYSIS:":
             self.mode = "analysis"
+            if self.buffer.startswith("\n"):
+                self.buffer = self.buffer[1:]
+        elif marker == "### SUGGESTIONS:":
+            self.mode = "suggestions"
             if self.buffer.startswith("\n"):
                 self.buffer = self.buffer[1:]
 

@@ -33,6 +33,20 @@ def test_parser_splits_model_thinking_sql_and_analysis():
     assert by_event["analysis"] == "Uses the users table."
 
 
+def test_parser_splits_analysis_and_suggestions():
+    events = collect_events([
+        "Here are the insights.\n\n### ANALYSIS:\nSample-level only.",
+        "\n\n### SUGGESTIONS:\n[{\"label\":\"Lọc tháng này\",\"prompt\":\"Lọc kết quả theo tháng này\",\"intent\":\"filter\"}]",
+    ])
+
+    by_event = {}
+    for event, chunk in events:
+        by_event[event] = by_event.get(event, "") + chunk
+
+    assert by_event["analysis"].strip() == "Sample-level only."
+    assert '"label":"Lọc tháng này"' in by_event["suggestions"]
+
+
 def test_parser_preserves_separate_thinking_events():
     events = collect_events([
         "<thinking>Intent: count users.</thinking>",

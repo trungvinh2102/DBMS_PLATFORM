@@ -14,7 +14,6 @@ interface AIChatMessagesProps {
   messages: Message[];
   isTyping: boolean;
   isFetchingConversation: boolean;
-  virtualizer: any;
   parentRef: React.RefObject<HTMLDivElement | null>;
   conversationId?: string | null;
   onExplain: (sql: string) => void;
@@ -29,7 +28,6 @@ const AIChatMessagesComponent = ({
   messages,
   isTyping,
   isFetchingConversation,
-  virtualizer,
   parentRef,
   conversationId,
   onExplain,
@@ -43,10 +41,7 @@ const AIChatMessagesComponent = ({
     ref={parentRef}
     className="flex-1 overflow-y-auto scroll-smooth px-3 py-6 scrollbar-thin scrollbar-thumb-muted focus:outline-none md:px-6"
   >
-    <div
-      className="relative w-full"
-      style={{ height: isFetchingConversation ? 'auto' : `${virtualizer.getTotalSize()}px` }}
-    >
+    <div className="flex w-full flex-col gap-6">
       {isFetchingConversation ? (
         <div className="flex flex-col gap-8 w-full animate-pulse">
           {[1, 2, 3].map((i) => (
@@ -61,35 +56,19 @@ const AIChatMessagesComponent = ({
           ))}
         </div>
       ) : (
-        virtualizer.getVirtualItems().map((vMsg: any) => {
-          const isLastTyping = isTyping && vMsg.index === messages.length;
-          const m = messages[vMsg.index];
-
-          return (
-            <div
-              key={vMsg.key}
-              ref={virtualizer.measureElement}
-              data-index={vMsg.index}
-              className="absolute top-0 left-0 w-full [content-visibility:auto] [contain-intrinsic-size:0_180px]"
-              style={{ transform: `translateY(${vMsg.start}px)` }}
-            >
-              <div className="pb-6">
-                {m ? (
-                  <AIMessage
-                    message={m}
-                    onExplain={onExplain}
-                    onOptimize={onOptimize}
-                    onApplySql={onApplySql}
-                    onPreviewSql={onPreviewSql}
-                    currentSql={currentSql}
-                    onSuggestionClick={onSuggestionClick}
-                    conversationId={conversationId}
-                  />
-                ) : null}
-              </div>
-            </div>
-          );
-        })
+        messages.map((m) => (
+          <AIMessage
+            key={m.id}
+            message={m}
+            onExplain={onExplain}
+            onOptimize={onOptimize}
+            onApplySql={onApplySql}
+            onPreviewSql={onPreviewSql}
+            currentSql={currentSql}
+            onSuggestionClick={onSuggestionClick}
+            conversationId={conversationId}
+          />
+        ))
       )}
 
       {messages.length === 0 && !isTyping && !isFetchingConversation && (

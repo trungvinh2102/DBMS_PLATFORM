@@ -273,7 +273,11 @@ Given a natural language request, you must:
 "data": [],
 "summary": "...",
 "confidence": 1,
-"suggestions": ["Show me the top 10 rows", "Filter to current month", "Compare with last week"]
+"suggestions": [
+  {"label": "Xem 10 dòng đầu", "prompt": "Hiển thị 10 dòng đầu tiên bằng truy vấn chỉ đọc", "intent": "drilldown"},
+  {"label": "Lọc theo tháng hiện tại", "prompt": "Thêm bộ lọc tháng hiện tại vào truy vấn này", "intent": "filter"},
+  {"label": "So sánh với tuần trước", "prompt": "So sánh kết quả này với tuần trước", "intent": "compare"}
+]
 }}
 
 ---
@@ -322,7 +326,11 @@ If detected:
 "data": [],
 "summary": "The request cannot be executed safely.",
 "confidence": 1,
-"suggestions": ["Ask for a read-only query", "Add a precise WHERE clause", "Request an explanation instead"]
+"suggestions": [
+  {"label": "Chuyển sang truy vấn chỉ đọc", "prompt": "Viết lại yêu cầu này thành một truy vấn chỉ đọc an toàn", "intent": "fix"},
+  {"label": "Thêm điều kiện WHERE rõ hơn", "prompt": "Thêm điều kiện WHERE cụ thể để giới hạn phạm vi truy vấn", "intent": "filter"},
+  {"label": "Giải thích truy vấn thay vì chạy", "prompt": "Giải thích truy vấn này thay vì thực thi nó", "intent": "explain"}
+]
 }}
 
 ---

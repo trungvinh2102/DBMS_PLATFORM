@@ -106,6 +106,41 @@ def test_build_history_preserves_rag_metadata_fields():
     assert [event["type"] for event in payload["events"]] == ["retrieval_trace", "citations", "warnings", "message"]
 
 
+def test_build_history_preserves_clickable_suggestions():
+    parts = new_response_parts()
+    suggestions = [{
+        "label": "Lọc tháng này",
+        "prompt": "Lọc kết quả theo tháng này",
+        "intent": "filter",
+    }]
+
+    append_stream_part(parts, "message", "Có thể phân tích tiếp.")
+    append_stream_part(parts, "suggestions", suggestions)
+
+    payload = parse_assistant_history_content(build_assistant_history_content(parts))
+
+    assert payload["suggestions"] == suggestions
+    assert [event["type"] for event in payload["events"]] == ["message", "suggestions"]
+
+
+def test_parse_suggestions_ignores_json_fence_markup():
+    payload = parse_assistant_history_content(
+        "Có thể phân tích tiếp.\n\n"
+        "### SUGGESTIONS:\n"
+        "```json\n"
+        "[\n"
+        "  {\"label\": \"Liệt kê tất cả người dùng\", \"prompt\": \"Liệt kê tất cả người dùng\", \"intent\": \"drilldown\"}\n"
+        "]\n"
+        "```"
+    )
+
+    assert payload["suggestions"] == [{
+        "label": "Liệt kê tất cả người dùng",
+        "prompt": "Liệt kê tất cả người dùng",
+        "intent": "drilldown",
+    }]
+
+
 def test_clean_history_removes_internal_tool_call_blocks():
     content = clean_assistant_history_content(
         '<tool_call>{"name": "SchemaContextLoader", "args": {}}</tool_call>\n\n'
@@ -158,6 +193,7 @@ def test_conversation_message_dict_returns_structured_assistant_fields():
     assert result["citations"] == []
     assert result["retrievalTrace"] is None
     assert result["warnings"] == []
+    assert result["suggestions"] == []
     assert result["created_on"] == "2026-05-18T00:00:00Z"
     assert [event["type"] for event in result["events"]] == ["message", "thinking", "confidence", "sql", "analysis"]
 

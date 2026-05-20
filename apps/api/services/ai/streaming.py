@@ -17,6 +17,7 @@ STREAM_RESPONSE_PARTS = {
     "citations": [],
     "retrieval_trace": [],
     "warnings": [],
+    "suggestions": [],
 }
 
 STATUS_THINKING_EVENTS = {
@@ -76,6 +77,7 @@ def build_assistant_history_payload(parts: Dict[str, List[str]]) -> Dict[str, An
         "citations": [],
         "retrievalTrace": None,
         "warnings": [],
+        "suggestions": [],
         "events": [],
     }
 
@@ -98,6 +100,8 @@ def build_assistant_history_payload(parts: Dict[str, List[str]]) -> Dict[str, An
             payload["retrievalTrace"] = _parse_jsonish(content, None)
         elif event == "warnings":
             payload["warnings"] = _parse_jsonish(content, [])
+        elif event == "suggestions":
+            payload["suggestions"] = _parse_suggestions(content)
         payload["events"].append({"type": event, "content": content})
 
     return payload
@@ -107,7 +111,7 @@ def _semantic_events(events: List[Tuple[str, Any]]) -> List[Tuple[str, Any]]:
     semantic_events: List[Tuple[str, Any]] = []
     for event, chunk in events:
         event_name = str(event or "message")
-        if event_name in {"citations", "retrieval_trace", "warnings"}:
+        if event_name in {"citations", "retrieval_trace", "warnings", "suggestions"} and isinstance(chunk, (dict, list)):
             semantic_events.append((event_name, chunk))
             continue
 
@@ -120,7 +124,7 @@ def _semantic_events(events: List[Tuple[str, Any]]) -> List[Tuple[str, Any]]:
             _append_thinking_event(semantic_events, raw_text, text)
             continue
 
-        if semantic_events and semantic_events[-1][0] == event_name and event_name in {"message", "sql", "analysis"}:
+        if semantic_events and semantic_events[-1][0] == event_name and event_name in {"message", "sql", "analysis", "suggestions"}:
             semantic_events[-1] = (event_name, semantic_events[-1][1] + raw_text)
         else:
             semantic_events.append((event_name, text if event_name == "confidence" else raw_text.strip()))
@@ -166,6 +170,7 @@ def parse_assistant_history_content(content: str) -> Dict[str, Any]:
         "citations": [],
         "retrievalTrace": None,
         "warnings": [],
+        "suggestions": [],
         "events": [],
     }
     if not cleaned:
@@ -218,6 +223,13 @@ def _parse_legacy_history_content(content: str, payload: Dict[str, Any]) -> Dict
         payload["events"].append({"type": "sql", "content": text})
     working = re.sub(r"\s*```sql[\s\S]*?```\s*", "\n\n", working, flags=re.I)
 
+    suggestions_match = re.search(r"### SUGGESTIONS:\s*([\s\S]*)", working, flags=re.I)
+    if suggestions_match:
+        text = suggestions_match.group(1).strip()
+        payload["suggestions"] = _parse_suggestions(text)
+        payload["events"].append({"type": "suggestions", "content": text})
+    working = re.sub(r"\s*### SUGGESTIONS:[\s\S]*", "", working, flags=re.I)
+
     analysis_match = re.search(r"### ANALYSIS:\s*([\s\S]*)", working, flags=re.I)
     if analysis_match:
         text = analysis_match.group(1).strip()
@@ -260,6 +272,77 @@ def _parse_jsonish(content: Any, fallback: Any) -> Any:
         return json.loads(str(content))
     except (TypeError, json.JSONDecodeError):
         return fallback
+
+
+def _parse_suggestions(content: Any) -> List[Dict[str, str]]:
+    """Normalizes clickable follow-up suggestions for the AI Assistant UI."""
+    raw_items = _parse_jsonish(_clean_suggestion_json_text(content), None)
+    if raw_items is None:
+        raw_items = [
+            line.strip(" -\t")
+            for line in str(content or "").splitlines()
+            if _is_plain_suggestion_line(line)
+        ]
+
+    if not isinstance(raw_items, list):
+        return []
+
+    suggestions: List[Dict[str, str]] = []
+    seen_prompts = set()
+    for item in raw_items:
+        suggestion = _normalize_suggestion(item)
+        if not suggestion:
+            continue
+        prompt_key = suggestion["prompt"].lower()
+        if prompt_key in seen_prompts:
+            continue
+        seen_prompts.add(prompt_key)
+        suggestions.append(suggestion)
+        if len(suggestions) >= 4:
+            break
+    return suggestions
+
+
+def _clean_suggestion_json_text(content: Any) -> Any:
+    if isinstance(content, (dict, list)):
+        return content
+
+    text = str(content or "").strip()
+    fence_match = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", text, flags=re.I)
+    if fence_match:
+        text = fence_match.group(1).strip()
+
+    array_start = text.find("[")
+    array_end = text.rfind("]")
+    if array_start >= 0 and array_end > array_start:
+        return text[array_start:array_end + 1]
+    return text
+
+
+def _is_plain_suggestion_line(line: str) -> bool:
+    text = line.strip(" -\t")
+    if not text:
+        return False
+    return not (
+        text.startswith(("```", "[", "]", "{", "}"))
+        or text.startswith(('"label"', '"prompt"', '"intent"'))
+    )
+
+
+def _normalize_suggestion(item: Any) -> Dict[str, str] | None:
+    if isinstance(item, str):
+        text = item.strip()
+        return {"label": text, "prompt": text, "intent": "other"} if text else None
+
+    if not isinstance(item, dict):
+        return None
+
+    prompt = str(item.get("prompt") or "").strip()
+    label = str(item.get("label") or prompt).strip()
+    intent = str(item.get("intent") or "other").strip() or "other"
+    if not prompt or not label:
+        return None
+    return {"label": label, "prompt": prompt, "intent": intent}
 
 
 def _events_from_legacy_parts(parts: Dict[str, List[str]]) -> List[Tuple[str, str]]:

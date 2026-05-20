@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { Activity, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -105,20 +104,21 @@ export function AIAssistant({
     init();
   }, [selectedDatabaseId, loadConversations]);
 
-  // Virtualization
-  const virtualizer = useVirtualizer({
-    count: messages.length + (isTyping ? 1 : 0),
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 150,
-    overscan: 5,
-  });
-
   // Auto-scroll logic
   useEffect(() => {
-    if (messages.length > 0) {
-      virtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
+    if (messages.length > 0 && parentRef.current) {
+      parentRef.current.scrollTo({
+        top: parentRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
-  }, [messages.length, messages[messages.length - 1]?.content, isTyping, virtualizer]);
+  }, [
+    messages.length,
+    messages[messages.length - 1]?.content,
+    messages[messages.length - 1]?.analysis,
+    messages[messages.length - 1]?.suggestions?.length,
+    isTyping,
+  ]);
 
   useEffect(() => {
     if (lastNewChatSignalRef.current === newChatSignal) return;
@@ -317,7 +317,10 @@ export function AIAssistant({
       `Columns: ${JSON.stringify(lab.columns || [])}`,
       `Sample rows: ${JSON.stringify(rows)}`,
     ].join("\n"));
-    void _handleSend(prompt, { taskKey: "results.analyze" });
+    void _handleSend(prompt, {
+      taskKey: "results.analyze",
+      displayContent: "Phân tích kết quả query hiện tại trong SQL Lab",
+    });
   }, [_handleSend, editorSql, lab.columns, lab.results]);
 
   const handleSuggestionClick = useCallback((suggestion: string) => _handleSend(suggestion), [_handleSend]);
@@ -373,7 +376,6 @@ export function AIAssistant({
           messages={messages}
           isTyping={isTyping}
           isFetchingConversation={isFetchingConversation}
-          virtualizer={virtualizer}
           parentRef={parentRef}
           conversationId={conversationId}
           {...AIActions}
