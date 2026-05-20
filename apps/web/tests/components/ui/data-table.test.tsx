@@ -20,6 +20,12 @@ const data: TestData[] = [
   { id: "2", name: "Jane Smith", email: "jane@example.com" },
 ];
 
+const paginatedData: TestData[] = Array.from({ length: 11 }, (_, index) => ({
+  id: String(index + 1),
+  name: `User ${index + 1}`,
+  email: `user-${index + 1}@example.com`,
+}));
+
 describe("DataTable Component", () => {
   it("renders headers and data correctly", () => {
     render(<DataTable columns={columns} data={data} />);
@@ -55,5 +61,24 @@ describe("DataTable Component", () => {
     fireEvent.change(input, { target: { value: "Non-existent" } });
 
     expect(screen.getByText("No results.")).toBeInTheDocument();
+  });
+
+  it("navigates between paginated rows", () => {
+    render(<DataTable columns={columns} data={paginatedData} />);
+
+    expect(screen.getByText("User 1")).toBeInTheDocument();
+    expect(screen.queryByText("User 11")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Go to next page" }));
+
+    expect(screen.queryByText("User 1")).not.toBeInTheDocument();
+    expect(screen.getByText("User 11")).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Go to previous page" }),
+    );
+
+    expect(screen.getByText("User 1")).toBeInTheDocument();
+    expect(screen.queryByText("User 11")).not.toBeInTheDocument();
   });
 });

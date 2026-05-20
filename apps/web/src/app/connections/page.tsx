@@ -162,10 +162,6 @@ function ConnectionsContent() {
                 />
               </div>
 
-              <div className="py-4 border-t border-slate-100 dark:border-border mt-auto text-[13px] text-slate-500 font-medium">
-                1 - {filteredConnections.length} of {connections?.length || 0}{" "}
-                connections
-              </div>
             </div>
           </div>
         )}
