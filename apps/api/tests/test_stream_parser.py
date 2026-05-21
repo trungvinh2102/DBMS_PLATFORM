@@ -4,7 +4,11 @@ test_stream_parser.py
 Regression tests for semantic AI stream event parsing.
 """
 
+import pytest
+
 from services.ai.stream_parser import TaggedResponseStreamParser
+
+pytestmark = pytest.mark.rag
 
 
 def collect_events(chunks):

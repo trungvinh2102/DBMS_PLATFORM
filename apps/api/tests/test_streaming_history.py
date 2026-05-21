@@ -6,6 +6,8 @@ Regression tests for rebuilding streamed AI Assistant events into saved chat his
 
 import datetime
 
+import pytest
+
 from services.ai.streaming import (
     append_stream_part,
     build_assistant_history_content,
@@ -14,6 +16,8 @@ from services.ai.streaming import (
     parse_assistant_history_content,
 )
 from services.ai.conversation_store import AIConversationStore
+
+pytestmark = pytest.mark.rag
 
 
 def test_build_history_preserves_semantic_sections():

@@ -6,11 +6,14 @@ Regression tests for local AI observability diagnostics.
 
 import datetime
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 import routes.ai_diagnostics as diagnostics_module
 from models import Base, RagRetrievalEvent
+
+pytestmark = pytest.mark.rag
 
 
 def test_ai_diagnostics_returns_safe_trace_summary(monkeypatch):

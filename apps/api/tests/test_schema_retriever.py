@@ -4,10 +4,14 @@ test_schema_retriever.py
 Regression tests for hybrid schema retrieval and RAG prompt context assembly.
 """
 
+import pytest
+
 from services.ai.context import SchemaContextService
 from services.schema_retriever import SchemaRetriever, TableRetrievalResult
 from services.ai_service import AIService
 from services.ai.retrieval.text import build_table_search_text
+
+pytestmark = pytest.mark.rag
 
 
 def test_retrieve_relevant_tables_uses_lexical_fallback(monkeypatch):

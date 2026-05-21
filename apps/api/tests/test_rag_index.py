@@ -18,6 +18,8 @@ from services.ai.retrieval.index_service import RagIndexService
 from services.ai.retrieval.retrieval_service import RagRetrievalService
 from services.ai.retrieval.vector_store import resolve_vector_store_config
 
+pytestmark = pytest.mark.rag
+
 
 @pytest.fixture
 def rag_session_factory(monkeypatch):

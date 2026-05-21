@@ -4,9 +4,13 @@ test_rag_phase3.py
 Regression tests for production RAG query understanding, context assembly, and prompts.
 """
 
+import pytest
+
 from services.ai.prompt_contracts import build_rag_prompt
 from services.ai.query_understanding import query_understanding_service
 from services.ai.rag_context import RagContextBuilder
+
+pytestmark = pytest.mark.rag
 
 
 def test_query_understanding_classifies_and_rewrites_followup_sql():

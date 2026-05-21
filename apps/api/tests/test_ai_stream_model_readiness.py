@@ -6,8 +6,12 @@ Regression tests for model readiness checks before AI Assistant streaming work.
 
 from types import SimpleNamespace
 
+import pytest
+
 from services.ai_service import MODEL_PREFLIGHT_STATUS
 from services.ai_service import ai_service
+
+pytestmark = pytest.mark.rag
 
 
 def test_stream_checks_explicit_model_before_understanding(mocker):

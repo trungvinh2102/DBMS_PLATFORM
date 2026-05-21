@@ -4,7 +4,10 @@ test_ai_stream_conversation.py
 Regression tests for AI Assistant streaming conversation continuity.
 """
 
+import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.rag
 
 
 def test_stream_exposes_conversation_id_header_and_uses_request_history(app, mocker):

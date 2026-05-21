@@ -14,6 +14,8 @@ from models import AIModel, Base
 from services.ai.langchain_runtime import get_ai_api_key, infer_provider_from_model_id, langchain_runtime
 from services.ai.base import BaseAIService
 
+pytestmark = pytest.mark.rag
+
 
 def test_infer_provider_from_model_id():
     assert infer_provider_from_model_id("gpt-4o-mini") == "openai"

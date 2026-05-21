@@ -26,6 +26,8 @@ from services.ai.retrieval.index_documents import build_schema_chunks
 from services.ai.retrieval.index_service import RagIndexService
 from services.ai.retrieval.retrieval_service import RagRetrievalService
 
+pytestmark = pytest.mark.rag
+
 
 @pytest.fixture
 def rag_eval_session_factory(monkeypatch):
