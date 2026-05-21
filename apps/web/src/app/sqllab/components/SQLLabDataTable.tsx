@@ -27,6 +27,49 @@ interface SQLLabDataTableProps {
   columnMetadata?: any[];
 }
 
+const ROW_INDEX_COLUMN_WIDTH_PX = 48;
+const MIN_DATA_COLUMN_WIDTH_PX = 88;
+const CELL_CHROME_WIDTH_PX = 44;
+const MONOSPACE_CHAR_WIDTH_PX = 8;
+
+function formatCellValue(val: any, nullText: string) {
+  if (val === null) return nullText;
+  if (typeof val === "object") return JSON.stringify(val);
+  return String(val);
+}
+
+function getEstimatedTextUnits(text: string) {
+  let units = 0;
+  for (const char of text) {
+    const codePoint = char.codePointAt(0) ?? 0;
+    units += codePoint >= 0x2e80 ? 2 : 1;
+  }
+  return units;
+}
+
+function estimateColumnWidths(columns: string[], data: any[], nullText: string) {
+  const maxUnitsByColumn = columns.map((column) =>
+    getEstimatedTextUnits(column),
+  );
+
+  data.forEach((row) => {
+    columns.forEach((column, index) => {
+      const value = formatCellValue(row?.[column], nullText);
+      const units = getEstimatedTextUnits(value);
+      if (units > maxUnitsByColumn[index]) {
+        maxUnitsByColumn[index] = units;
+      }
+    });
+  });
+
+  return maxUnitsByColumn.map((units) =>
+    Math.max(
+      MIN_DATA_COLUMN_WIDTH_PX,
+      Math.ceil(units * MONOSPACE_CHAR_WIDTH_PX) + CELL_CHROME_WIDTH_PX,
+    ),
+  );
+}
+
 /**
  * High-performance virtualized table component for database query results.
  */
@@ -80,11 +123,19 @@ export function SQLLabDataTable({
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
+  const columnWidths = useMemo(
+    () => estimateColumnWidths(columns, data, showNullAs),
+    [columns, data, showNullAs],
+  );
+  const tableWidth = useMemo(
+    () =>
+      ROW_INDEX_COLUMN_WIDTH_PX +
+      columnWidths.reduce((total, width) => total + width, 0),
+    [columnWidths],
+  );
 
   const displayValue = (val: any) => {
-    if (val === null) return showNullAs;
-    if (typeof val === "object") return JSON.stringify(val);
-    return String(val);
+    return formatCellValue(val, showNullAs);
   };
 
   const isColumnEditable = (colName: string) => {
@@ -160,7 +211,19 @@ export function SQLLabDataTable({
         ref={parentRef}
         className="flex-1 relative overflow-auto scrollbar-thin bg-background"
       >
-        <table className="w-full text-sm border-collapse table-fixed min-w-full font-mono">
+        <table
+          className="min-w-full text-sm border-collapse table-fixed font-mono"
+          style={{ width: `${tableWidth}px` }}
+        >
+          <colgroup>
+            <col style={{ width: `${ROW_INDEX_COLUMN_WIDTH_PX}px` }} />
+            {columns.map((col, i) => (
+              <col
+                key={`${col}-${i}`}
+                style={{ width: `${columnWidths[i]}px` }}
+              />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 bg-background/95 backdrop-blur-md shadow-sm z-50">
             <tr>
               <th className="border-b border-r p-1 text-[9px] text-muted-foreground font-black w-12 text-center bg-muted/20 sticky left-0 z-51 uppercase tracking-tighter">
@@ -170,12 +233,12 @@ export function SQLLabDataTable({
                 <th
                   key={`${col}-${i}`}
                   className={cn(
-                    "border-b border-r pt-3 pb-2 px-3 text-left font-black text-[11px] bg-muted/5 w-45 transition-colors hover:bg-muted/10 group truncate select-text uppercase tracking-tighter",
-                    mini ? "px-2 w-37.5" : "px-3",
+                    "border-b border-r pt-3 pb-2 px-3 text-left font-black text-[11px] bg-muted/5 transition-colors hover:bg-muted/10 group select-text uppercase tracking-tighter whitespace-nowrap",
+                    mini ? "px-2" : "px-3",
                   )}
                 >
-                  <div className="flex items-center justify-between gap-2 overflow-hidden">
-                    <span className="truncate">{col}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{col}</span>
                     <ChevronDown className="h-3 w-3 opacity-0 group-hover:opacity-30 shrink-0" />
                   </div>
                 </th>
@@ -217,8 +280,8 @@ export function SQLLabDataTable({
                       <td
                         key={j}
                         className={cn(
-                          "border-r p-2 text-[11px] font-medium truncate w-45 border-border/20 transition-all select-text relative",
-                          mini ? "p-1.5 w-37.5" : "p-2.5",
+                          "border-r p-2 text-[11px] font-medium whitespace-nowrap border-border/20 transition-all select-text relative",
+                          mini ? "p-1.5" : "p-2.5",
                           isObject &&
                           "cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors",
                           isEdited && !isEditing && "bg-amber-500/10",
@@ -253,7 +316,7 @@ export function SQLLabDataTable({
                             }}
                           />
                         ) : (
-                          <div className="truncate">
+                          <div>
                             {val === null ? (
                               <span className="text-muted-foreground/40 italic font-black uppercase tracking-widest text-[9px]">
                                 {showNullAs}
