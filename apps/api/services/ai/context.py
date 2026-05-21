@@ -15,6 +15,7 @@ from models import SessionLocal
 from ..metadata import metadata_service
 from ..base_service import BaseDatabaseService
 from ..schema_retriever import TableRetrievalResult, schema_retriever
+from .retrieval.text import format_table_reference
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,7 @@ class SchemaContextService:
         all_fks = metadata_service.get_all_foreign_keys(db_id, schema)
         
         context = [f"DATABASE DIALECT: {db_type.upper()}"]
+        context.extend(self._format_identifier_contract(target_cols.keys(), schema, db_type))
         if retrieval_results:
             context.extend(self._format_retrieved_evidence(db_id, retrieval_results))
         context.append("SCHEMA STRUCTURE:")
@@ -128,6 +130,17 @@ class SchemaContextService:
             retrieval_trace=self._build_retrieval_trace(db_id, intent, schema, retrieval_results),
             citations=self._build_citations(db_id, retrieval_results),
         )
+
+    def _format_identifier_contract(self, table_names, schema: str, db_type: str) -> List[str]:
+        lines = [
+            "IDENTIFIER CONTRACT:",
+            "- Use table and column identifiers exactly as listed; preserve case and spelling.",
+            "- Never pluralize, singularize, lowercase, or otherwise rewrite table names.",
+            "- Exact table references:",
+        ]
+        for table_name in table_names:
+            lines.append(f"  - {table_name} -> {format_table_reference(str(table_name), schema, db_type)}")
+        return lines
 
     def _format_retrieved_evidence(self, db_id: str, results: List[TableRetrievalResult]) -> List[str]:
         """Formats compact retrieval evidence for the model prompt."""

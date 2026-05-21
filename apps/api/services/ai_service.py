@@ -22,6 +22,8 @@ from .prompts import VIETNAMESE_RESPONSE_POLICY
 
 logger = logging.getLogger(__name__)
 
+MODEL_PREFLIGHT_STATUS = "Đang kiểm tra model và hạn mức..."
+
 DATABASE_TASK_KEYWORDS = {
     "sql", "query", "queries", "database", "db", "schema", "table", "tables",
     "column", "columns", "row", "rows", "join", "filter", "where", "group",
@@ -114,9 +116,44 @@ class AIService(SqlAIService, AgentAIService):
     ):
         """Streams responses for chat interfaces using SSE events."""
         history = history or []
+        readiness_checked = False
+        if model_id:
+            provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
+            yield "thinking", MODEL_PREFLIGHT_STATUS
+            try:
+                langchain_runtime.validate_model_ready(
+                    model_id=model_id,
+                    user_id=user_id,
+                    provider=provider,
+                    probe_remote=True,
+                )
+                readiness_checked = True
+            except Exception as readiness_error:
+                logger.warning("AI model readiness check failed before stream setup: %s", readiness_error)
+                yield "error", str(readiness_error)
+                return
+
         understanding = query_understanding_service.understand(prompt, history, db_id, schema)
         is_database_request = understanding.needs_retrieval
         quick_response = self._quick_general_response(prompt) if not is_database_request else ""
+
+        resolved_task_key = task_key or ("chat.database" if is_database_request else "chat.general")
+        model_id = task_model_router.resolve_model_id(resolved_task_key, user_id, model_id, db_id)
+        provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
+        if not readiness_checked:
+            yield "thinking", MODEL_PREFLIGHT_STATUS
+            try:
+                langchain_runtime.validate_model_ready(
+                    model_id=model_id,
+                    user_id=user_id,
+                    provider=provider,
+                    probe_remote=True,
+                )
+            except Exception as readiness_error:
+                logger.warning("AI model readiness check failed before streaming: %s", readiness_error)
+                yield "error", str(readiness_error)
+                return
+
         if quick_response:
             yield "message", quick_response
             return
@@ -162,9 +199,6 @@ class AIService(SqlAIService, AgentAIService):
             if conv_id and not langchain_history:
                 langchain_history = self._load_langchain_history(conv_id)
 
-            resolved_task_key = task_key or ("chat.database" if is_database_request else "chat.general")
-            model_id = task_model_router.resolve_model_id(resolved_task_key, user_id, model_id, db_id)
-            provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             parser = TaggedResponseStreamParser()
             for chunk in langchain_runtime.stream_text(
                 system_prompt=system_prompt,

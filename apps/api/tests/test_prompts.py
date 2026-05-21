@@ -42,6 +42,8 @@ def test_sql_generation_prompt_includes_grounding_and_safety_rules():
 
     assert "Use only tables, collections, columns, fields, and relationships" in prompt
     assert "Do not invent identifiers" in prompt
+    assert "Preserve identifier case and spelling exactly" in prompt
+    assert "never pluralize" in prompt
     assert "DROP" in prompt
     assert "TRUNCATE" in prompt
     assert "FEEDBACK EXAMPLE" in prompt

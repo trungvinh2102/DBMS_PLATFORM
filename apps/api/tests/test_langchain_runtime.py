@@ -5,7 +5,12 @@ Regression tests for QurioDB's LangChain provider runtime, OpenAI-compatible
 provider selection, and provider-safe AI service fallback behavior.
 """
 
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 import services.ai.langchain_runtime as runtime
+from models import AIModel, Base
 from services.ai.langchain_runtime import get_ai_api_key, infer_provider_from_model_id, langchain_runtime
 from services.ai.base import BaseAIService
 
@@ -68,6 +73,46 @@ def test_status_reports_supported_provider_registry():
     assert status["supportedProviders"] == ["openai", "google", "anthropic", "qwen", "deepseek"]
     assert status["defaultModels"]["openai"] == "gpt-4o-mini"
     assert status["defaultModels"]["google"] == "gemini-2.5-flash"
+
+
+def test_validate_model_ready_rejects_inactive_registered_model(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session_factory = sessionmaker(bind=engine)
+    monkeypatch.setattr(runtime, "SessionLocal", session_factory)
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "test-key")
+
+    session = session_factory()
+    try:
+        session.add(AIModel(
+            id="model-1",
+            name="Inactive Gemini",
+            modelId="gemini-inactive",
+            provider="Google",
+            isActive=False,
+        ))
+        session.commit()
+    finally:
+        session.close()
+
+    with pytest.raises(RuntimeError, match="inactive"):
+        langchain_runtime.validate_model_ready(model_id="gemini-inactive", provider="google")
+
+
+def test_validate_model_ready_remote_probe_surfaces_quota_errors(monkeypatch):
+    class QuotaLimitedModel:
+        def invoke(self, messages, config=None):
+            raise RuntimeError("quota exceeded")
+
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "test-key")
+    monkeypatch.setattr(langchain_runtime, "build_model", lambda **kwargs: QuotaLimitedModel())
+
+    with pytest.raises(RuntimeError, match="quota exceeded"):
+        langchain_runtime.validate_model_ready(
+            model_id="gemini-2.5-flash",
+            provider="google",
+            probe_remote=True,
+        )
 
 
 def test_langchain_failure_returns_provider_error_without_native_fallback(monkeypatch):

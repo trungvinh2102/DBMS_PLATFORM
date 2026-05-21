@@ -241,6 +241,60 @@ class LangChainRuntime:
             "project": os.getenv("LANGSMITH_PROJECT") or os.getenv("LANGCHAIN_PROJECT"),
         }
 
+    def validate_model_ready(
+        self,
+        model_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        provider: Optional[str] = None,
+        probe_remote: bool = False,
+    ) -> Dict[str, str]:
+        """Validates the selected model/provider before starting expensive AI work."""
+        if not HAS_LANGCHAIN:
+            raise RuntimeError("LangChain chat integrations are not installed")
+
+        target_provider = normalize_provider(provider or self.resolve_provider(model_id, user_id))
+        target_model = model_id or DEFAULT_PROVIDER_MODELS.get(target_provider, self.default_model)
+
+        if model_id:
+            session = SessionLocal()
+            try:
+                model = session.query(AIModel).filter(AIModel.modelId == model_id).first()
+                if model and not getattr(model, "isActive", True):
+                    raise RuntimeError(f"AI model '{model_id}' is inactive. Activate it in AI Settings before streaming.")
+            finally:
+                session.close()
+
+        if target_provider == "anthropic" and not HAS_ANTHROPIC:
+            raise RuntimeError("Anthropic integration is not installed")
+
+        api_key = get_ai_api_key(user_id, target_provider)
+        if not api_key:
+            raise RuntimeError(f"Missing {target_provider} API key. Configure environment variables or AI Settings.")
+
+        if probe_remote:
+            self._probe_model_access(target_model, user_id, target_provider)
+
+        return {"provider": target_provider, "model": target_model}
+
+    def _probe_model_access(self, model_id: str, user_id: Optional[str], provider: str) -> None:
+        """Performs a minimal provider call to catch quota, rate limit, and model access errors."""
+        try:
+            model = self.build_model(
+                model_id=model_id,
+                user_id=user_id,
+                provider=provider,
+                temperature=0,
+                max_tokens=4,
+            )
+            messages = self.make_messages(
+                "You are checking model availability. Reply with OK.",
+                "OK",
+            )
+            config = {"metadata": {**langsmith_metadata(user_id=user_id), "preflight": "true"}}
+            model.invoke(messages, config=config)
+        except Exception as exc:
+            raise RuntimeError(f"AI model preflight failed for provider {provider}: {exc}") from exc
+
     def build_model(
         self,
         model_id: Optional[str] = None,
@@ -255,10 +309,9 @@ class LangChainRuntime:
 
         target_provider = normalize_provider(provider or self.resolve_provider(model_id, user_id))
         target_model = model_id or DEFAULT_PROVIDER_MODELS.get(target_provider, self.default_model)
+        self.validate_model_ready(model_id=model_id, user_id=user_id, provider=target_provider)
 
         api_key = get_ai_api_key(user_id, target_provider)
-        if not api_key:
-            raise RuntimeError(f"Missing {target_provider} API key. Configure environment variables or AI Settings.")
 
         kwargs: Dict[str, Any] = {"model": target_model, "temperature": temperature, "max_retries": 2}
         if max_tokens is not None:

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from models import QueryHistory, SavedQuery
 
-from .text import build_table_search_text, foreign_keys_for_table
+from .text import build_table_search_text, foreign_keys_for_table, format_table_reference
 
 SECRET_VALUE_PATTERN = re.compile(
     r"(?i)\b(api[_\-\s]?key|token|password|secret)\b\s*[:=]\s*['\"]?([A-Za-z0-9_\-./]{8,})['\"]?"
@@ -44,6 +44,10 @@ def build_schema_chunks(
             db_type=db_type,
             foreign_keys=foreign_keys_for_table(table_name, foreign_keys),
             indexes=indexes_by_table.get(table_name, []),
+        )
+        content = content.replace(
+            f"SQL table reference: {format_table_reference(table_name, None, db_type)}",
+            f"SQL table reference: {format_table_reference(table_name, schema, db_type)}",
         )
         chunks.append({
             "chunkType": "table",

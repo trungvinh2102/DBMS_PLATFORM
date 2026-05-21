@@ -71,6 +71,7 @@ def test_index_database_schema_writes_generalized_sources_and_chunks(rag_session
     table_chunk = next(chunk for chunk in chunks if chunk.chunkType == "table")
     graph_chunk = next(chunk for chunk in chunks if chunk.chunkType == "schema_graph")
     assert table_chunk.metadataJson["citation"] == "database:db-1/schema:public/table:orders"
+    assert 'SQL table reference: "public"."orders"' in table_chunk.content
     assert "customer_id INTEGER required foreign key to customers.id" in table_chunk.content
     assert graph_chunk.metadataJson["citation"] == "database:db-1/schema:public/graph"
     assert "orders.customer_id -> customers.id" in graph_chunk.content

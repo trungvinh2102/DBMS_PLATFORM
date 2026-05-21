@@ -26,6 +26,7 @@ STATUS_THINKING_EVENTS = {
     "Learning from your feedback...",
     "Ready.",
     "Initialization complete.",
+    "Đang kiểm tra model và hạn mức...",
     "Đang khởi tạo bối cảnh...",
     "Phân tích lược đồ...",
     "Học hỏi từ phản hồi của các bạn...",

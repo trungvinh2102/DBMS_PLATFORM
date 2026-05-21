@@ -50,6 +50,10 @@ OUTPUT FORMAT:
 RULES:
 - Use only retrieved or database-context identifiers.
 - Do not invent tables, columns, collections, or fields.
+- Preserve identifier case and spelling exactly as shown in the IDENTIFIER CONTRACT and retrieved evidence.
+- Do not use table names outside the allowed table list in the IDENTIFIER CONTRACT.
+- For PostgreSQL mixed-case identifiers, use the quoted SQL references exactly, for example `"Booking"` instead of bookings.
+- Never pluralize, singularize, lowercase, or translate table names. `Booking` is not `bookings`; `Experience` is not `experiences`.
 - If evidence is insufficient, ask a clarification question instead of fabricating SQL.
 - Prefer read-only statements. Do not generate destructive DDL/DCL.
 - Follow the language policy for all visible explanation.

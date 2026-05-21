@@ -52,6 +52,7 @@ def build_table_search_text(
 
     return "\n".join([
         f"Table: {table_name}",
+        f"SQL table reference: {format_table_reference(table_name, None, db_type)}",
         f"Identifier words: {' '.join(split_identifier(table_name))}",
         f"Dialect: {db_type}",
         "Columns:",
@@ -61,6 +62,24 @@ def build_table_search_text(
         "Indexes:",
         *(index_parts or ["- none"]),
     ])
+
+
+def format_table_reference(table_name: str, schema: Optional[str] = None, db_type: str = "sql") -> str:
+    """Formats an exact SQL table reference that preserves identifier case."""
+    quote_start, quote_end = _identifier_quotes(db_type)
+    table_ref = f"{quote_start}{table_name}{quote_end}"
+    if schema:
+        return f"{quote_start}{schema}{quote_end}.{table_ref}"
+    return table_ref
+
+
+def _identifier_quotes(db_type: str) -> tuple[str, str]:
+    normalized = str(db_type or "").strip().lower()
+    if normalized in {"mysql", "mariadb"}:
+        return "`", "`"
+    if normalized in {"mssql", "sqlserver", "sql server"}:
+        return "[", "]"
+    return '"', '"'
 
 
 def expand_query_terms(intent: str) -> List[str]:

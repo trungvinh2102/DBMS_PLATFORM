@@ -95,6 +95,8 @@ def test_schema_context_includes_retrieval_notes_and_fk_neighbors(monkeypatch):
     context = service.format_schema_context("db-1", "public", intent="orders by customer")
 
     assert "RETRIEVED EVIDENCE" in context
+    assert "IDENTIFIER CONTRACT:" in context
+    assert '- orders -> "public"."orders"' in context
     assert "[database:db-1/schema:public/table:orders] orders: score=0.0200" in context
     assert 'CREATE TABLE "orders"' in context
     assert 'CREATE TABLE "customers"' in context
@@ -161,6 +163,7 @@ def test_table_search_text_includes_foreign_keys_and_indexes():
     )
 
     assert "Dialect: postgresql" in text
+    assert 'SQL table reference: "orders"' in text
     assert "customer_id uuid required foreign key to customers.id" in text
     assert "orders.customer_id -> customers.id" in text
     assert "idx_orders_customer_id" in text
@@ -191,6 +194,7 @@ def test_stream_response_does_not_emit_retrieval_trace_tool_call(monkeypatch):
         "services.ai_service.langchain_runtime.stream_text",
         lambda **_: iter(["done"]),
     )
+    monkeypatch.setattr("services.ai_service.langchain_runtime.validate_model_ready", lambda **_: None)
 
     events = list(service.stream_generate_response("show orders", db_id="db-1", schema="public", history=[]))
 
@@ -218,6 +222,7 @@ def test_stream_response_skips_schema_retrieval_for_general_chat(monkeypatch):
         return iter(["Tôi là QurioDB copilot."])
 
     monkeypatch.setattr("services.ai_service.langchain_runtime.stream_text", stream_text)
+    monkeypatch.setattr("services.ai_service.langchain_runtime.validate_model_ready", lambda **_: None)
 
     events = list(service.stream_generate_response("mày là ai", db_id="db-1", schema="public", history=[]))
 
@@ -247,6 +252,7 @@ def test_stream_response_uses_rag_context_for_database_chat(monkeypatch):
     monkeypatch.setattr("services.ai_service.rag_context_builder.build", build_rag_context)
     monkeypatch.setattr("services.ai_service.feedback_context_service.get_feedback_context", lambda *_: "")
     monkeypatch.setattr("services.ai_service.langchain_runtime.stream_text", lambda **_: iter(["done"]))
+    monkeypatch.setattr("services.ai_service.langchain_runtime.validate_model_ready", lambda **_: None)
 
     list(service.stream_generate_response("Những người dùng nào dùng từ ngữ nhạy cảm", db_id="db-1", schema="public", history=[]))
 
