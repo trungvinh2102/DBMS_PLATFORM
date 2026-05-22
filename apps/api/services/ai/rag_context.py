@@ -14,7 +14,7 @@ from services.ai.retrieval.evaluation import contains_prompt_injection
 from services.ai.retrieval.index_service import rag_index_service
 from services.ai.retrieval.metadata_source import SchemaMetadataSource
 from services.ai.retrieval.retrieval_service import rag_retrieval_service
-from services.ai.retrieval.text import format_table_reference
+from services.ai.retrieval.text import format_column_reference, format_table_reference
 
 SQL_RETRIEVAL_INTENTS = {"text_to_sql", "sql_explain", "sql_repair", "sql_optimize"}
 
@@ -114,11 +114,12 @@ class RagContextBuilder:
             lines.append("- none")
         for index, item in enumerate(items, start=1):
             citation = (item.get("citation") or {}).get("id") or f"item:{index}"
+            content = self._compress_item_content(understanding.retrieval_query, str(item.get("content") or ""))
             lines.extend([
                 f"[{index}] {item.get('title')} ({item.get('sourceType')}, score={item.get('score')})",
                 f"Citation: {citation}",
                 "Content:",
-                str(item.get("content") or "").strip(),
+                content,
                 "",
             ])
         if warnings:
@@ -133,7 +134,9 @@ class RagContextBuilder:
         items: List[Dict[str, Any]],
     ) -> List[str]:
         allowed_table_names = self._allowed_table_names(database_id, schema)
+        allowed_columns_by_table = self._allowed_columns_by_table(database_id, schema)
         table_refs = []
+        column_refs = []
         seen = set()
         for item in items:
             if item.get("sourceType") != "database_schema":
@@ -142,7 +145,15 @@ class RagContextBuilder:
             if not table_name or table_name in seen:
                 continue
             seen.add(table_name)
-            table_refs.append(f"- {table_name} -> {format_table_reference(table_name, schema, db_type)}")
+            table_ref = format_table_reference(table_name, schema, db_type)
+            table_refs.append(f"- {table_name} -> {table_ref}")
+            column_refs.extend(self._format_column_contract_lines(
+                table_name,
+                table_ref,
+                allowed_columns_by_table.get(table_name, []),
+                db_type,
+                schema,
+            ))
 
         if not table_refs:
             lines = [
@@ -159,8 +170,11 @@ class RagContextBuilder:
             f"- Allowed table names in this schema: {', '.join(allowed_table_names) if allowed_table_names else '(not available)'}",
             "- Do not use any table name outside the allowed table list.",
             "- Use the SQL references below exactly for tables with mixed-case names.",
-            "- Never pluralize, singularize, lowercase, or otherwise rewrite table names.",
+            "- Use the SQL column references below exactly for mixed-case columns.",
+            "- When using an alias, keep the same quoted column component after the alias, for example B.\"experienceId\"; never B.experienceId.",
+            "- Never pluralize, singularize, lowercase, or otherwise rewrite table or column names.",
             *table_refs,
+            *column_refs,
         ]
         return lines
 
@@ -171,6 +185,45 @@ class RagContextBuilder:
             return list(self.metadata.get_all_columns(database_id, schema).keys())
         except Exception:
             return []
+
+    def _allowed_columns_by_table(self, database_id: Optional[str], schema: str) -> Dict[str, List[str]]:
+        if not database_id:
+            return {}
+        try:
+            all_columns = self.metadata.get_all_columns(database_id, schema)
+            return {
+                table_name: [str(column.get("name")) for column in columns if column.get("name")]
+                for table_name, columns in all_columns.items()
+            }
+        except Exception:
+            return {}
+
+    def _format_column_contract_lines(
+        self,
+        table_name: str,
+        table_ref: str,
+        columns: List[str],
+        db_type: str,
+        schema: str,
+    ) -> List[str]:
+        if not columns:
+            return []
+
+        parts = [
+            f"{column} -> {format_column_reference(column, db_type)}"
+            for column in columns[:80]
+        ]
+        if len(columns) > 80:
+            parts.append(f"... {len(columns) - 80} more columns")
+
+        table_column_examples = [
+            format_column_reference(column, db_type, table_name=table_name, schema=schema)
+            for column in columns[:8]
+        ]
+        return [
+            f"- Columns for {table_ref}: {'; '.join(parts)}",
+            f"- Table-qualified column examples for {table_ref}: {', '.join(table_column_examples)}",
+        ]
 
     def _schema_table_name(self, item: Dict[str, Any]) -> Optional[str]:
         if item.get("chunkType") == "schema_graph":
@@ -220,6 +273,33 @@ class RagContextBuilder:
             seen.add(key)
             used += token_count
         return selected
+
+    def _compress_item_content(self, query: str, content: str) -> str:
+        """Keeps prompt context bounded while preserving query-matched evidence."""
+        words = content.strip().split()
+        max_words = self._max_chunk_words()
+        if len(words) <= max_words:
+            return content.strip()
+
+        terms = {term for term in re.findall(r"[a-zA-Z0-9_]+", query.lower()) if len(term) > 2}
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        matched_lines = [
+            line for line in lines
+            if any(term in line.lower() for term in terms)
+        ]
+
+        compressed = []
+        for line in lines[:8]:
+            if line not in compressed:
+                compressed.append(line)
+        for line in matched_lines:
+            if line not in compressed:
+                compressed.append(line)
+
+        text = "\n".join(compressed).strip()
+        if len(text.split()) > max_words:
+            text = " ".join(text.split()[:max_words])
+        return f"{text}\n[content truncated to fit RAG context budget]"
 
     def _dedupe_citations(self, citations) -> List[Dict[str, Any]]:
         results = []
@@ -284,6 +364,9 @@ class RagContextBuilder:
 
     def _max_context_tokens(self) -> int:
         return self._int_env("QURIODB_RAG_MAX_CONTEXT_TOKENS", 6000, minimum=512, maximum=20000)
+
+    def _max_chunk_words(self) -> int:
+        return self._int_env("QURIODB_RAG_MAX_CHUNK_WORDS", 900, minimum=120, maximum=4000)
 
     def _int_env(self, name: str, default: int, minimum: int, maximum: int) -> int:
         try:

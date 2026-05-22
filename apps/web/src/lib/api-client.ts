@@ -1,6 +1,6 @@
 /**
  * @file api-client.ts
- * @description API client for connecting to the Flask backend.
+ * @description API client for connecting to the FastAPI backend.
  */
 
 import axios from "axios";
@@ -228,6 +228,31 @@ export const aiApi = {
   updateConversation: (id: string, data: any) => req(api.put(`ai/conversations/${id}`, data)),
   deleteConversation: (id: string) => req(api.delete(`ai/conversations/${id}`)),
   getRagStatus: () => req(api.get("rag/status")),
+  getRagPipelineStatus: () => req(api.get("rag/pipeline/status")),
+  planRagPipeline: (data: {
+    query: string;
+    databaseId?: string;
+    schema_name?: string;
+    history?: Array<Record<string, string>>;
+  }) => req(api.post("rag/pipeline/plan", data)),
+  syncRagDatabase: (databaseId: string, data?: {
+    schema_name?: string;
+    includeSavedQueries?: boolean;
+    includeQueryHistory?: boolean;
+    includeFailedHistory?: boolean;
+    queryHistoryLimit?: number;
+  }) => req(api.post(`rag/pipeline/sync/database/${databaseId}`, data || {})),
+  evaluateRag: (data: {
+    cases: Array<{
+      name: string;
+      query: string;
+      expectedCitations: string[];
+      databaseId?: string;
+      sourceTypes?: string[];
+      topK?: number;
+      maxLatencyMs?: number;
+    }>;
+  }) => req(api.post("rag/evaluate", data)),
   getRagSources: (params?: { databaseId?: string; sourceType?: string }) => req(api.get("rag/sources", { params })),
   getRagSource: (id: string) => req(api.get(`rag/sources/${id}`)),
   deleteRagSource: (id: string) => req(api.delete(`rag/sources/${id}`)),

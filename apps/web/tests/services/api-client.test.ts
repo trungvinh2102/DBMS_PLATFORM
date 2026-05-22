@@ -136,6 +136,33 @@ describe("api-client", () => {
     expect(chunks).toBe("chunk1");
   });
 
+  it("aiApi RAG pipeline endpoints should work", async () => {
+    server.use(
+      http.get("*/api/rag/status", () => HttpResponse.json({ vectorStore: { backend: "sqlite_json" } })),
+      http.get("*/api/rag/pipeline/status", () => HttpResponse.json({ enabled: true, stageCount: 16, stages: [] })),
+      http.get("*/api/rag/sources", () => HttpResponse.json([{ id: "source-1", title: "Users", status: "indexed" }])),
+      http.get("*/api/rag/sources/source-1", () => HttpResponse.json({ id: "source-1", chunks: [] })),
+      http.delete("*/api/rag/sources/source-1", () => HttpResponse.json({ deleted: true })),
+      http.post("*/api/rag/index/*", () => HttpResponse.json({ status: "indexed" })),
+      http.post("*/api/rag/pipeline/plan", () => HttpResponse.json({ understanding: { intent: "sql_generation" } })),
+      http.post("*/api/rag/pipeline/sync/database/1", () => HttpResponse.json({ summary: { chunks: 2 } })),
+      http.post("*/api/rag/evaluate", () => HttpResponse.json({ summary: { totalCases: 1, passedCases: 1 } })),
+    );
+
+    expect(await aiApi.getRagStatus()).toEqual({ vectorStore: { backend: "sqlite_json" } });
+    expect(await aiApi.getRagPipelineStatus()).toEqual({ enabled: true, stageCount: 16, stages: [] });
+    expect(await aiApi.getRagSources()).toHaveLength(1);
+    expect(await aiApi.getRagSource("source-1")).toEqual({ id: "source-1", chunks: [] });
+    expect(await aiApi.deleteRagSource("source-1")).toEqual({ deleted: true });
+    expect(await aiApi.indexRagDatabase("1")).toEqual({ status: "indexed" });
+    expect(await aiApi.indexRagSavedQueries("1")).toEqual({ status: "indexed" });
+    expect(await aiApi.indexRagQueryHistory({ databaseId: "1" })).toEqual({ status: "indexed" });
+    expect(await aiApi.indexRagSource({ title: "Doc", content: "Content" })).toEqual({ status: "indexed" });
+    expect(await aiApi.planRagPipeline({ query: "find users", databaseId: "1" })).toEqual({ understanding: { intent: "sql_generation" } });
+    expect(await aiApi.syncRagDatabase("1", { includeQueryHistory: true })).toEqual({ summary: { chunks: 2 } });
+    expect(await aiApi.evaluateRag({ cases: [{ name: "Users", query: "users", expectedCitations: ["database:1/schema:public/table:users"] }] })).toEqual({ summary: { totalCases: 1, passedCases: 1 } });
+  });
+
   it("databaseApi comprehensive coverage", async () => {
     server.use(
       http.get("*/api/database/*", () => HttpResponse.json({ data: "mock" })),

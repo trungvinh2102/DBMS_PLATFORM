@@ -15,7 +15,7 @@ pytestmark = pytest.mark.rag
 
 
 def test_stream_checks_explicit_model_before_understanding(mocker):
-    understand = mocker.patch("services.ai_service.query_understanding_service.understand")
+    understand = mocker.patch("services.ai_service.rag_pipeline_service.understand_query")
     mocker.patch(
         "services.ai_service.langchain_runtime.resolve_provider",
         return_value="google",
@@ -47,7 +47,7 @@ def test_stream_checks_explicit_model_before_understanding(mocker):
 
 def test_stream_checks_model_readiness_before_retrieval(mocker):
     mocker.patch(
-        "services.ai_service.query_understanding_service.understand",
+        "services.ai_service.rag_pipeline_service.understand_query",
         return_value=SimpleNamespace(needs_retrieval=True),
     )
     mocker.patch(
@@ -62,7 +62,7 @@ def test_stream_checks_model_readiness_before_retrieval(mocker):
         "services.ai_service.langchain_runtime.validate_model_ready",
         side_effect=RuntimeError("AI model 'gemini-inactive' is inactive"),
     )
-    build_context = mocker.patch("services.ai_service.rag_context_builder.build")
+    build_context = mocker.patch("services.ai_service.rag_pipeline_service.build_context_for_understanding")
 
     events = list(ai_service.stream_generate_response(
         "show customer tables",

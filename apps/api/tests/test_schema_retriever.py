@@ -253,7 +253,7 @@ def test_stream_response_uses_rag_context_for_database_chat(monkeypatch):
             },
         )()
 
-    monkeypatch.setattr("services.ai_service.rag_context_builder.build", build_rag_context)
+    monkeypatch.setattr("services.ai_service.rag_pipeline_service.build_context_for_understanding", build_rag_context)
     monkeypatch.setattr("services.ai_service.feedback_context_service.get_feedback_context", lambda *_: "")
     monkeypatch.setattr("services.ai_service.langchain_runtime.stream_text", lambda **_: iter(["done"]))
     monkeypatch.setattr("services.ai_service.langchain_runtime.validate_model_ready", lambda **_: None)

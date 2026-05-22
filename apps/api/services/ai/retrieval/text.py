@@ -32,17 +32,18 @@ def build_table_search_text(
     table_name: str,
     columns: List[Dict[str, Any]],
     db_type: str = "sql",
+    schema: Optional[str] = None,
     foreign_keys: Optional[List[Dict[str, Any]]] = None,
     indexes: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Builds rich retrieval text with exact table, column, FK, and index signals."""
     fk_list = foreign_keys or []
     column_parts = [
-        _format_column_for_index(column, fk_list)
+        _format_column_for_index(column, fk_list, table_name, db_type, schema)
         for column in columns
     ]
     fk_parts = [
-        f"- {fk.get('table')}.{fk.get('column')} -> {fk.get('foreignTable')}.{fk.get('foreignColumn')}"
+        _format_foreign_key_for_index(fk, db_type, schema)
         for fk in fk_list
     ]
     index_parts = [
@@ -52,7 +53,7 @@ def build_table_search_text(
 
     return "\n".join([
         f"Table: {table_name}",
-        f"SQL table reference: {format_table_reference(table_name, None, db_type)}",
+        f"SQL table reference: {format_table_reference(table_name, schema, db_type)}",
         f"Identifier words: {' '.join(split_identifier(table_name))}",
         f"Dialect: {db_type}",
         "Columns:",
@@ -66,11 +67,30 @@ def build_table_search_text(
 
 def format_table_reference(table_name: str, schema: Optional[str] = None, db_type: str = "sql") -> str:
     """Formats an exact SQL table reference that preserves identifier case."""
-    quote_start, quote_end = _identifier_quotes(db_type)
-    table_ref = f"{quote_start}{table_name}{quote_end}"
+    table_ref = format_identifier_reference(table_name, db_type)
     if schema:
-        return f"{quote_start}{schema}{quote_end}.{table_ref}"
+        return f"{format_identifier_reference(schema, db_type)}.{table_ref}"
     return table_ref
+
+
+def format_column_reference(
+    column_name: str,
+    db_type: str = "sql",
+    table_name: Optional[str] = None,
+    schema: Optional[str] = None,
+) -> str:
+    """Formats an exact SQL column reference that preserves identifier case."""
+    column_ref = format_identifier_reference(column_name, db_type)
+    if table_name:
+        return f"{format_table_reference(table_name, schema, db_type)}.{column_ref}"
+    return column_ref
+
+
+def format_identifier_reference(identifier: str, db_type: str = "sql") -> str:
+    """Quotes one identifier component for the target dialect."""
+    quote_start, quote_end = _identifier_quotes(db_type)
+    safe_identifier = _escape_identifier(identifier, quote_start, quote_end)
+    return f"{quote_start}{safe_identifier}{quote_end}"
 
 
 def _identifier_quotes(db_type: str) -> tuple[str, str]:
@@ -80,6 +100,13 @@ def _identifier_quotes(db_type: str) -> tuple[str, str]:
     if normalized in {"mssql", "sqlserver", "sql server"}:
         return "[", "]"
     return '"', '"'
+
+
+def _escape_identifier(identifier: str, quote_start: str, quote_end: str) -> str:
+    value = str(identifier or "")
+    if quote_start == "[" and quote_end == "]":
+        return value.replace("]", "]]")
+    return value.replace(quote_end, quote_end * 2)
 
 
 def expand_query_terms(intent: str) -> List[str]:
@@ -173,12 +200,34 @@ def split_identifier(value: str) -> List[str]:
     return re.split(r"[_\-\s.]+", spaced)
 
 
-def _format_column_for_index(column: Dict[str, Any], foreign_keys: List[Dict[str, Any]]) -> str:
+def _format_column_for_index(
+    column: Dict[str, Any],
+    foreign_keys: List[Dict[str, Any]],
+    table_name: str,
+    db_type: str,
+    schema: Optional[str],
+) -> str:
     name = str(column.get("name", ""))
     column_type = str(column.get("type", ""))
     nullable = "nullable" if column.get("nullable", True) else "required"
     key_hint = _column_key_hint(name, foreign_keys)
-    return f"- {name} {column_type} {nullable} {key_hint}".strip()
+    column_ref = format_column_reference(name, db_type)
+    table_column_ref = format_column_reference(name, db_type, table_name=table_name, schema=schema)
+    return f"- {name} {column_type} {nullable} {key_hint} SQL column reference: {column_ref}; table-qualified: {table_column_ref}".strip()
+
+
+def _format_foreign_key_for_index(fk: Dict[str, Any], db_type: str, schema: Optional[str]) -> str:
+    table_name = str(fk.get("table") or "")
+    column_name = str(fk.get("column") or "")
+    foreign_table = str(fk.get("foreignTable") or "")
+    foreign_column = str(fk.get("foreignColumn") or "")
+    source = f"{table_name}.{column_name}"
+    target = f"{foreign_table}.{foreign_column}"
+    if not table_name or not column_name or not foreign_table or not foreign_column:
+        return f"- {source} -> {target}"
+    source_ref = format_column_reference(column_name, db_type, table_name=table_name, schema=schema)
+    target_ref = format_column_reference(foreign_column, db_type, table_name=foreign_table, schema=schema)
+    return f"- {source} -> {target}; SQL join reference: {source_ref} -> {target_ref}"
 
 
 def _column_key_hint(column_name: str, foreign_keys: List[Dict[str, Any]]) -> str:

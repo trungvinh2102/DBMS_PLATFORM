@@ -14,6 +14,7 @@ from .ranking import cosine_similarity, fuse_scores
 from .reranking import DeterministicRagReranker, RagReranker
 from .text import build_reasons, expand_query_terms, lexical_score, matched_terms
 from .types import RagRetrievalResult
+from .vector_store import resolve_vector_store_config
 
 
 class RagRetrievalService:
@@ -38,6 +39,9 @@ class RagRetrievalService:
     ) -> Dict[str, Any]:
         """Returns ranked chunks, citations, and a safe retrieval trace."""
         started = time.perf_counter()
+        vector_config = resolve_vector_store_config()
+        if not vector_config.enabled:
+            return self._disabled_result(query_text, database_id, started)
         if not query_text or not query_text.strip():
             return self._empty_result(query_text, database_id, started)
 
@@ -53,11 +57,12 @@ class RagRetrievalService:
                 for source, chunk, _embedding in rows
             }
             semantic_scores = self._semantic_scores(query_text, rows)
-            fused = fuse_scores(semantic_scores, lexical_scores)[:max(top_k, candidate_limit)]
+            candidate_budget = max(top_k, candidate_limit)
+            fused = fuse_scores(semantic_scores, lexical_scores)[:candidate_budget]
             row_by_chunk_id = {chunk.id: (source, chunk, embedding) for source, chunk, embedding in rows}
 
             results = []
-            for chunk_id, score in fused[:top_k]:
+            for chunk_id, score in fused:
                 source, chunk, _embedding = row_by_chunk_id[chunk_id]
                 terms = matched_terms(expanded_terms, chunk.content)
                 reasons = build_reasons(chunk.objectName or source.title, terms, chunk.content)
@@ -80,11 +85,20 @@ class RagRetrievalService:
                     reasons=reasons,
                 ))
 
-            results = self.reranker.rerank(query_text, results)[:top_k]
-            trace = self._build_trace(query_text, database_id, rows, results, semantic_scores, started)
+            reranked_results = self.reranker.rerank(query_text, results)[:top_k]
+            trace = self._build_trace(
+                query_text,
+                database_id,
+                rows,
+                reranked_results,
+                semantic_scores,
+                started,
+                candidate_budget=candidate_budget,
+                ranked_candidate_count=len(results),
+            )
             return {
-                "items": [self._result_to_dict(result) for result in results],
-                "citations": [result.to_citation() for result in results],
+                "items": [self._result_to_dict(result) for result in reranked_results],
+                "citations": [result.to_citation() for result in reranked_results],
                 "retrievalTrace": trace,
             }
         finally:
@@ -236,7 +250,17 @@ class RagRetrievalService:
             scores[chunk.id] = cosine_similarity(query_vector, embedding.vectorJson or [])
         return scores
 
-    def _build_trace(self, query_text: str, database_id: Optional[str], rows, results, semantic_scores, started) -> Dict[str, Any]:
+    def _build_trace(
+        self,
+        query_text: str,
+        database_id: Optional[str],
+        rows,
+        results,
+        semantic_scores,
+        started,
+        candidate_budget: int,
+        ranked_candidate_count: int,
+    ) -> Dict[str, Any]:
         embeddings_available = self.embeddings.is_available()
         return {
             "intent": query_text,
@@ -245,6 +269,8 @@ class RagRetrievalService:
             "embeddingAvailable": embeddings_available,
             "fallbackReason": "" if embeddings_available else "embedding_provider_unavailable",
             "candidateCount": len(rows),
+            "candidateBudget": candidate_budget,
+            "rankedCandidateCount": ranked_candidate_count,
             "selectedCount": len(results),
             "latencyMs": int((time.perf_counter() - started) * 1000),
             "items": [result.to_trace_item() for result in results],
@@ -258,6 +284,22 @@ class RagRetrievalService:
                 "intent": query_text or "",
                 "databaseId": database_id,
                 "retrievalMode": "empty",
+                "candidateCount": 0,
+                "selectedCount": 0,
+                "latencyMs": int((time.perf_counter() - started) * 1000),
+                "items": [],
+            },
+        }
+
+    def _disabled_result(self, query_text: str, database_id: Optional[str], started) -> Dict[str, Any]:
+        return {
+            "items": [],
+            "citations": [],
+            "retrievalTrace": {
+                "intent": query_text or "",
+                "databaseId": database_id,
+                "retrievalMode": "disabled",
+                "fallbackReason": "rag_disabled",
                 "candidateCount": 0,
                 "selectedCount": 0,
                 "latencyMs": int((time.perf_counter() - started) * 1000),

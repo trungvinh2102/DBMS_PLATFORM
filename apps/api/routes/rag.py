@@ -6,8 +6,18 @@ Debug and indexing routes for QurioDB's generalized RAG layer.
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from schemas.rag import RagIndexQueryHistoryRequest, RagIndexSavedQueriesRequest, RagIndexSourceRequest, RagRetrieveRequest
+from schemas.rag import (
+    RagEvaluateRequest,
+    RagIndexQueryHistoryRequest,
+    RagIndexSavedQueriesRequest,
+    RagIndexSourceRequest,
+    RagPlanRequest,
+    RagRetrieveRequest,
+    RagSyncDatabaseRequest,
+)
+from services.ai.retrieval.evaluation import RagEvalCase, evaluate_retrieval_cases
 from services.ai.retrieval.index_service import rag_index_service
+from services.ai.retrieval.pipeline import rag_pipeline_service
 from services.ai.retrieval.retrieval_service import rag_retrieval_service
 from services.ai.retrieval.vector_store import resolve_vector_store_config
 from utils.auth_middleware import get_current_user
@@ -19,6 +29,39 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 def get_rag_status():
     """Reports RAG backend configuration without exposing secrets."""
     return {"vectorStore": resolve_vector_store_config().to_status()}
+
+
+@router.get("/pipeline/status")
+def get_pipeline_status():
+    """Reports how QurioDB maps the production RAG flow into backend services."""
+    return rag_pipeline_service.status()
+
+
+@router.post("/pipeline/plan")
+def plan_query(data: RagPlanRequest, current_user: dict = Depends(get_current_user)):
+    """Runs query understanding and RAG context planning without invoking an LLM."""
+    return rag_pipeline_service.plan_query(
+        data.query,
+        database_id=data.databaseId,
+        schema=data.schema_name,
+        history=data.history,
+        user_id=current_user.get("userId"),
+        model_id=None,
+    )
+
+
+@router.post("/pipeline/sync/database/{database_id}")
+def sync_database(database_id: str, data: RagSyncDatabaseRequest, current_user: dict = Depends(get_current_user)):
+    """Synchronizes core RAG sources for one database."""
+    return rag_pipeline_service.sync_database(
+        database_id,
+        schema=data.schema_name,
+        user_id=current_user.get("userId"),
+        include_saved_queries=data.includeSavedQueries,
+        include_query_history=data.includeQueryHistory,
+        include_failed_history=data.includeFailedHistory,
+        query_history_limit=data.queryHistoryLimit,
+    )
 
 
 @router.post("/index/database/{database_id}")
@@ -109,6 +152,28 @@ def retrieve(data: RagRetrieveRequest, current_user: dict = Depends(get_current_
         source_types=data.sourceTypes,
         top_k=data.topK,
         candidate_limit=data.candidateLimit,
+    )
+
+
+@router.post("/evaluate")
+def evaluate(data: RagEvaluateRequest, current_user: dict = Depends(get_current_user)):
+    """Runs deterministic retrieval eval cases for local production RAG checks."""
+    cases = [
+        RagEvalCase(
+            name=item.name,
+            query=item.query,
+            expected_citations=item.expectedCitations,
+            database_id=item.databaseId,
+            source_types=item.sourceTypes,
+            top_k=item.topK,
+            max_latency_ms=item.maxLatencyMs,
+        )
+        for item in data.cases
+    ]
+    return evaluate_retrieval_cases(
+        cases,
+        rag_retrieval_service,
+        user_id=current_user.get("userId"),
     )
 
 

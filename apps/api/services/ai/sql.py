@@ -9,8 +9,7 @@ from typing import Dict, Any, Optional
 from .base import BaseAIService
 from .feedback_context import feedback_context_service
 from .prompt_contracts import build_rag_prompt
-from .query_understanding import query_understanding_service
-from .rag_context import rag_context_builder
+from .retrieval.pipeline import rag_pipeline_service
 from ..prompts import get_sql_explanation_prompt
 
 logger = logging.getLogger(__name__)
@@ -22,8 +21,9 @@ class SqlAIService(BaseAIService):
         """Generates a SQL query using RAG-based context pruning and few-shot feedback."""
         self._save_chat("user", prompt, user_id, db_id)
         
-        understanding = query_understanding_service.understand(prompt, [], db_id, schema)
-        context_result = rag_context_builder.build(understanding, user_id=user_id)
+        pipeline_context = rag_pipeline_service.build_context(prompt, db_id, schema, user_id=user_id, model_id=model_id)
+        understanding = pipeline_context.understanding
+        context_result = pipeline_context.package
         feedback = ""
         if user_id:
             feedback = feedback_context_service.get_feedback_context(db_id, user_id)
@@ -74,8 +74,9 @@ class SqlAIService(BaseAIService):
         """Refactors SQL for better performance based on schema context."""
         self._save_chat("user", f"Optimize this SQL: {sql}", user_id, db_id)
         prompt = f"Optimize SQL: {sql}"
-        understanding = query_understanding_service.understand(prompt, [], db_id, schema)
-        context_result = rag_context_builder.build(understanding, user_id=user_id)
+        pipeline_context = rag_pipeline_service.build_context(prompt, db_id, schema, user_id=user_id, model_id=model_id)
+        understanding = pipeline_context.understanding
+        context_result = pipeline_context.package
         system_prompt = build_rag_prompt(context_result.context, understanding)
         
         response = self._generate_response(
@@ -106,8 +107,9 @@ class SqlAIService(BaseAIService):
         """Analyzes a SQL error and provides a corrected version."""
         self._save_chat("user", f"Fix SQL: {sql}\nError: {error}", user_id, db_id)
         prompt = f"Fix SQL: {sql} with error: {error}"
-        understanding = query_understanding_service.understand(prompt, [], db_id, schema)
-        context_result = rag_context_builder.build(understanding, user_id=user_id)
+        pipeline_context = rag_pipeline_service.build_context(prompt, db_id, schema, user_id=user_id, model_id=model_id)
+        understanding = pipeline_context.understanding
+        context_result = pipeline_context.package
         system_prompt = build_rag_prompt(context_result.context, understanding)
         
         response = self._generate_response(

@@ -5,6 +5,7 @@ Regression tests for production RAG query understanding, context assembly, and p
 """
 
 import pytest
+import json
 
 from services.ai.prompt_contracts import build_rag_prompt
 from services.ai.query_understanding import query_understanding_service
@@ -13,12 +14,30 @@ from services.ai.rag_context import RagContextBuilder
 pytestmark = pytest.mark.rag
 
 
-def test_query_understanding_classifies_and_rewrites_followup_sql():
+@pytest.fixture
+def ai_intent_router(monkeypatch):
+    def classify(**kwargs):
+        payload = json.loads(kwargs["prompt"])
+        message = str(payload["user_message"]).lower()
+        if "hello" in message:
+            intent = "general_chat"
+        elif "schema" in message:
+            intent = "schema_question"
+        else:
+            intent = "text_to_sql"
+        return json.dumps({"intent": intent, "confidence": 0.9, "reason": "test"})
+
+    monkeypatch.setattr("services.ai.langchain_runtime.langchain_runtime.invoke_text", classify)
+    monkeypatch.setattr("services.ai.task_model_router.task_model_router.resolve_model_id", lambda *_args, **_kwargs: None)
+
+
+def test_query_understanding_classifies_and_rewrites_followup_sql(ai_intent_router):
     understanding = query_understanding_service.understand(
         "add customer name to that query",
         [{"role": "assistant", "content": "```sql\nSELECT * FROM orders\n```"}],
         database_id="db-1",
         schema="public",
+        user_id="user-1",
     )
 
     assert understanding.intent == "text_to_sql"
@@ -27,15 +46,15 @@ def test_query_understanding_classifies_and_rewrites_followup_sql():
     assert "Previous SQL context" in understanding.retrieval_query
 
 
-def test_query_understanding_skips_retrieval_for_general_chat():
-    understanding = query_understanding_service.understand("hello", database_id="db-1")
+def test_query_understanding_skips_retrieval_for_general_chat(ai_intent_router):
+    understanding = query_understanding_service.understand("hello", database_id="db-1", user_id="user-1")
 
     assert understanding.intent == "general_chat"
     assert understanding.needs_retrieval is False
     assert understanding.source_types == []
 
 
-def test_rag_context_builder_formats_budgeted_untrusted_evidence(monkeypatch):
+def test_rag_context_builder_formats_budgeted_untrusted_evidence(monkeypatch, ai_intent_router):
     builder = RagContextBuilder()
     monkeypatch.setattr(builder.metadata, "get_db_type", lambda *_: "postgresql")
     monkeypatch.setattr(builder.metadata, "get_all_columns", lambda *_: {"orders": [], "customers": []})
@@ -56,7 +75,7 @@ def test_rag_context_builder_formats_budgeted_untrusted_evidence(monkeypatch):
             "retrievalTrace": {"retrievalMode": "lexical_fallback", "selectedCount": 1},
         },
     )
-    understanding = query_understanding_service.understand("show orders", database_id="db-1")
+    understanding = query_understanding_service.understand("show orders", database_id="db-1", user_id="user-1")
 
     package = builder.build(understanding, user_id="user-1")
 
@@ -70,7 +89,7 @@ def test_rag_context_builder_formats_budgeted_untrusted_evidence(monkeypatch):
     assert package.retrieval_trace["intent"] == "text_to_sql"
 
 
-def test_rag_context_preserves_mixed_case_postgres_identifiers(monkeypatch):
+def test_rag_context_preserves_mixed_case_postgres_identifiers(monkeypatch, ai_intent_router):
     builder = RagContextBuilder()
     monkeypatch.setattr(builder.metadata, "get_db_type", lambda *_: "postgresql")
     monkeypatch.setattr(
@@ -97,7 +116,7 @@ def test_rag_context_preserves_mixed_case_postgres_identifiers(monkeypatch):
             "retrievalTrace": {"retrievalMode": "lexical_fallback", "selectedCount": 1},
         },
     )
-    understanding = query_understanding_service.understand("top bookings by experience query", database_id="db-1")
+    understanding = query_understanding_service.understand("top bookings by experience query", database_id="db-1", user_id="user-1")
 
     package = builder.build(understanding, user_id="user-1")
 
@@ -107,8 +126,8 @@ def test_rag_context_preserves_mixed_case_postgres_identifiers(monkeypatch):
     assert "bookings ->" not in package.context
 
 
-def test_rag_prompt_contract_contains_stable_sections():
-    understanding = query_understanding_service.understand("show orders", database_id="db-1")
+def test_rag_prompt_contract_contains_stable_sections(ai_intent_router):
+    understanding = query_understanding_service.understand("show orders", database_id="db-1", user_id="user-1")
 
     prompt = build_rag_prompt("DATABASE CONTEXT:\n- dialect: postgresql", understanding)
 
@@ -125,8 +144,8 @@ def test_rag_prompt_contract_contains_stable_sections():
     assert "Do not prefix thinking text with labels" in prompt
 
 
-def test_general_database_rag_prompt_defaults_to_vietnamese():
-    understanding = query_understanding_service.understand("describe this schema", database_id="db-1")
+def test_general_database_rag_prompt_defaults_to_vietnamese(ai_intent_router):
+    understanding = query_understanding_service.understand("describe this schema", database_id="db-1", user_id="user-1")
 
     prompt = build_rag_prompt("DATABASE CONTEXT:\n- dialect: postgresql", understanding)
 

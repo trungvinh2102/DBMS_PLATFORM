@@ -15,8 +15,13 @@ import services.ai.retrieval.retrieval_service as retrieval_module
 from models import Base, QueryHistory, RagChunk, RagRetrievalEvent, RagSource, SavedQuery
 from services.ai.retrieval.index_documents import mask_sql_literals
 from services.ai.retrieval.index_service import RagIndexService
+from services.ai.retrieval.pipeline import RagPipelineService
 from services.ai.retrieval.retrieval_service import RagRetrievalService
+from services.ai.retrieval.text import build_table_search_text
 from services.ai.retrieval.vector_store import resolve_vector_store_config
+from services.ai.query_understanding import query_understanding_service
+from schemas.rag import RagEvaluateRequest
+from routes.rag import evaluate as evaluate_rag_endpoint, rag_retrieval_service as route_rag_retrieval_service
 
 pytestmark = pytest.mark.rag
 
@@ -79,6 +84,41 @@ def test_index_database_schema_writes_generalized_sources_and_chunks(rag_session
     assert "orders.customer_id -> customers.id" in graph_chunk.content
 
 
+def test_query_understanding_uses_connected_database_context_without_domain_keywords():
+    understanding = query_understanding_service.understand(
+        "Trải nghiệm nào có số lượt đặt nhiều nhất?",
+        database_id="db-1",
+        schema="public",
+    )
+
+    assert understanding.intent == "text_to_sql"
+    assert understanding.needs_retrieval is True
+    assert "database_schema" in understanding.source_types
+
+
+def test_schema_index_text_preserves_postgres_mixed_case_column_references():
+    text = build_table_search_text(
+        "Booking",
+        [
+            {"name": "id", "type": "TEXT", "nullable": False},
+            {"name": "experienceId", "type": "TEXT", "nullable": False},
+        ],
+        db_type="postgresql",
+        schema="public",
+        foreign_keys=[{
+            "table": "Booking",
+            "column": "experienceId",
+            "foreignTable": "Experience",
+            "foreignColumn": "id",
+        }],
+    )
+
+    assert 'SQL table reference: "public"."Booking"' in text
+    assert 'SQL column reference: "experienceId"' in text
+    assert 'table-qualified: "public"."Booking"."experienceId"' in text
+    assert 'SQL join reference: "public"."Booking"."experienceId" -> "public"."Experience"."id"' in text
+
+
 def test_rag_retrieve_uses_lexical_fallback_over_generalized_chunks(rag_session_factory, monkeypatch):
     index_service = RagIndexService()
     retrieval_service = RagRetrievalService()
@@ -102,6 +142,8 @@ def test_rag_retrieve_uses_lexical_fallback_over_generalized_chunks(rag_session_
     assert result["items"][0]["objectName"] == "customers"
     assert result["citations"][0]["id"] == "database:db-1/schema:public/table:customers"
     assert result["retrievalTrace"]["retrievalMode"] == "lexical_fallback"
+    assert result["retrievalTrace"]["rankedCandidateCount"] >= result["retrievalTrace"]["selectedCount"]
+    assert result["retrievalTrace"]["candidateBudget"] == 32
 
 
 def test_index_saved_queries_respects_user_scope(rag_session_factory, monkeypatch):
@@ -279,3 +321,160 @@ def test_vector_store_config_sanitizes_unknown_backend(monkeypatch):
     monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "unknown-cloud")
 
     assert resolve_vector_store_config().backend == "sqlite_json"
+
+
+def test_rag_disabled_short_circuits_index_and_retrieve(rag_session_factory, monkeypatch):
+    monkeypatch.setenv("QURIODB_RAG_ENABLED", "false")
+    index_service = RagIndexService()
+    retrieval_service = RagRetrievalService()
+
+    result = index_service.index_text_source(
+        "document",
+        "Disabled Source",
+        "This should not be indexed while RAG is disabled.",
+        source_id="document:disabled",
+    )
+    retrieval = retrieval_service.retrieve("disabled source")
+
+    session = rag_session_factory()
+    try:
+        source_count = session.query(RagSource).count()
+        chunk_count = session.query(RagChunk).count()
+    finally:
+        session.close()
+
+    assert result["status"] == "disabled"
+    assert result["chunkCount"] == 0
+    assert source_count == 0
+    assert chunk_count == 0
+    assert retrieval["retrievalTrace"]["retrievalMode"] == "disabled"
+    assert retrieval["retrievalTrace"]["fallbackReason"] == "rag_disabled"
+
+
+def test_rag_evaluate_endpoint_runs_retrieval_cases(rag_session_factory, monkeypatch):
+    monkeypatch.setattr(route_rag_retrieval_service.embeddings, "is_available", lambda: False)
+    index_service = RagIndexService()
+    monkeypatch.setattr(index_service.embeddings, "is_available", lambda: False)
+    index_service.index_text_source(
+        "document",
+        "Support Manual",
+        "Refund policy requires order_id and customer email.",
+        database_id="db-1",
+        user_id="user-1",
+        source_id="document:support-manual",
+    )
+
+    report = evaluate_rag_endpoint(
+        RagEvaluateRequest(cases=[{
+            "name": "support recall",
+            "query": "refund policy customer email",
+            "expectedCitations": ["document:support-manual#chunk-0"],
+            "databaseId": "db-1",
+            "sourceTypes": ["document"],
+        }]),
+        current_user={"userId": "user-1"},
+    )
+
+    assert report["passed"] is True
+    assert report["recallAtK"] == 1.0
+
+
+def test_rag_pipeline_status_maps_all_production_flows():
+    status = RagPipelineService().status()
+
+    keys = [stage["key"] for stage in status["stages"]]
+
+    assert status["stageCount"] == 16
+    assert "ingestion" in keys
+    assert "retrieval" in keys
+    assert "generation" in keys
+    assert "evaluation" in keys
+    assert "security_acl" in keys
+    assert status["vectorStore"]["backend"] == "sqlite_json"
+
+
+def test_rag_pipeline_plan_returns_understanding_and_context(monkeypatch):
+    pipeline = RagPipelineService()
+    monkeypatch.setattr(
+        "services.ai.langchain_runtime.langchain_runtime.invoke_text",
+        lambda **_: '{"intent":"text_to_sql","confidence":0.9,"reason":"test"}',
+    )
+    monkeypatch.setattr("services.ai.task_model_router.task_model_router.resolve_model_id", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        "services.ai.rag_context.rag_retrieval_service.retrieve",
+        lambda *_args, **_kwargs: {
+            "items": [{
+                "chunkId": "chunk-1",
+                "sourceType": "database_schema",
+                "chunkType": "table",
+                "objectName": "orders",
+                "schemaName": "public",
+                "title": "public.orders",
+                "score": 0.9,
+                "content": "Table: orders\nColumns:\n- id integer\n- total numeric",
+                "citation": {"id": "database:db-1/schema:public/table:orders"},
+            }],
+            "citations": [{"id": "database:db-1/schema:public/table:orders"}],
+            "retrievalTrace": {"retrievalMode": "lexical_fallback", "selectedCount": 1},
+        },
+    )
+    monkeypatch.setattr("services.ai.rag_context.rag_index_service.index_database_schema", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr("services.ai.rag_context.RagContextBuilder._allowed_table_names", lambda *_args, **_kwargs: ["orders"])
+    monkeypatch.setattr("services.ai.rag_context.RagContextBuilder._schema_table_name", lambda _self, item: item.get("objectName"))
+    monkeypatch.setattr("services.ai.retrieval.pipeline.rag_context_builder.metadata.get_db_type", lambda *_: "postgresql")
+
+    plan = pipeline.plan_query("show order totals", database_id="db-1", schema="public", user_id="user-1")
+
+    assert plan["understanding"]["intent"] == "text_to_sql"
+    assert plan["understanding"]["needsRetrieval"] is True
+    assert plan["retrievalTrace"]["selectedCount"] == 1
+    assert plan["citations"][0]["id"] == "database:db-1/schema:public/table:orders"
+    assert "RETRIEVED EVIDENCE" in plan["contextPreview"]
+
+
+def test_rag_pipeline_sync_database_indexes_core_sources(rag_session_factory, monkeypatch):
+    index_service = RagIndexService()
+    pipeline = RagPipelineService(index_service=index_service)
+    monkeypatch.setattr(index_service.embeddings, "is_available", lambda: False)
+    monkeypatch.setattr(
+        index_service.metadata,
+        "get_all_columns",
+        lambda *_: {"orders": [{"name": "total", "type": "NUMERIC", "nullable": False}]},
+    )
+    monkeypatch.setattr(index_service.metadata, "get_db_type", lambda *_: "postgresql")
+    monkeypatch.setattr(index_service.metadata, "get_all_foreign_keys", lambda *_: [])
+    monkeypatch.setattr(index_service.metadata, "get_indexes_for_tables", lambda *_: {})
+    session = rag_session_factory()
+    try:
+        session.add_all([
+            SavedQuery(
+                id="saved-1",
+                name="Revenue",
+                sql="SELECT SUM(total) FROM orders",
+                databaseId="db-1",
+                userId="user-1",
+            ),
+            QueryHistory(
+                id="history-1",
+                sql="SELECT * FROM orders WHERE total > 10",
+                status="SUCCESS",
+                executionTime=5,
+                databaseId="db-1",
+            ),
+        ])
+        session.commit()
+    finally:
+        session.close()
+
+    result = pipeline.sync_database(
+        "db-1",
+        schema="public",
+        user_id="user-1",
+        include_saved_queries=True,
+        include_query_history=True,
+    )
+
+    assert result["summary"]["sourceTypes"] == 3
+    assert result["sources"]["database_schema"]["chunkCount"] == 2
+    assert result["sources"]["saved_query"]["indexedSources"] == 1
+    assert result["sources"]["query_history"]["indexedSources"] == 1

@@ -145,9 +145,9 @@ class BaseAIService:
                 databaseId=db_id or trace.get("databaseId"),
                 queryTextHash=hashlib.sha256(str(query_text or "").encode("utf-8")).hexdigest(),
                 retrievalMode=trace.get("retrievalMode") or "unknown",
-                candidateCount=int(trace.get("candidateBudget") or 0),
+                candidateCount=int(trace.get("candidateCount") or trace.get("candidateBudget") or 0),
                 selectedCount=int(trace.get("selectedCount") or len(trace.get("tables") or [])),
-                latencyMs=latency_ms,
+                latencyMs=int(trace.get("latencyMs") or latency_ms or 0),
                 trace=trace,
             ))
             session.commit()

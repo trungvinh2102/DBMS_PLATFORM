@@ -48,12 +48,14 @@ OUTPUT FORMAT:
 7. ### SUGGESTIONS: strict JSON array of clickable follow-up suggestions.
 
 RULES:
+- The DATABASE CONTEXT dialect is authoritative. If it provides a concrete dialect, do not ask the user what database type they use.
 - Use only retrieved or database-context identifiers.
 - Do not invent tables, columns, collections, or fields.
 - Preserve identifier case and spelling exactly as shown in the IDENTIFIER CONTRACT and retrieved evidence.
 - Do not use table names outside the allowed table list in the IDENTIFIER CONTRACT.
 - For PostgreSQL mixed-case identifiers, use the quoted SQL references exactly, for example `"Booking"` instead of bookings.
-- Never pluralize, singularize, lowercase, or translate table names. `Booking` is not `bookings`; `Experience` is not `experiences`.
+- For PostgreSQL mixed-case columns, quote the column after any alias, for example `B."experienceId"` instead of `B.experienceId`.
+- Never pluralize, singularize, lowercase, or translate table or column names. `Booking` is not `bookings`; `experienceId` is not `experienceid`.
 - If evidence is insufficient, ask a clarification question instead of fabricating SQL.
 - Prefer read-only statements. Do not generate destructive DDL/DCL.
 - Follow the language policy for all visible explanation.

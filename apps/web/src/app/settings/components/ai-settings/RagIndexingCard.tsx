@@ -4,10 +4,11 @@
  */
 
 import { useMemo, useState } from "react";
-import { Database, FileText, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Activity, Database, FileText, Loader2, PlayCircle, RefreshCw, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { aiApi, databaseApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -30,17 +32,50 @@ interface RagSource {
   indexed_on?: string | null;
 }
 
+interface RagPipelineStage {
+  key: string;
+  name: string;
+  status: string;
+  capabilities?: string[];
+}
+
+interface RagPipelineStatus {
+  enabled?: boolean;
+  stageCount?: number;
+  vectorStore?: {
+    backend?: string;
+    enabled?: boolean;
+  };
+  stages?: RagPipelineStage[];
+}
+
+interface RagSourceDetail extends RagSource {
+  chunks?: Array<{
+    metadata?: {
+      citation?: string;
+    };
+  }>;
+}
+
 const getDatabaseLabel = (database: any) => database.databaseName || database.name || database.id;
 
 export function RagIndexingCard() {
   const queryClient = useQueryClient();
   const [selectedDatabaseId, setSelectedDatabaseId] = useState("");
+  const [includeQueryHistory, setIncludeQueryHistory] = useState(false);
+  const [includeFailedHistory, setIncludeFailedHistory] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentContent, setDocumentContent] = useState("");
+  const [evaluationResult, setEvaluationResult] = useState<any>(null);
 
   const statusQuery = useQuery({
     queryKey: ["rag-status"],
     queryFn: () => aiApi.getRagStatus(),
+  });
+
+  const pipelineStatusQuery = useQuery({
+    queryKey: ["rag-pipeline-status"],
+    queryFn: () => aiApi.getRagPipelineStatus(),
   });
 
   const sourcesQuery = useQuery({
@@ -54,28 +89,28 @@ export function RagIndexingCard() {
   });
 
   const databaseOptions = useMemo(() => databasesQuery.data || [], [databasesQuery.data]);
+  const selectedDatabase = selectedDatabaseId || databaseOptions[0]?.id || "";
+  const sources = (sourcesQuery.data || []) as RagSource[];
 
   const invalidateRag = () => {
     queryClient.invalidateQueries({ queryKey: ["rag-sources"] });
     queryClient.invalidateQueries({ queryKey: ["rag-status"] });
+    queryClient.invalidateQueries({ queryKey: ["rag-pipeline-status"] });
   };
 
-  const indexDatabaseMutation = useMutation({
-    mutationFn: () => aiApi.indexRagDatabase(selectedDatabaseId || databaseOptions[0]?.id, "public"),
+  const syncPipelineMutation = useMutation({
+    mutationFn: () => aiApi.syncRagDatabase(selectedDatabase, {
+      schema_name: "public",
+      includeSavedQueries: true,
+      includeQueryHistory,
+      includeFailedHistory,
+      queryHistoryLimit: 100,
+    }),
     onSuccess: () => {
-      toast.success("Schema index refreshed.");
+      toast.success("RAG pipeline synced.");
       invalidateRag();
     },
-    onError: (err: any) => toast.error(`Schema indexing failed: ${err.message}`),
-  });
-
-  const indexSavedQueriesMutation = useMutation({
-    mutationFn: () => aiApi.indexRagSavedQueries(selectedDatabaseId || databaseOptions[0]?.id),
-    onSuccess: () => {
-      toast.success("Saved queries indexed.");
-      invalidateRag();
-    },
-    onError: (err: any) => toast.error(`Saved query indexing failed: ${err.message}`),
+    onError: (err: any) => toast.error(`Pipeline sync failed: ${err.message}`),
   });
 
   const indexDocumentMutation = useMutation({
@@ -103,14 +138,45 @@ export function RagIndexingCard() {
     onError: (err: any) => toast.error(`Source removal failed: ${err.message}`),
   });
 
-  const selectedDatabase = selectedDatabaseId || databaseOptions[0]?.id || "";
+  const evaluatePipelineMutation = useMutation({
+    mutationFn: async () => {
+      const source = sources.find((item) => item.status === "indexed");
+      if (!source) throw new Error("Index at least one source before running evaluation.");
+
+      const detail = await aiApi.getRagSource(source.id) as RagSourceDetail;
+      const expectedCitation = detail.chunks
+        ?.map((chunk) => chunk.metadata?.citation)
+        .find(Boolean);
+      if (!expectedCitation) throw new Error("Selected source has no citation metadata.");
+
+      return aiApi.evaluateRag({
+        cases: [{
+          name: `Smoke: ${source.title}`,
+          query: source.title,
+          expectedCitations: [expectedCitation],
+          databaseId: source.databaseId || selectedDatabase || undefined,
+          sourceTypes: [source.sourceType],
+          topK: 8,
+          maxLatencyMs: 1500,
+        }],
+      });
+    },
+    onSuccess: (result) => {
+      setEvaluationResult(result);
+      toast.success("RAG evaluation completed.");
+    },
+    onError: (err: any) => toast.error(`RAG evaluation failed: ${err.message}`),
+  });
+
   const selectedDatabaseLabel = useMemo(() => {
     const database = databaseOptions.find((option: any) => option.id === selectedDatabase);
     return database ? getDatabaseLabel(database) : "";
   }, [databaseOptions, selectedDatabase]);
   const canIndexDocument = Boolean(documentTitle.trim() && documentContent.trim());
-  const sources = (sourcesQuery.data || []) as RagSource[];
   const vectorStatus = statusQuery.data?.vectorStore;
+  const pipelineStatus = pipelineStatusQuery.data as RagPipelineStatus | undefined;
+  const stages = pipelineStatus?.stages || [];
+  const evalSummary = evaluationResult?.summary;
 
   return (
     <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm group/card relative">
@@ -127,12 +193,12 @@ export function RagIndexingCard() {
             </div>
           </div>
           <div className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {vectorStatus?.backend || "sqlite_json"}
+            {pipelineStatus?.stageCount || 0} stages / {vectorStatus?.backend || "sqlite_json"}
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-5 pt-2">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
           <Select
             value={selectedDatabase}
             onValueChange={setSelectedDatabaseId}
@@ -160,24 +226,62 @@ export function RagIndexingCard() {
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
+            type="button"
             className="gap-2"
-            disabled={!selectedDatabase || indexDatabaseMutation.isPending}
-            onClick={() => indexDatabaseMutation.mutate()}
+            disabled={!selectedDatabase || syncPipelineMutation.isPending}
+            onClick={() => syncPipelineMutation.mutate()}
           >
-            {indexDatabaseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Schema
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            disabled={!selectedDatabase || indexSavedQueriesMutation.isPending}
-            onClick={() => indexSavedQueriesMutation.mutate()}
-          >
-            {indexSavedQueriesMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Saved SQL
+            {syncPipelineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Sync pipeline
           </Button>
         </div>
+
+        <div className="grid gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 md:grid-cols-[1fr_auto_auto]">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Badge variant="outline" className={cn(
+              "rounded-md text-[9px] font-bold uppercase tracking-widest",
+              pipelineStatus?.enabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600" : "border-amber-500/20 bg-amber-500/5 text-amber-600",
+            )}>
+              {pipelineStatus?.enabled ? "Enabled" : "Disabled"}
+            </Badge>
+            <span className="truncate text-xs font-semibold">
+              {stages.length ? `${stages.length} production stages mapped` : "Pipeline status unavailable"}
+            </span>
+          </div>
+          <label className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground md:justify-end">
+            History
+            <Switch
+              checked={includeQueryHistory}
+              onCheckedChange={(checked: boolean) => setIncludeQueryHistory(checked)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground md:justify-end">
+            Failed
+            <Switch
+              checked={includeFailedHistory}
+              disabled={!includeQueryHistory}
+              onCheckedChange={(checked: boolean) => setIncludeFailedHistory(checked)}
+            />
+          </label>
+        </div>
+
+        {stages.length > 0 && (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {stages.map((stage, index) => (
+              <div key={stage.key} className="flex min-w-0 items-center gap-2 rounded-md border border-border/50 bg-background/70 px-2.5 py-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-black tabular-nums text-emerald-600">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate text-[11px] font-bold">{stage.name}</div>
+                  <div className="truncate text-[9px] uppercase tracking-widest text-muted-foreground">
+                    {stage.status}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr_auto]">
           <Input
@@ -234,6 +338,29 @@ export function RagIndexingCard() {
               No RAG sources indexed yet.
             </div>
           )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/10 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Activity className="h-4 w-4 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <div className="truncate text-xs font-bold">Retrieval evaluation</div>
+              <div className="truncate text-[10px] text-muted-foreground">
+                {evalSummary ? `${evalSummary.passedCases}/${evalSummary.totalCases} passed, recall ${Math.round((evalSummary.recallAtK || 0) * 100)}%` : "No evaluation run yet"}
+              </div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 rounded-lg text-[10px] font-black uppercase tracking-widest"
+            disabled={!sources.length || evaluatePipelineMutation.isPending}
+            onClick={() => evaluatePipelineMutation.mutate()}
+          >
+            {evaluatePipelineMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
+            Run eval
+          </Button>
         </div>
       </CardContent>
     </Card>

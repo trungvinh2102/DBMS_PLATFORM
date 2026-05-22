@@ -4,27 +4,38 @@
  */
 
 import React from "react";
-import { Activity, Database, RefreshCw, X } from "lucide-react";
+import { Activity, Database, GitBranch, Loader2, RefreshCw, SearchCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface AIDiagnosticsPanelProps {
   diagnostics: any;
+  pipelineStatus?: any;
+  ragPlan?: any;
   isLoading: boolean;
+  isPlanning?: boolean;
   isDark?: boolean;
+  onPlan?: () => void;
   onRefresh: () => void;
   onClose: () => void;
 }
 
 export const AIDiagnosticsPanel = React.memo(({
   diagnostics,
+  pipelineStatus,
+  ragPlan,
   isLoading,
+  isPlanning,
   isDark,
+  onPlan,
   onRefresh,
   onClose,
 }: AIDiagnosticsPanelProps) => {
   const summary = diagnostics?.summary || {};
   const events = diagnostics?.events || [];
+  const stages = pipelineStatus?.stages || [];
+  const understanding = ragPlan?.understanding;
+  const trace = ragPlan?.retrievalTrace;
 
   return (
     <div className={cn(
@@ -46,6 +57,11 @@ export const AIDiagnosticsPanel = React.memo(({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {onPlan && (
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={onPlan} disabled={isPlanning} aria-label="Plan current RAG query">
+              {isPlanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <SearchCheck className="h-3.5 w-3.5" />}
+            </Button>
+          )}
           <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={onRefresh} disabled={isLoading} aria-label="Refresh AI trace">
             <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
           </Button>
@@ -59,6 +75,56 @@ export const AIDiagnosticsPanel = React.memo(({
         <TraceStat label="Max" value={`${summary.maxLatencyMs || 0}ms`} />
         <TraceStat label="Chunks" value={summary.avgSelectedCount || 0} />
         <TraceStat label="Fallback" value={summary.fallbackCount || 0} />
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="rounded-md border border-border/80 bg-background/95 p-2 shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-md dark:shadow-black/35">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              <GitBranch className="h-3 w-3 text-primary" />
+              Pipeline
+            </div>
+            <span className={cn(
+              "rounded border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest",
+              pipelineStatus?.enabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600" : "border-amber-500/20 bg-amber-500/5 text-amber-600",
+            )}>
+              {pipelineStatus?.enabled ? "On" : "Off"}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {stages.slice(0, 16).map((stage: any, index: number) => (
+              <span
+                key={stage.key}
+                className="h-5 rounded border border-border/70 bg-muted/30 text-center text-[9px] font-black leading-5 tabular-nums text-muted-foreground"
+                title={stage.name}
+              >
+                {index + 1}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-border/80 bg-background/95 p-2 shadow-sm shadow-slate-950/5 dark:border-white/10 dark:bg-white/[0.04] dark:shadow-md dark:shadow-black/35">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">RAG Plan</div>
+          {understanding ? (
+            <div className="space-y-1 text-[11px]">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Intent</span>
+                <span className="truncate font-semibold">{understanding.intent}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Retrieval</span>
+                <span className="font-semibold">{understanding.needsRetrieval ? "needed" : "skipped"}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Chunks</span>
+                <span className="font-semibold tabular-nums">{trace?.selectedCount || 0}/{trace?.candidateCount || 0}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="py-2 text-center text-[11px] text-muted-foreground">No RAG plan yet.</p>
+          )}
+        </div>
       </div>
 
       <div className="mt-3 max-h-36 space-y-2 overflow-y-auto pr-1">

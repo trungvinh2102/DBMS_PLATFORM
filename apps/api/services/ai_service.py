@@ -14,8 +14,7 @@ from .ai.context import schema_context_service
 from .ai.feedback_context import feedback_context_service
 from .ai.langchain_runtime import langchain_runtime
 from .ai.prompt_contracts import build_rag_prompt, build_results_analysis_prompt
-from .ai.query_understanding import query_understanding_service
-from .ai.rag_context import rag_context_builder
+from .ai.retrieval.pipeline import rag_pipeline_service
 from .ai.stream_parser import TaggedResponseStreamParser
 from .ai.task_model_router import task_model_router
 from .prompts import VIETNAMESE_RESPONSE_POLICY
@@ -24,25 +23,6 @@ logger = logging.getLogger(__name__)
 
 MODEL_PREFLIGHT_STATUS = "Đang kiểm tra model và hạn mức..."
 
-DATABASE_TASK_KEYWORDS = {
-    "sql", "query", "queries", "database", "db", "schema", "table", "tables",
-    "column", "columns", "row", "rows", "join", "filter", "where", "group",
-    "order", "limit", "select", "insert", "update", "delete", "mongodb",
-    "mql", "collection", "index", "indexes", "explain", "optimize",
-    "users", "orders", "customers", "revenue", "count", "sum", "average",
-    "analysis", "analytics", "data", "dataset", "report",
-    "truy vấn", "cơ sở dữ liệu", "du lieu", "dữ liệu", "bang", "bảng",
-    "cot", "cột", "dong", "dòng", "loc", "lọc", "sap xep", "sắp xếp",
-    "thong ke", "thống kê", "phan tich", "phân tích", "nguoi dung",
-    "người dùng", "doanh thu", "dem", "đếm", "online", "nhay cam",
-    "nhạy cảm",
-}
-
-GENERAL_CHAT_PATTERNS = (
-    r"^(hi|hello|hey|thanks|thank you|ok|okay|bye)\b",
-    r"^(xin chào|chào|cảm ơn|cam on|tạm biệt|tam biet)\b",
-    r"^(bạn là ai|ban la ai|mày là ai|may la ai|m la ai|who are you|what are you|what can you do|help)\??$",
-)
 
 class AIService(SqlAIService, AgentAIService):
     """
@@ -133,9 +113,20 @@ class AIService(SqlAIService, AgentAIService):
                 yield "error", str(readiness_error)
                 return
 
-        understanding = query_understanding_service.understand(prompt, history, db_id, schema)
+        quick_response = self._quick_general_response(prompt)
+        if quick_response:
+            yield "message", quick_response
+            return
+
+        understanding = rag_pipeline_service.understand_query(
+            prompt,
+            db_id,
+            schema,
+            history,
+            user_id=user_id,
+            model_id=model_id,
+        )
         is_database_request = understanding.needs_retrieval
-        quick_response = self._quick_general_response(prompt) if not is_database_request else ""
 
         resolved_task_key = task_key or ("chat.database" if is_database_request else "chat.general")
         model_id = task_model_router.resolve_model_id(resolved_task_key, user_id, model_id, db_id)
@@ -154,10 +145,6 @@ class AIService(SqlAIService, AgentAIService):
                 yield "error", str(readiness_error)
                 return
 
-        if quick_response:
-            yield "message", quick_response
-            return
-
         # Yield clean text. Frontend will handle wrapping for the UI steps.
         yield "thinking", "Đang khởi tạo bối cảnh..."
         
@@ -168,7 +155,7 @@ class AIService(SqlAIService, AgentAIService):
         if db_id and is_database_request:
             yield "thinking", "Phân tích lược đồ..."
             
-            context_result = rag_context_builder.build(understanding, user_id=user_id)
+            context_result = rag_pipeline_service.build_context_for_understanding(understanding, user_id=user_id)
             if context_result.retrieval_trace:
                 yield "retrieval_trace", context_result.retrieval_trace
             if context_result.citations:
@@ -240,38 +227,6 @@ class AIService(SqlAIService, AgentAIService):
         if latest_sql and follow_up_markers.intersection(prompt_terms):
             return f"{prompt}\n\nPrevious SQL context:\n{latest_sql[:1200]}"
         return prompt
-
-    def _is_database_assistant_request(self, prompt: str, history: list) -> bool:
-        """Returns true when a chat turn needs expensive schema retrieval."""
-        normalized = " ".join(str(prompt or "").lower().split())
-        if not normalized:
-            return False
-
-        if any(re.search(pattern, normalized) for pattern in GENERAL_CHAT_PATTERNS):
-            return False
-
-        if self._has_recent_sql_context(history) and self._is_follow_up_prompt(normalized):
-            return True
-
-        return any(keyword in normalized for keyword in DATABASE_TASK_KEYWORDS)
-
-    def _has_recent_sql_context(self, history: list) -> bool:
-        for message in reversed(history[-6:]):
-            content = str(message.get("content", ""))
-            upper_content = content.upper()
-            if "```SQL" in upper_content or "SELECT " in upper_content or "FROM " in upper_content:
-                return True
-        return False
-
-    def _is_follow_up_prompt(self, normalized_prompt: str) -> bool:
-        follow_up_markers = {
-            "that", "it", "this", "previous", "query", "add", "filter", "sort",
-            "same", "now", "fix", "explain", "optimize", "đó", "do", "nó",
-            "nay", "này", "trước", "truoc", "thêm", "them", "lọc", "loc",
-            "sắp xếp", "sap xep", "sửa", "sua",
-        }
-        prompt_terms = {term.strip(".,!?").lower() for term in normalized_prompt.split()}
-        return bool(follow_up_markers.intersection(prompt_terms))
 
     def _quick_general_response(self, prompt: str) -> str:
         """Returns instant responses for obvious non-database chat turns."""

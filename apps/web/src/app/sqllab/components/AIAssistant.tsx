@@ -59,7 +59,10 @@ export function AIAssistant({
   const [commandMenuIndex, setCommandMenuIndex] = useState(0);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [pipelineStatus, setPipelineStatus] = useState<any>(null);
+  const [ragPlan, setRagPlan] = useState<any>(null);
   const [isDiagnosticsLoading, setIsDiagnosticsLoading] = useState(false);
+  const [isRagPlanning, setIsRagPlanning] = useState(false);
   const parentRef = useRef<HTMLDivElement>(null);
   const lastNewChatSignalRef = useRef(newChatSignal);
 
@@ -86,13 +89,15 @@ export function AIAssistant({
   useEffect(() => {
     const init = async () => {
       try {
-        const [models, status] = await Promise.all([
+        const [models, status, pipeline] = await Promise.all([
           aiApi.getModels(),
           aiApi.getAIStatus(),
+          aiApi.getRagPipelineStatus(),
           loadConversations(selectedDatabaseId)
         ]);
         setAvailableModels(models || []);
         setRuntimeStatus(status);
+        setPipelineStatus(pipeline);
         setSelectedModel((current) => current || AUTO_MODEL_VALUE);
         if (status && !status.hasApiKey) {
           toast.warning("AI provider key is not configured.");
@@ -293,8 +298,12 @@ export function AIAssistant({
   const refreshDiagnostics = useCallback(async () => {
     setIsDiagnosticsLoading(true);
     try {
-      const result = await aiApi.getDiagnostics({ databaseId: selectedDatabaseId, limit: 25 });
+      const [result, pipeline] = await Promise.all([
+        aiApi.getDiagnostics({ databaseId: selectedDatabaseId, limit: 25 }),
+        aiApi.getRagPipelineStatus(),
+      ]);
       setDiagnostics(result);
+      setPipelineStatus(pipeline);
     } catch (err: any) {
       toast.error(err.message || "Không thể tải AI trace.");
     } finally {
@@ -309,6 +318,28 @@ export function AIAssistant({
       return next;
     });
   }, [refreshDiagnostics]);
+
+  const handlePlanRag = useCallback(async () => {
+    const query = input.trim() || editorSql.trim();
+    if (!query) {
+      toast.error("Nhập prompt hoặc SQL trước khi plan RAG.");
+      return;
+    }
+
+    setIsRagPlanning(true);
+    try {
+      const plan = await aiApi.planRagPipeline({
+        query,
+        databaseId: selectedDatabaseId,
+        schema_name: selectedSchema || "public",
+      });
+      setRagPlan(plan);
+    } catch (err: any) {
+      toast.error(err.message || "Không thể plan RAG.");
+    } finally {
+      setIsRagPlanning(false);
+    }
+  }, [editorSql, input, selectedDatabaseId, selectedSchema]);
 
   const handleAnalyzeResults = useCallback(() => {
     const rows = Array.isArray(lab.results) ? lab.results.slice(0, 8) : [];
@@ -390,7 +421,11 @@ export function AIAssistant({
         {showDiagnostics && (
           <AIDiagnosticsPanel
             diagnostics={diagnostics}
+            pipelineStatus={pipelineStatus}
+            ragPlan={ragPlan}
             isLoading={isDiagnosticsLoading}
+            isPlanning={isRagPlanning}
+            onPlan={handlePlanRag}
             onRefresh={refreshDiagnostics}
             onClose={() => setShowDiagnostics(false)}
           />

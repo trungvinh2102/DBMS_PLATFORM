@@ -20,6 +20,7 @@ from .index_documents import (
     rough_token_count,
 )
 from .metadata_source import SchemaMetadataSource
+from .vector_store import resolve_vector_store_config
 
 
 class RagIndexService:
@@ -183,6 +184,9 @@ class RagIndexService:
         access_scope: str,
         chunks: Iterable[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        if not resolve_vector_store_config().enabled:
+            return {"sourceId": source_id, "sourceType": source_type, "status": "disabled", "chunkCount": 0, "embeddingCount": 0}
+
         chunk_payloads = list(chunks)
         source_hash = content_hash("\n\n".join(chunk["content"] for chunk in chunk_payloads))
         session = SessionLocal()

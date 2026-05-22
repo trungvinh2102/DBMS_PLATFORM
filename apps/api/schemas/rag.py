@@ -4,7 +4,7 @@ rag.py
 Pydantic schemas for QurioDB RAG indexing and retrieval endpoints.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -35,3 +35,32 @@ class RagIndexSourceRequest(BaseModel):
     uri: Optional[str] = None
     sourceId: Optional[str] = None
     accessScope: str = "user"
+
+
+class RagEvalCaseRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    query: str = Field(min_length=1)
+    expectedCitations: List[str] = Field(default_factory=list, min_length=1)
+    databaseId: Optional[str] = None
+    sourceTypes: Optional[List[str]] = None
+    topK: int = Field(default=8, ge=1, le=20)
+    maxLatencyMs: int = Field(default=1500, ge=1, le=30000)
+
+
+class RagEvaluateRequest(BaseModel):
+    cases: List[RagEvalCaseRequest] = Field(min_length=1, max_length=100)
+
+
+class RagPlanRequest(BaseModel):
+    query: str = Field(min_length=1)
+    databaseId: Optional[str] = None
+    schema_name: str = "public"
+    history: List[Dict[str, str]] = Field(default_factory=list, max_length=20)
+
+
+class RagSyncDatabaseRequest(BaseModel):
+    schema_name: str = "public"
+    includeSavedQueries: bool = True
+    includeQueryHistory: bool = False
+    includeFailedHistory: bool = False
+    queryHistoryLimit: int = Field(default=100, ge=1, le=500)
