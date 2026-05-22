@@ -3,37 +3,30 @@
   "private": true,
   "type": "module",
   "packageManager": "bun@1.3.6",
-  "workspaces": ["apps/*"],
-
+  "workspaces": [
+    "apps/*"
+  ],
   "engines": {
     "node": ">=20",
     "bun": ">=1.3.6"
   },
-
   "scripts": {
     "dev": "turbo dev",
     "dev:web": "turbo -F web dev",
+    "dev:backend": "cd apps/api && venv/Scripts/python app.py",
     "start": "turbo start",
-
     "build": "turbo build",
     "desktop:build": "powershell -ExecutionPolicy Bypass -Command \"& ./build-backend.ps1 -Target gnu; \\$env:RUSTUP_TOOLCHAIN='stable-x86_64-pc-windows-gnu'; \\$env:PATH='C:/ProgramData/mingw64/mingw64/bin;' + \\$env:PATH; cd apps/desktop; bun run tauri build --target x86_64-pc-windows-gnu\"",
-
-    "check-types": "turbo check-types",
-    "lint": "turbo lint",
-
-    "format": "prettier --write .",
-    "clean": "rm -rf node_modules .turbo",
-
     "db:start": "docker compose up -d",
     "db:watch": "docker compose up",
     "db:stop": "docker compose stop",
     "db:down": "docker compose down",
-
-    "dev:backend": "cd apps/api && venv/Scripts/python app.py",
-    "start:backend": "cd apps/api && venv/Scripts/python -m gunicorn app:app",
+    "check-types": "turbo check-types",
+    "lint": "turbo lint",
+    "format": "prettier --write .",
+    "clean": "rm -rf node_modules .turbo",
     "test:rag": "cd apps/api && python -m pytest -m rag"
   },
-
   "devDependencies": {
     "@types/node": "^22.13.14",
     "prettier": "^3.8.1",
