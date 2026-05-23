@@ -71,42 +71,43 @@ export const ReasoningSection = React.memo(({
                 const isActiveStep = step.status === "active" || (idx === steps.length - 1 && isGeneratingSQL);
 
                 return (
-                <div key={idx} className="relative group/step animate-in fade-in slide-in-from-left-2 duration-500">
-                  {/* Step Dot/Icon */}
-                  <div className={cn(
-                    "absolute -left-[31px] top-0.5 w-2.5 h-2.5 rounded-full border-2 bg-background transition-all group-hover/step:scale-125",
-                    "border-primary/40",
-                    isActiveStep && "border-primary"
-                  )}>
-                    {isActiveStep && (
-                      <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-2">
-                      {isActiveStep ? <Loader2 className="h-3 w-3 text-primary/70 animate-spin" /> : <BrainCircuit className="h-3 w-3 text-primary/60" />}
-                      <span className={cn(
-                        "text-[9px] font-bold uppercase tracking-tighter",
-                        "text-primary/70"
-                      )}>
-                        Đang suy luận
-                      </span>
-                    </div>
-
+                  <div key={idx} className="relative group/step animate-in fade-in slide-in-from-left-2 duration-500">
+                    {/* Step Dot/Icon */}
                     <div className={cn(
-                      "p-3 rounded-xl text-[11px] leading-relaxed font-medium border transition-colors prose prose-sm dark:prose-invert max-w-none",
-                      isDark
-                        ? "bg-[#111419]/40 border-white/5 text-slate-300 group-hover/step:border-white/10"
-                        : "bg-white border-slate-100 text-slate-600 shadow-sm group-hover/step:border-slate-200"
+                      "absolute -left-[31px] top-0.5 w-2.5 h-2.5 rounded-full border-2 bg-background transition-all group-hover/step:scale-125",
+                      "border-primary/40",
+                      isActiveStep && "border-primary"
                     )}>
-                      <ReactMarkdown>
-                        {step.content.replace(/<thinking>|<\/thinking>/gi, '').trim()}
-                      </ReactMarkdown>
+                      {isActiveStep && (
+                        <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-75" />
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        {isActiveStep ? <Loader2 className="h-3 w-3 text-primary/70 animate-spin" /> : <BrainCircuit className="h-3 w-3 text-primary/60" />}
+                        <span className={cn(
+                          "text-[9px] font-bold uppercase tracking-tighter",
+                          "text-primary/70"
+                        )}>
+                          Đang suy luận
+                        </span>
+                      </div>
+
+                      <div className={cn(
+                        "py-1 px-3 rounded-xl text-[9px] leading-relaxed font-medium border transition-colors prose prose-sm dark:prose-invert max-w-none",
+                        isDark
+                          ? "bg-[#111419]/40 border-white/5 text-slate-300 group-hover/step:border-white/10"
+                          : "bg-white border-slate-100 text-slate-600 shadow-sm group-hover/step:border-slate-200"
+                      )}>
+                        <ReactMarkdown>
+                          {step.content.replace(/<thinking>|<\/thinking>/gi, '').trim()}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )})}
+                )
+              })}
 
               {!isGeneratingSQL && (
                 <div className="flex items-center gap-2 text-[9px] font-bold text-emerald-500/70 uppercase tracking-tighter">
