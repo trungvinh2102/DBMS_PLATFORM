@@ -20,7 +20,7 @@ export const DataTablePreview = React.memo(({ columns, data }: DataTablePreviewP
   const visibleRows = React.useMemo(() => data.slice(0, 5), [data]);
 
   return (
-    <div className="mt-4 p-2.5 rounded-2xl bg-muted/20 border border-primary/10 glass-v2 overflow-hidden">
+    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/70 bg-white/80 p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur-sm dark:border-white/10 dark:bg-card/70 dark:shadow-[0_10px_30px_-18px_rgba(0,0,0,0.65)]">
       <div className="flex items-center gap-2 mb-2 px-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
         <Sparkles className="h-3 w-3" />
         Sample Results Preview (Top 5)
