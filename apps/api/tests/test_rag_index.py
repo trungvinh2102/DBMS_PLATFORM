@@ -493,9 +493,10 @@ def test_rag_pipeline_status_maps_all_production_flows():
 
     keys = [stage["key"] for stage in status["stages"]]
 
-    assert status["stageCount"] == 16
+    assert status["stageCount"] == 17
     assert "ingestion" in keys
     assert "retrieval" in keys
+    assert "argument" in keys
     assert "generation" in keys
     assert "evaluation" in keys
     assert "security_acl" in keys
@@ -540,7 +541,10 @@ def test_rag_pipeline_plan_returns_understanding_and_context(monkeypatch):
     assert plan["understanding"]["needsRetrieval"] is True
     assert plan["retrievalTrace"]["selectedCount"] == 1
     assert plan["retrievalTrace"]["ragMode"] == "deep"
+    assert plan["argument"]["requiredIdentifiers"] == ["orders"]
+    assert plan["argument"]["confidence"] == 3
     assert plan["citations"][0]["id"] == "database:db-1/schema:public/table:orders"
+    assert "RAG ARGUMENT" in plan["contextPreview"]
     assert "RETRIEVED EVIDENCE" in plan["contextPreview"]
 
 

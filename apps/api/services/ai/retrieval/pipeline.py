@@ -73,6 +73,12 @@ PRODUCTION_RAG_STAGES = [
         "capabilities": ["token_budget", "chunk_compression", "citations", "identifier_contract"],
     },
     {
+        "key": "argument",
+        "name": "Argument planning",
+        "status": "available",
+        "capabilities": ["evidence_claims", "identifier_constraints", "known_gaps", "generation_confidence"],
+    },
+    {
         "key": "generation",
         "name": "Generation",
         "status": "available",
@@ -180,6 +186,7 @@ class RagPipelineService:
                 "filters": understanding.filters,
             },
             "retrievalTrace": package.retrieval_trace,
+            "argument": package.argument,
             "citations": package.citations,
             "warnings": package.warnings,
             "contextPreview": package.context[:2000],
