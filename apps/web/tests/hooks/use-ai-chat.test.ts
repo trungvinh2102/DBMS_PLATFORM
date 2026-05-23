@@ -13,6 +13,7 @@ import {
   isStatusThinkingEvent,
   stripInternalToolEnvelopes,
   stripThinkingLabel,
+  translateThinkingStatus,
   useAIChat,
 } from "@/app/sqllab/hooks/useAIChat";
 
@@ -37,6 +38,13 @@ describe("useAIChat stream status handling", () => {
   it("recognizes ready statuses so following reasoning does not merge into them", () => {
     expect(isStatusThinkingEvent("Sẵn sàng.")).toBe(true);
     expect(isStatusThinkingEvent("Intent: Xác định người dùng sử dụng từ ngữ nhạy cảm.")).toBe(false);
+  });
+
+  it("translates legacy English SQL thinking statuses before display", () => {
+    expect(translateThinkingStatus("Generating SQL...")).toBe("Đang tạo SQL...");
+    expect(translateThinkingStatus("Testing generated SQL safely...")).toBe("Đang chạy thử SQL đã tạo một cách an toàn...");
+    expect(translateThinkingStatus("SQL preview passed.")).toBe("SQL đã chạy thử thành công.");
+    expect(translateThinkingStatus("Preview failed; repairing SQL (1/2)...")).toBe("Bản chạy thử thất bại; đang sửa SQL (1/2)...");
   });
 
   it("recognizes labeled thinking events as separate stream steps", () => {
@@ -159,6 +167,61 @@ describe("useAIChat stream status handling", () => {
           content: "use voice_message_meta.transcription.",
         }),
       ]);
+    });
+  });
+
+  it("renders streamed legacy English thinking statuses in Vietnamese", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk, onHeaders) => {
+      onHeaders?.(new Headers({ "X-Conversation-Id": "conv-translated-thinking" }));
+      onChunk("Generating SQL...", "thinking");
+      onChunk("Testing generated SQL safely...", "thinking");
+      onChunk("SQL preview passed.", "thinking");
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("tạo truy vấn kiểm thử");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)?.steps?.map((step) => step.content)).toEqual([
+        "Đang tạo SQL...",
+        "Đang chạy thử SQL đã tạo một cách an toàn...",
+        "SQL đã chạy thử thành công.",
+      ]);
+    });
+  });
+
+  it("shows assistant activity immediately while waiting for the first stream chunk", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    let resolveStream: (() => void) | undefined;
+    vi.spyOn(aiApi, "streamChat").mockImplementation(() => new Promise<void>((resolve) => {
+      resolveStream = resolve;
+    }));
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    let sendPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.handleSend("tạo truy vấn kiểm thử");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)).toEqual(expect.objectContaining({
+        role: "assistant",
+        isStreaming: true,
+        steps: [expect.objectContaining({
+          content: "Đang kết nối trợ lý...",
+          status: "active",
+        })],
+      }));
+    });
+
+    await act(async () => {
+      resolveStream?.();
+      await sendPromise;
     });
   });
 });

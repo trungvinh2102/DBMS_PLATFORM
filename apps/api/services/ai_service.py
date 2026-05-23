@@ -22,6 +22,7 @@ from .prompts import VIETNAMESE_RESPONSE_POLICY
 logger = logging.getLogger(__name__)
 
 MODEL_PREFLIGHT_STATUS = "Đang kiểm tra model và hạn mức..."
+RESPONSE_START_STATUS = "Đang chuẩn bị phản hồi..."
 
 
 class AIService(SqlAIService, AgentAIService):
@@ -97,6 +98,7 @@ class AIService(SqlAIService, AgentAIService):
         """Streams responses for chat interfaces using SSE events."""
         history = history or []
         readiness_checked = False
+        yield "thinking", RESPONSE_START_STATUS
         if model_id:
             provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             yield "thinking", MODEL_PREFLIGHT_STATUS

@@ -21,17 +21,28 @@ STREAM_RESPONSE_PARTS = {
 }
 
 STATUS_THINKING_EVENTS = {
+    "Đang chuẩn bị phản hồi...",
     "Initializing context...",
     "Analyzing schema...",
     "Learning from your feedback...",
     "Ready.",
     "Initialization complete.",
+    "Generating SQL...",
+    "Testing generated SQL safely...",
+    "SQL preview passed.",
     "Đang kiểm tra model và hạn mức...",
     "Đang khởi tạo bối cảnh...",
     "Phân tích lược đồ...",
+    "Đang phân tích lược đồ...",
     "Học hỏi từ phản hồi của các bạn...",
+    "Đang học từ phản hồi của bạn...",
     "Sẵn sàng.",
     "Khởi tạo xong.",
+    "Đang tạo SQL...",
+    "Đang kiểm tra SQL đã tạo một cách an toàn...",
+    "Đang chạy thử SQL đã tạo một cách an toàn...",
+    "SQL preview đã đạt kiểm tra.",
+    "SQL đã chạy thử thành công.",
 }
 
 LABELED_THINKING_EVENT_PATTERN = re.compile(r"^(Intent|Schema mapping|Strategy):", re.I)
@@ -144,6 +155,9 @@ def _append_thinking_event(events: List[Tuple[str, str]], raw_text: str, text: s
         _is_status_thinking_event(text)
         or _is_status_thinking_event(previous)
         or _is_labeled_thinking_event(text)
+        or text.startswith("Preview failed; repairing SQL")
+        or text.startswith("Preview thất bại; đang sửa SQL")
+        or text.startswith("Bản chạy thử thất bại; đang sửa SQL")
     )
     if should_start_step:
         events.append(("thinking", clean_text))

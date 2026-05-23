@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AISuggestion, Message, AIStep } from "../components/ai/types";
 
 const ACTIVE_CONVERSATION_STORAGE_PREFIX = "sqllab_ai_active_conversation";
+const INITIAL_ASSISTANT_ACTIVITY = "Đang kết nối trợ lý...";
 
 export const getActiveAIConversationStorageKey = (databaseId?: string) =>
   `${ACTIVE_CONVERSATION_STORAGE_PREFIX}:${databaseId || "global"}`;
@@ -50,20 +51,69 @@ const serializeMessageContent = (message: Message) => {
 };
 
 export const STATUS_THINKING_EVENTS = new Set([
+  "Đang kết nối trợ lý...",
+  "Đang chuẩn bị phản hồi...",
   "Initializing context...",
   "Analyzing schema...",
   "Learning from your feedback...",
   "Ready.",
   "Initialization complete.",
+  "Generating SQL...",
+  "Testing generated SQL safely...",
+  "SQL preview passed.",
   "Đang kiểm tra model và hạn mức...",
   "Đang khởi tạo bối cảnh...",
   "Phân tích lược đồ...",
+  "Đang phân tích lược đồ...",
   "Học hỏi từ phản hồi của các bạn...",
+  "Đang học từ phản hồi của bạn...",
   "Sẵn sàng.",
   "Khởi tạo xong.",
+  "Đang tạo SQL...",
+  "Đang kiểm tra SQL đã tạo một cách an toàn...",
+  "Đang chạy thử SQL đã tạo một cách an toàn...",
+  "SQL preview đã đạt kiểm tra.",
+  "SQL đã chạy thử thành công.",
 ]);
 
-export const isStatusThinkingEvent = (text: string) => STATUS_THINKING_EVENTS.has(text.trim());
+const THINKING_STATUS_TRANSLATIONS: Record<string, string> = {
+  "Initializing context...": "Đang khởi tạo bối cảnh...",
+  "Analyzing schema...": "Đang phân tích lược đồ...",
+  "Learning from your feedback...": "Đang học từ phản hồi của bạn...",
+  "Ready.": "Sẵn sàng.",
+  "Initialization complete.": "Khởi tạo xong.",
+  "Generating SQL...": "Đang tạo SQL...",
+  "Testing generated SQL safely...": "Đang chạy thử SQL đã tạo một cách an toàn...",
+  "SQL preview passed.": "SQL đã chạy thử thành công.",
+  "Đang kiểm tra SQL đã tạo một cách an toàn...": "Đang chạy thử SQL đã tạo một cách an toàn...",
+  "SQL preview đã đạt kiểm tra.": "SQL đã chạy thử thành công.",
+  "Phân tích lược đồ...": "Đang phân tích lược đồ...",
+  "Học hỏi từ phản hồi của các bạn...": "Đang học từ phản hồi của bạn...",
+};
+
+const SQL_REPAIR_STATUS_PATTERN = /^(?:Preview failed; repairing SQL|Preview thất bại; đang sửa SQL|Bản chạy thử thất bại; đang sửa SQL) \((\d+)\/(\d+)\)\.\.\.$/;
+
+export const isStatusThinkingEvent = (text: string) => {
+  const trimmed = text.trim();
+  return STATUS_THINKING_EVENTS.has(trimmed) || SQL_REPAIR_STATUS_PATTERN.test(trimmed);
+};
+
+export const translateThinkingStatus = (text: string) => {
+  const trimmed = String(text || "").trim();
+  const translated = THINKING_STATUS_TRANSLATIONS[trimmed];
+  if (translated) return translated;
+
+  const repairMatch = trimmed.match(SQL_REPAIR_STATUS_PATTERN);
+  if (repairMatch) return `Bản chạy thử thất bại; đang sửa SQL (${repairMatch[1]}/${repairMatch[2]})...`;
+
+  return text;
+};
+
+const translateThinkingContent = (text: string) =>
+  String(text || "")
+    .split(/\n\n/)
+    .map((part) => translateThinkingStatus(part))
+    .join("\n\n");
 
 const LABELED_THINKING_EVENT_PATTERN = /^(Intent|Schema mapping|Strategy):/i;
 const THINKING_LABEL_PATTERN = /^\s*(Intent|Schema mapping|Strategy):\s*/i;
@@ -79,7 +129,7 @@ const toThinkingSteps = (events: any[]): AIStep[] => {
     const rawText = String(event.content);
     const text = rawText.trim();
     if (!text) return steps;
-    const displayText = stripThinkingLabel(text).trim();
+    const displayText = translateThinkingStatus(stripThinkingLabel(text).trim());
     const displayRawText = stripThinkingLabel(rawText);
     if (!displayText) return steps;
 
@@ -267,7 +317,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       return {
         content: message.content || "",
         explanation: message.explanation || "",
-        thought: message.thought || message.thinking || "",
+        thought: translateThinkingContent(message.thought || message.thinking || ""),
         sql: message.sql || "",
         analysis: message.analysis || "",
         confidence: message.confidence,
@@ -294,7 +344,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         return {
           content: data.summary || data.content || "",
           explanation: data.explanation || "",
-          thought: data.thinking || data.thought || "", // Map from standard keys
+          thought: translateThinkingContent(data.thinking || data.thought || ""), // Map from standard keys
           sql: data.sql || "",
           analysis: data.analysis || "",
           confidence: data.confidence,
@@ -335,7 +385,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     while ((stepMatch = stepRegex.exec(text)) !== null) {
       const [, type, , , innerContent] = stepMatch;
       if (type === "thinking") {
-        const content = stripThinkingLabel(innerContent || "").trim();
+        const content = translateThinkingStatus(stripThinkingLabel(innerContent || "").trim());
         if (content) {
           thinkingContent.push(content);
           steps.push({
@@ -352,13 +402,13 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const partialMatch = text.match(partialThoughtRegex);
     if (partialMatch && !text.includes("</thinking>", partialMatch.index)) {
       const content = partialMatch[1].trim();
-      if (content) thinkingContent.push(stripThinkingLabel(content).trim());
+      if (content) thinkingContent.push(translateThinkingStatus(stripThinkingLabel(content).trim()));
     }
 
     if (!steps.length && (thinkingContent.length > 0 || (partialMatch && !text.includes("</thinking>", partialMatch.index)))) {
       steps.push({
         type: "thinking",
-        content: thinkingContent.join("\n\n") || "Analyzing...",
+        content: thinkingContent.join("\n\n") || "Đang phân tích...",
         status: "complete",
       });
     }
@@ -515,7 +565,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       content: "",
       isActionable: true,
       isStreaming: true,
-      steps: [],
+      steps: [{ type: "thinking", content: INITIAL_ASSISTANT_ACTIVITY, status: "active" }],
     };
 
     setMessages(prev => [...prev, userMsg, initialAssistantMsg]);
@@ -637,7 +687,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             const rawText = String(chunk || "");
             const text = rawText.trim();
             if (!text) return;
-            const displayText = stripThinkingLabel(text).trim();
+            const displayText = translateThinkingStatus(stripThinkingLabel(text).trim());
             const displayRawText = stripThinkingLabel(rawText);
             if (!displayText) return;
 

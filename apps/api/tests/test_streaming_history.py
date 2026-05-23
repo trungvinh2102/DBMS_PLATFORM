@@ -46,10 +46,29 @@ def test_build_history_preserves_semantic_sections():
 def test_append_stream_part_preserves_status_thinking_events():
     parts = new_response_parts()
 
+    append_stream_part(parts, "thinking", "Đang chuẩn bị phản hồi...")
     append_stream_part(parts, "thinking", "Initializing context...")
     append_stream_part(parts, "thinking", "Actual reasoning")
 
-    assert parts["thinking"] == ["Initializing context...", "Actual reasoning"]
+    assert parts["thinking"] == ["Đang chuẩn bị phản hồi...", "Initializing context...", "Actual reasoning"]
+
+
+def test_build_history_preserves_vietnamese_sql_status_steps():
+    parts = new_response_parts()
+
+    append_stream_part(parts, "thinking", "Đang tạo SQL...")
+    append_stream_part(parts, "thinking", "Bản chạy thử thất bại; đang sửa SQL (1/2)...")
+    append_stream_part(parts, "thinking", "Đang chạy thử SQL đã tạo một cách an toàn...")
+    append_stream_part(parts, "thinking", "SQL đã chạy thử thành công.")
+
+    payload = parse_assistant_history_content(build_assistant_history_content(parts))
+
+    assert payload["events"] == [
+        {"type": "thinking", "content": "Đang tạo SQL..."},
+        {"type": "thinking", "content": "Bản chạy thử thất bại; đang sửa SQL (1/2)..."},
+        {"type": "thinking", "content": "Đang chạy thử SQL đã tạo một cách an toàn..."},
+        {"type": "thinking", "content": "SQL đã chạy thử thành công."},
+    ]
 
 
 def test_build_history_merges_split_thinking_words_within_same_labeled_step():

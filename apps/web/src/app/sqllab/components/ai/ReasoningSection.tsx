@@ -49,7 +49,7 @@ export const ReasoningSection = React.memo(({
           <BrainCircuit className="h-3.5 w-3.5" />
         </div>
         <span className="text-[10.5px] font-black uppercase tracking-widest group-hover/thought:text-primary transition-colors">
-          {showThought ? "Hide Assistant Activity" : "View Assistant Activity"}
+          {showThought ? "Ẩn hoạt động trợ lý" : "Xem hoạt động trợ lý"}
         </span>
         {isGeneratingSQL && (
           <div className="ml-2 flex items-center gap-1">
@@ -90,7 +90,7 @@ export const ReasoningSection = React.memo(({
                         "text-[9px] font-bold uppercase tracking-tighter",
                         "text-primary/70"
                       )}>
-                        Thinking
+                        Đang suy luận
                       </span>
                     </div>
 
@@ -110,7 +110,7 @@ export const ReasoningSection = React.memo(({
 
               {!isGeneratingSQL && (
                 <div className="flex items-center gap-2 text-[9px] font-bold text-emerald-500/70 uppercase tracking-tighter">
-                  <CheckCircle2 className="h-3 w-3" /> Analysis Complete
+                  <CheckCircle2 className="h-3 w-3" /> Phân tích hoàn tất
                 </div>
               )}
             </div>
