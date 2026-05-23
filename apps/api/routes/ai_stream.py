@@ -30,18 +30,17 @@ def stream_chat(data: StreamChatRequest, current_user: dict = Depends(get_curren
     messages = _resolve_stream_messages(data)
     user_id = current_user.get("userId")
     last_message = messages[-1]["content"]
-    display_message = _resolve_display_message(data, last_message)
     conversation_id = conversation_store.ensure_conversation(
         user_id,
         data.databaseId,
-        display_message,
+        last_message,
         data.conversationId,
     )
     request_history = [message for message in messages[:-1] if message.get("content")]
     history = conversation_store.load_recent_history(conversation_id) if user_id else []
     if not history:
         history = request_history
-    ai_service._save_chat("user", display_message, user_id, data.databaseId, conv_id=conversation_id)
+    ai_service._save_chat("user", last_message, user_id, data.databaseId, conv_id=conversation_id)
 
     return StreamingResponse(
         _stream_response(data, user_id, last_message, conversation_id, history),
@@ -57,11 +56,6 @@ def _resolve_stream_messages(data: StreamChatRequest):
     if not messages:
         raise HTTPException(status_code=400, detail="No messages provided")
     return messages
-
-
-def _resolve_display_message(data: StreamChatRequest, fallback: str) -> str:
-    display_text = str(data.displayText or "").strip()
-    return display_text or fallback
 
 
 def _stream_response(data: StreamChatRequest, user_id: str, last_message: str, conversation_id: str, history: list):

@@ -64,13 +64,6 @@ TASK_CATALOG: List[Dict[str, Any]] = [
         "recommendedCapabilities": ["latencyTier:fast"],
     },
     {
-        "key": "results.analyze",
-        "name": "Analyze results",
-        "description": "Summarize result-grid samples and suggest follow-up analysis.",
-        "requiredCapabilities": ["supportsStreaming"],
-        "recommendedCapabilities": ["supportsReasoning"],
-    },
-    {
         "key": "agent.sql_readonly",
         "name": "Read-only SQL agent",
         "description": "Plan, generate, validate, repair, and preview safe read-only SQL.",

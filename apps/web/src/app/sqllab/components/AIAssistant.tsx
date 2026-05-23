@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Activity, BarChart3 } from "lucide-react";
+import { Activity } from "lucide-react";
 import { toast } from "sonner";
 
 import { aiApi, databaseApi } from "@/lib/api-client";
@@ -341,27 +341,6 @@ export function AIAssistant({
     }
   }, [editorSql, input, selectedDatabaseId, selectedSchema]);
 
-  const handleAnalyzeResults = useCallback(() => {
-    const rows = Array.isArray(lab.results) ? lab.results.slice(0, 8) : [];
-    if (!rows.length) {
-      toast.error("Chưa có kết quả query để phân tích.");
-      return;
-    }
-    const prompt = buildVietnamesePrompt([
-      "Phân tích kết quả query hiện tại trong SQL Lab.",
-      "Hãy nêu insight chính, bất thường đáng chú ý, và 3 câu hỏi tiếp theo nên hỏi.",
-      "",
-      `SQL hiện tại:\n\`\`\`sql\n${editorSql}\n\`\`\``,
-      "",
-      `Columns: ${JSON.stringify(lab.columns || [])}`,
-      `Sample rows: ${JSON.stringify(rows)}`,
-    ].join("\n"));
-    void _handleSend(prompt, {
-      taskKey: "results.analyze",
-      displayContent: "Phân tích kết quả query hiện tại trong SQL Lab",
-    });
-  }, [_handleSend, editorSql, lab.columns, lab.results]);
-
   const handleSuggestionClick = useCallback((suggestion: string) => _handleSend(suggestion), [_handleSend]);
 
   const handleSelectConversation = useCallback((id: string) => {
@@ -432,16 +411,6 @@ export function AIAssistant({
         )}
 
         <div className="flex shrink-0 items-center gap-2 border-t border-border/70 bg-muted/10 px-3 py-2 md:px-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest"
-            onClick={handleAnalyzeResults}
-            disabled={isTyping || !Array.isArray(lab.results) || lab.results.length === 0}
-          >
-            <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
-            Analyze Results
-          </Button>
           <Button
             type="button"
             variant="ghost"

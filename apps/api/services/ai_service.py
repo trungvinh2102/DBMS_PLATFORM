@@ -14,7 +14,7 @@ from .ai.agent import AgentAIService
 from .ai.context import schema_context_service
 from .ai.feedback_context import feedback_context_service
 from .ai.langchain_runtime import langchain_runtime
-from .ai.prompt_contracts import build_rag_prompt, build_results_analysis_prompt
+from .ai.prompt_contracts import build_rag_prompt
 from .ai.retrieval.pipeline import rag_pipeline_service
 from .ai.sql_execution import sql_execution_verifier
 from .ai.stream_parser import TaggedResponseStreamParser
@@ -181,10 +181,7 @@ class AIService(SqlAIService, AgentAIService):
                 yield "thinking", "Học hỏi từ phản hồi của các bạn..."
                 feedback = feedback_context_service.get_feedback_context(db_id, user_id)
 
-            if task_key == "results.analyze":
-                system_prompt = build_results_analysis_prompt(context_result.context, understanding)
-            else:
-                system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
+            system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
             yield "thinking", "Sẵn sàng."
         elif db_id:
             from .prompts import get_general_chat_prompt
@@ -198,7 +195,7 @@ class AIService(SqlAIService, AgentAIService):
             if conv_id and not langchain_history:
                 langchain_history = self._load_langchain_history(conv_id)
 
-            if db_id and getattr(understanding, "intent", "") in SQL_PREVIEW_INTENTS and task_key != "results.analyze":
+            if db_id and getattr(understanding, "intent", "") in SQL_PREVIEW_INTENTS:
                 yield from self._stream_sql_with_preview_repair(
                     system_prompt=system_prompt,
                     prompt=prompt,

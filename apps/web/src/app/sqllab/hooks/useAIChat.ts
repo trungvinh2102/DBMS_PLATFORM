@@ -245,15 +245,6 @@ const parseSuggestionsContent = (value: string): AISuggestion[] => {
   }
 };
 
-const normalizeUserMessageContent = (content: string) => {
-  const text = String(content || "");
-  const isAnalyzeResultsPrompt =
-    text.includes("Phân tích kết quả query hiện tại trong SQL Lab") ||
-    (text.includes("Sample rows:") && text.includes("Columns:") && text.includes("SQL hiện tại:"));
-
-  return isAnalyzeResultsPrompt ? "Phân tích kết quả query hiện tại trong SQL Lab" : text;
-};
-
 export const stripInternalToolEnvelopes = (text: string) => {
   let cleaned = "";
   let index = 0;
@@ -289,11 +280,6 @@ export const stripInternalToolEnvelopes = (text: string) => {
   return cleaned.trim();
 };
 
-interface SendAIMessageOptions {
-  taskKey?: string;
-  displayContent?: string;
-}
-
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -309,7 +295,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, [messages]);
 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
-    if (message.role === "user") return { content: normalizeUserMessageContent(message.content) };
+    if (message.role === "user") return { content: String(message.content || "") };
 
     if (message.events || message.sql || message.analysis || message.thought || message.confidence !== undefined) {
       const steps = Array.isArray(message.events) ? toThinkingSteps(message.events) : undefined;
@@ -545,7 +531,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     setMessages([]);
   }, [databaseId]);
 
-  const handleSend = useCallback(async (input: string, options?: SendAIMessageOptions) => {
+  const handleSend = useCallback(async (input: string) => {
     if (!input.trim() || isTyping || !databaseId) {
       if (!databaseId) toast.error("Connect a database first.");
       return;
@@ -556,7 +542,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: options?.displayContent || input,
+      content: input,
     };
     const assistantMsgId = (Date.now() + 1).toString();
     const initialAssistantMsg: Message = {
@@ -678,8 +664,6 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           databaseId,
           schema: schema || "public",
           modelId: selectedModel || undefined,
-          taskKey: options?.taskKey,
-          displayText: options?.displayContent,
           conversationId: conversationId || undefined,
         },
         (chunk, event) => {
