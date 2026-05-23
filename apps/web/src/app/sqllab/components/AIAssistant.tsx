@@ -449,7 +449,7 @@ export function AIAssistant({
             onClick={handleToggleDiagnostics}
           >
             <Activity className="mr-1.5 h-3.5 w-3.5" />
-            Trace
+            Diagnostics
           </Button>
         </div>
 
