@@ -5,28 +5,11 @@ AI-assisted query classification and retrieval planning for QurioDB RAG.
 """
 
 import json
-import re
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-
-SUPPORTED_INTENTS = {
-    "general_chat",
-    "text_to_sql",
-    "sql_explain",
-    "sql_repair",
-    "sql_optimize",
-    "schema_question",
-    "document_question",
-    "out_of_scope",
-}
-
-EXPLICIT_DATABASE_SYNTAX_PATTERN = re.compile(
-    r"(```sql|\bselect\b|\bwith\b|\bfrom\b|\bjoin\b|\bwhere\b|\bgroup\s+by\b|"
-    r"\border\s+by\b|\blimit\b|\binsert\b|\bupdate\b|\bdelete\b|db\.\w+\.|aggregate\()",
-    re.IGNORECASE,
-)
+from services.ai.query_behavior import query_behavior_analyzer
 
 
 @dataclass(frozen=True)
@@ -42,6 +25,13 @@ class QueryUnderstanding:
     filters: Dict[str, Any] = field(default_factory=dict)
     allow_sample_rows: bool = False
     max_latency_ms: int = 1500
+    behavior: str = "general_chat"
+    confidence: float = 0.0
+    reason: str = ""
+    complexity: str = "simple"
+    exploration_score: float = 0.0
+    rag_mode: str = "none"
+    reasoning_mode: str = "fast"
 
 
 class QueryUnderstandingService:
@@ -65,27 +55,50 @@ class QueryUnderstandingService:
                 source_types=[],
                 database_id=database_id,
                 schema=schema or "public",
+                behavior="general_chat",
+                confidence=1.0,
+                reason="empty prompt",
             )
 
         history = history or []
         schema_name = schema or "public"
-        intent = self._analyze_intent_with_model(
+        analysis = self._analyze_intent_with_model(
             prompt=prompt,
             history=history,
             database_id=database_id,
             schema=schema_name,
             user_id=user_id,
             model_id=model_id,
-        ) or self._fallback_intent(normalized, has_database=bool(database_id))
+        )
+        if not analysis:
+            analysis = query_behavior_analyzer.fallback_analysis(normalized, has_database=bool(database_id))
+
+        intent = analysis["intent"]
+        behavior = analysis["behavior"]
+        rag_mode = analysis["rag_mode"]
+        needs_retrieval = rag_mode != "none"
 
         return QueryUnderstanding(
             intent=intent,
             retrieval_query=self.rewrite_retrieval_query(prompt, history),
-            needs_retrieval=intent not in {"general_chat", "out_of_scope"},
+            needs_retrieval=needs_retrieval,
             source_types=self._source_types_for_intent(intent),
             database_id=database_id,
             schema=schema_name,
-            filters={"objectTypes": self._object_types_for_intent(intent)},
+            filters={
+                "objectTypes": self._object_types_for_intent(intent),
+                "behavior": behavior,
+                "complexity": analysis["complexity"],
+                "ragMode": rag_mode,
+                "reasoningMode": analysis["reasoning_mode"],
+            },
+            behavior=behavior,
+            confidence=analysis["confidence"],
+            reason=analysis["reason"],
+            complexity=analysis["complexity"],
+            exploration_score=analysis["exploration_score"],
+            rag_mode=rag_mode,
+            reasoning_mode=analysis["reasoning_mode"],
         )
 
     def rewrite_retrieval_query(self, prompt: str, history: List[Dict[str, str]]) -> str:
@@ -103,7 +116,7 @@ class QueryUnderstandingService:
         schema: str,
         user_id: Optional[str],
         model_id: Optional[str],
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, Any]]:
         if not user_id and not model_id:
             return None
 
@@ -129,14 +142,7 @@ class QueryUnderstandingService:
         except Exception:
             return None
 
-        return self._parse_intent_response(response)
-
-    def _fallback_intent(self, normalized: str, has_database: bool = False) -> str:
-        if has_database:
-            return "text_to_sql"
-        if self._has_explicit_database_syntax(normalized):
-            return "text_to_sql"
-        return "out_of_scope"
+        return query_behavior_analyzer.parse_router_response(response, self._normalize, prompt)
 
     def _source_types_for_intent(self, intent: str) -> List[str]:
         if intent == "document_question":
@@ -185,9 +191,18 @@ Allowed intents:
 - document_question: user asks about indexed documents, manuals, files, or uploaded knowledge.
 - out_of_scope: not answerable by QurioDB.
 
+Allowed behaviors:
+- general_chat: greetings, thanks, casual chat, or product help without a database task.
+- sql_coding: user wants a concrete query, syntax help, SQL explanation, SQL repair, or SQL optimization.
+- schema_lookup: user asks about tables, columns, relationships, keys, or database structure.
+- data_exploration: user asks for metrics, trends, comparisons, anomaly/root-cause analysis, cohorts, rankings, segments, or business/data insights from connected data.
+- document_lookup: user asks about indexed documents, manuals, files, or uploaded knowledge.
+- out_of_scope: not answerable by QurioDB.
+
 Use connected_database as important behavioral context. If a database is connected and the user asks for business or data insight, classify as text_to_sql even when no SQL words appear.
+Use data_exploration only when the user asks for an answer or insight from data, not merely SQL syntax.
 Return exactly:
-{"intent":"text_to_sql","confidence":0.0,"reason":"short routing reason"}"""
+{"intent":"text_to_sql","behavior":"data_exploration","confidence":0.0,"complexity":"moderate","exploration_score":0.0,"rag_mode":"deep","reasoning_mode":"deep","reason":"short routing reason"}"""
 
     def _intent_router_payload(
         self,
@@ -213,25 +228,6 @@ Return exactly:
             },
             ensure_ascii=False,
         )
-
-    def _parse_intent_response(self, response: str) -> Optional[str]:
-        text = str(response or "").strip()
-        if not text:
-            return None
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE).strip()
-            text = re.sub(r"\s*```$", "", text).strip()
-        start = text.find("{")
-        end = text.rfind("}")
-        if start >= 0 and end > start:
-            text = text[start:end + 1]
-        try:
-            payload = json.loads(text)
-        except json.JSONDecodeError:
-            return None
-
-        intent = str(payload.get("intent") or "").strip()
-        return intent if intent in SUPPORTED_INTENTS else None
 
     def _normalize(self, text: str) -> str:
         normalized = unicodedata.normalize("NFKD", str(text or "").lower())

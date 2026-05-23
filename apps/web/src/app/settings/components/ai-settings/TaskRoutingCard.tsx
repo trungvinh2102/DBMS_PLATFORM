@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 import { AIModel, AITaskAssignment, AITaskCatalogItem } from "./types";
 
@@ -109,67 +111,108 @@ export function TaskRoutingCard({
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3 pt-2">
+      <CardContent className="pt-2">
         {isLoading ? (
           <div className="flex justify-center py-10">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          catalog.map((task) => {
-            const assignment = draft[task.key];
-            const selectedModel = modelsById.get(assignment?.modelId || "");
-            const isProviderReady = providerHasKey(selectedModel);
-            const hasCapabilities = modelSupportsTask(task, selectedModel);
+          <div className="max-h-[calc(100vh-25rem)] min-h-72 overflow-y-auto rounded-lg border border-border/50 bg-background/40 custom-scrollbar">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[32%] px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Task
+                  </TableHead>
+                  <TableHead className="w-[24%] text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Primary
+                  </TableHead>
+                  <TableHead className="w-[24%] text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Fallback
+                  </TableHead>
+                  <TableHead className="w-[12%] text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-[8%] text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Enabled
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {catalog.map((task) => {
+                  const assignment = draft[task.key];
+                  const selectedModel = modelsById.get(assignment?.modelId || "");
+                  const isProviderReady = providerHasKey(selectedModel);
+                  const hasCapabilities = modelSupportsTask(task, selectedModel);
 
-            return (
-              <div
-                key={task.key}
-                className="grid gap-3 rounded-lg border border-border/50 bg-muted/10 p-4 lg:grid-cols-[minmax(0,1fr)_18rem_18rem_5rem]"
-              >
-                <div className="min-w-0 space-y-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="text-sm font-black tracking-tight">{task.name}</div>
-                    <Badge variant="outline" className="rounded-md text-[9px] font-bold uppercase tracking-widest">
-                      {task.key}
-                    </Badge>
-                    {!isProviderReady && (
-                      <Badge variant="outline" className="rounded-md border-amber-500/20 bg-amber-500/5 text-[9px] text-amber-600">
-                        Missing key
-                      </Badge>
-                    )}
-                    {!hasCapabilities && (
-                      <Badge variant="outline" className="rounded-md border-rose-500/20 bg-rose-500/5 text-[9px] text-rose-600">
-                        Capability warning
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted-foreground">{task.description}</p>
-                </div>
-
-                <ModelSelect
-                  label="Primary"
-                  value={assignment?.modelId || AUTO_MODEL_VALUE}
-                  models={models}
-                  onChange={(modelId) => updateTask(task.key, { modelId })}
-                />
-
-                <ModelSelect
-                  label="Fallback"
-                  value={assignment?.fallbackModelId || AUTO_MODEL_VALUE}
-                  models={models}
-                  onChange={(fallbackModelId) => updateTask(task.key, { fallbackModelId })}
-                />
-
-                <div className="flex items-center justify-between gap-2 lg:justify-end">
-                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground/50" />
-                  <Switch
-                    checked={assignment?.enabled ?? true}
-                    onCheckedChange={(enabled: boolean) => updateTask(task.key, { enabled })}
-                  />
-                </div>
-              </div>
-            );
-          })
+                  return (
+                    <TableRow
+                      key={task.key}
+                      className={cn(
+                        "border-border/40 hover:bg-muted/20",
+                        !(assignment?.enabled ?? true) && "opacity-60",
+                      )}
+                    >
+                      <TableCell className="px-4 py-3 align-top whitespace-normal">
+                        <div className="min-w-0 space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-black tracking-tight">{task.name}</span>
+                            <Badge variant="outline" className="rounded-md text-[9px] font-bold uppercase tracking-widest">
+                              {task.key}
+                            </Badge>
+                          </div>
+                          <p className="max-w-xl text-xs leading-relaxed text-muted-foreground">{task.description}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 align-top">
+                        <ModelSelect
+                          value={assignment?.modelId || AUTO_MODEL_VALUE}
+                          models={models}
+                          onChange={(modelId) => updateTask(task.key, { modelId })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 align-top">
+                        <ModelSelect
+                          value={assignment?.fallbackModelId || AUTO_MODEL_VALUE}
+                          models={models}
+                          onChange={(fallbackModelId) => updateTask(task.key, { fallbackModelId })}
+                        />
+                      </TableCell>
+                      <TableCell className="py-3 align-top">
+                        <div className="flex flex-col gap-1.5">
+                          {!isProviderReady && (
+                            <Badge variant="outline" className="w-fit rounded-md border-amber-500/20 bg-amber-500/5 text-[9px] text-amber-600">
+                              Missing key
+                            </Badge>
+                          )}
+                          {!hasCapabilities && (
+                            <Badge variant="outline" className="w-fit rounded-md border-rose-500/20 bg-rose-500/5 text-[9px] text-rose-600">
+                              Capability
+                            </Badge>
+                          )}
+                          {isProviderReady && hasCapabilities && (
+                            <Badge variant="outline" className="w-fit rounded-md border-emerald-500/20 bg-emerald-500/5 text-[9px] text-emerald-600">
+                              Ready
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 pr-4 align-top">
+                        <div className="flex items-center justify-end gap-2">
+                          <SlidersHorizontal className="h-4 w-4 text-muted-foreground/50" />
+                          <Switch
+                            checked={assignment?.enabled ?? true}
+                            onCheckedChange={(enabled: boolean) => updateTask(task.key, { enabled })}
+                            aria-label={`Enable ${task.name}`}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -177,40 +220,36 @@ export function TaskRoutingCard({
 }
 
 interface ModelSelectProps {
-  label: string;
   value: string;
   models: AIModel[];
   onChange: (modelId: string | null) => void;
 }
 
-function ModelSelect({ label, value, models, onChange }: ModelSelectProps) {
+function ModelSelect({ value, models, onChange }: ModelSelectProps) {
   const selectedModel = models.find((model) => model.modelId === value);
   const selectedLabel = selectedModel ? getModelLabel(selectedModel) : "Auto";
 
   return (
-    <div className="space-y-1">
-      <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</div>
-      <Select value={value} onValueChange={(next) => onChange(next === AUTO_MODEL_VALUE ? null : next)}>
-        <SelectTrigger className="min-h-10 h-auto w-full whitespace-normal rounded-lg border-border/50 bg-background/70 py-2 text-xs">
-          <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-4">
-            {selectedLabel}
-          </span>
-        </SelectTrigger>
-        <SelectContent
-          side="bottom"
-          alignItemWithTrigger={false}
-          className="w-[min(32rem,calc(100vw-2rem))] rounded-lg border-border/50"
-        >
-          <SelectItem value={AUTO_MODEL_VALUE}>Auto</SelectItem>
-          {models.map((model) => (
-            <SelectItem key={model.id} value={model.modelId}>
-              <span className="whitespace-normal break-words leading-4">
-                {getModelLabel(model)}
-              </span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Select value={value} onValueChange={(next) => onChange(next === AUTO_MODEL_VALUE ? null : next)}>
+      <SelectTrigger className="min-h-9 h-auto w-full whitespace-normal rounded-md border-border/50 bg-background/80 py-2 text-xs">
+        <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-4">
+          {selectedLabel}
+        </span>
+      </SelectTrigger>
+      <SelectContent
+        side="bottom"
+        alignItemWithTrigger={false}
+        className="w-[min(32rem,calc(100vw-2rem))] rounded-lg border-border/50"
+      >
+        <SelectItem value={AUTO_MODEL_VALUE}>Auto</SelectItem>
+        {models.map((model) => (
+          <SelectItem key={model.id} value={model.modelId}>
+            <span className="whitespace-normal break-words leading-4">
+              {getModelLabel(model)}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

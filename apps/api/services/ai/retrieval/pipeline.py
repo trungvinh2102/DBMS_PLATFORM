@@ -165,6 +165,13 @@ class RagPipelineService:
         return {
             "understanding": {
                 "intent": understanding.intent,
+                "behavior": understanding.behavior,
+                "confidence": understanding.confidence,
+                "reason": understanding.reason,
+                "complexity": understanding.complexity,
+                "explorationScore": understanding.exploration_score,
+                "ragMode": understanding.rag_mode,
+                "reasoningMode": understanding.reasoning_mode,
                 "needsRetrieval": understanding.needs_retrieval,
                 "retrievalQuery": understanding.retrieval_query,
                 "sourceTypes": understanding.source_types,

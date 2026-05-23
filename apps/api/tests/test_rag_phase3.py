@@ -52,6 +52,38 @@ def test_query_understanding_skips_retrieval_for_general_chat(ai_intent_router):
     assert understanding.intent == "general_chat"
     assert understanding.needs_retrieval is False
     assert understanding.source_types == []
+    assert understanding.behavior == "general_chat"
+    assert understanding.rag_mode == "none"
+
+
+def test_query_understanding_accepts_structured_behavior_router(monkeypatch):
+    monkeypatch.setattr(
+        "services.ai.langchain_runtime.langchain_runtime.invoke_text",
+        lambda **_: json.dumps({
+            "intent": "text_to_sql",
+            "behavior": "data_exploration",
+            "confidence": 0.88,
+            "complexity": "complex",
+            "exploration_score": 0.92,
+            "rag_mode": "deep",
+            "reasoning_mode": "deep",
+            "reason": "business metric comparison",
+        }),
+    )
+    monkeypatch.setattr("services.ai.task_model_router.task_model_router.resolve_model_id", lambda *_args, **_kwargs: None)
+
+    understanding = query_understanding_service.understand(
+        "Compare revenue trend by customer segment and explain anomalies",
+        database_id="db-1",
+        user_id="user-1",
+    )
+
+    assert understanding.intent == "text_to_sql"
+    assert understanding.behavior == "data_exploration"
+    assert understanding.confidence == 0.88
+    assert understanding.exploration_score == 0.92
+    assert understanding.rag_mode == "deep"
+    assert understanding.reasoning_mode == "deep"
 
 
 def test_rag_context_builder_formats_budgeted_untrusted_evidence(monkeypatch, ai_intent_router):

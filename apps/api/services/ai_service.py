@@ -101,7 +101,6 @@ class AIService(SqlAIService, AgentAIService):
         """Streams responses for chat interfaces using SSE events."""
         history = history or []
         readiness_checked = False
-        yield "thinking", RESPONSE_START_STATUS
         if model_id:
             provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             yield "thinking", MODEL_PREFLIGHT_STATUS
@@ -132,6 +131,11 @@ class AIService(SqlAIService, AgentAIService):
             model_id=model_id,
         )
         is_database_request = understanding.needs_retrieval
+        is_deep_data_exploration = (
+            getattr(understanding, "behavior", "") == "data_exploration"
+            and getattr(understanding, "rag_mode", "") == "deep"
+            and getattr(understanding, "exploration_score", 0.0) >= 0.65
+        )
 
         resolved_task_key = task_key or ("chat.database" if is_database_request else "chat.general")
         model_id = task_model_router.resolve_model_id(resolved_task_key, user_id, model_id, db_id)
@@ -151,6 +155,7 @@ class AIService(SqlAIService, AgentAIService):
                 return
 
         # Yield clean text. Frontend will handle wrapping for the UI steps.
+        yield "thinking", RESPONSE_START_STATUS
         yield "thinking", "Đang khởi tạo bối cảnh..."
         
         system_prompt = (
@@ -158,6 +163,8 @@ class AIService(SqlAIService, AgentAIService):
             f"{VIETNAMESE_RESPONSE_POLICY}"
         )
         if db_id and is_database_request:
+            if is_deep_data_exploration:
+                yield "thinking", "Phân tích mục tiêu khám phá dữ liệu..."
             yield "thinking", "Phân tích lược đồ..."
             
             context_result = rag_pipeline_service.build_context_for_understanding(understanding, user_id=user_id)
@@ -170,7 +177,7 @@ class AIService(SqlAIService, AgentAIService):
 
             # Fetch feedback context if user_id is available
             feedback = ""
-            if user_id:
+            if user_id and is_deep_data_exploration:
                 yield "thinking", "Học hỏi từ phản hồi của các bạn..."
                 feedback = feedback_context_service.get_feedback_context(db_id, user_id)
 

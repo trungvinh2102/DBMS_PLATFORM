@@ -44,3 +44,32 @@ export interface AITaskAssignment {
   maxTokens?: number | null;
   enabled: boolean;
 }
+
+export interface AIRouterTerm {
+  id: string;
+  termSetId: string;
+  termSetKey?: string | null;
+  term: string;
+  normalizedTerm: string;
+  language: string;
+  matchType: "phrase" | "token" | "prefix" | "regex" | string;
+  weight: number;
+  isNegative: boolean;
+  enabled: boolean;
+  notes?: string | null;
+}
+
+export interface AIRouterTermSet {
+  id: string;
+  key: string;
+  behavior: string;
+  intent: string;
+  ragMode: "none" | "shallow" | "deep" | string;
+  reasoningMode: "fast" | "normal" | "deep" | string;
+  defaultWeight: number;
+  enabled: boolean;
+  systemDefined: boolean;
+  databaseId?: string | null;
+  userId?: string | null;
+  terms: AIRouterTerm[];
+}

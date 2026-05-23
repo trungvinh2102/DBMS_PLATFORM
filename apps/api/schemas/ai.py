@@ -102,3 +102,24 @@ class AITaskAssignmentRequest(BaseModel):
 
 class SaveAITaskAssignmentsRequest(BaseModel):
     assignments: List[AITaskAssignmentRequest]
+
+
+class CreateAIRouterTermRequest(BaseModel):
+    termSetKey: str
+    term: str
+    language: str = "any"
+    matchType: str = "phrase"
+    weight: float = 1.0
+    isNegative: bool = False
+    enabled: bool = True
+    notes: Optional[str] = None
+
+
+class UpdateAIRouterTermRequest(BaseModel):
+    term: Optional[str] = None
+    language: Optional[str] = None
+    matchType: Optional[str] = None
+    weight: Optional[float] = None
+    isNegative: Optional[bool] = None
+    enabled: Optional[bool] = None
+    notes: Optional[str] = None

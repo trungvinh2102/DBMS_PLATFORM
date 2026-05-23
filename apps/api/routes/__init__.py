@@ -10,6 +10,7 @@ __all__ = [
     "ai_conversations",
     "ai_generation",
     "ai_models",
+    "ai_router_terms",
     "ai_stream",
     "ai_task_assignments",
     "auth",

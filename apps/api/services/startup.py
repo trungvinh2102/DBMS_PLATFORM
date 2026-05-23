@@ -32,6 +32,7 @@ def setup_database():
         session = SessionLocal()
         seed_roles(session, Role)
         seed_default_admin(session, Role, User)
+        seed_ai_router_terms(session)
         session.commit()
         print("Backend: Database setup complete.")
     except Exception as exc:
@@ -74,6 +75,13 @@ def seed_default_admin(session, role_model, user_model):
     )
     session.add(admin_user)
     print("Backend: Default admin user created (admin / password123)")
+
+
+def seed_ai_router_terms(session):
+    """Create configurable AI router keyword defaults for first-run routing."""
+    from services.ai.router_terms import router_term_service
+
+    router_term_service.seed_defaults(session)
 
 
 def migrate_user_ai_configs_for_provider_keys(engine):

@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { aiApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -16,8 +17,13 @@ import { ModelLibrary } from "./ai-settings/ModelLibrary";
 import { AddModelDialog } from "./ai-settings/AddModelDialog";
 import { DeleteModelDialog } from "./ai-settings/DeleteModelDialog";
 import { RagIndexingCard } from "./ai-settings/RagIndexingCard";
+import { RouterTermsCard } from "./ai-settings/RouterTermsCard";
 import { TaskRoutingCard } from "./ai-settings/TaskRoutingCard";
 import { AIModel, AITaskAssignment, AITaskCatalogItem, NewAIModel } from "./ai-settings/types";
+import {
+  AISettingsSectionKey,
+  AISettingsSectionRail,
+} from "./ai-settings/AISettingsSectionRail";
 
 /**
  * Main AI Settings component.
@@ -26,16 +32,17 @@ import { AIModel, AITaskAssignment, AITaskCatalogItem, NewAIModel } from "./ai-s
 export function AISettings() {
   const queryClient = useQueryClient();
   const { registerActions } = useSettingsActions();
-  
+
   // State for Provider Config
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState("Google");
-  
+
   // State for Add Model Form
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [modelToDelete, setModelToDelete] = useState<{id: string, name: string} | null>(null);
+  const [modelToDelete, setModelToDelete] = useState<{ id: string, name: string } | null>(null);
   const [newModel, setNewModel] = useState<NewAIModel>({ name: "", modelId: "", provider: "Google", description: "" });
+  const [activeSection, setActiveSection] = useState<AISettingsSectionKey>("gateway");
 
   // 1. Fetch AI Config
   const configQuery = useQuery({
@@ -99,7 +106,7 @@ export function AISettings() {
 
   // Register actions for global buttons
   useEffect(() => {
-    registerActions("ai", { 
+    registerActions("ai", {
       onSave: handleSaveConfig,
       onReset: handleReset
     });
@@ -172,12 +179,26 @@ export function AISettings() {
     }
   };
 
-  return (
-    <TooltipProvider delay={200}>
-      <div className="max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-6 pt-1">
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-8">
-          
-          <ProviderConfig 
+  const models = (modelsQuery.data as AIModel[]) || [];
+  const taskCatalog = (taskCatalogQuery.data as AITaskCatalogItem[]) || [];
+  const taskAssignments = (taskAssignmentsQuery.data as AITaskAssignment[]) || [];
+  const providerHealth = statusQuery.data?.providers?.[provider.toLowerCase()];
+  const hasProviderKey = providerHealth?.hasApiKey ?? Boolean(apiKey && apiKey !== "********");
+  const activeModels = models.filter((model) => model.isActive).length;
+
+  const sectionMetrics: Partial<Record<AISettingsSectionKey, string>> = {
+    gateway: hasProviderKey ? "key" : "open",
+    models: String(models.length),
+    routing: String(taskCatalog.length),
+    terms: "db",
+    rag: statusQuery.data?.rag?.enabled ? "on" : "local",
+  };
+
+  const renderActiveSection = () => {
+    switch (activeSection) {
+      case "gateway":
+        return (
+          <ProviderConfig
             apiKey={apiKey}
             setApiKey={setApiKey}
             provider={provider}
@@ -187,13 +208,15 @@ export function AISettings() {
             isSaving={saveConfigMutation.isPending}
             isRevealing={revealKeyMutation.isPending}
           />
-
-          <ModelLibrary 
-            models={modelsQuery.data as AIModel[]}
+        );
+      case "models":
+        return (
+          <ModelLibrary
+            models={models}
             isLoading={modelsQuery.isLoading}
             onDelete={handleDeleteModel}
           >
-            <AddModelDialog 
+            <AddModelDialog
               isOpen={isAddDialogOpen}
               setIsOpen={setIsAddDialogOpen}
               newModel={newModel}
@@ -202,27 +225,58 @@ export function AISettings() {
               isAdding={addModelMutation.isPending}
             />
           </ModelLibrary>
-
+        );
+      case "routing":
+        return (
           <TaskRoutingCard
-            catalog={(taskCatalogQuery.data as AITaskCatalogItem[]) || []}
-            assignments={(taskAssignmentsQuery.data as AITaskAssignment[]) || []}
-            models={(modelsQuery.data as AIModel[]) || []}
+            catalog={taskCatalog}
+            assignments={taskAssignments}
+            models={models}
             runtimeStatus={statusQuery.data}
             isLoading={taskCatalogQuery.isLoading || taskAssignmentsQuery.isLoading || modelsQuery.isLoading}
             isSaving={saveTaskAssignmentsMutation.isPending}
             onSave={(assignments) => saveTaskAssignmentsMutation.mutate(assignments)}
           />
+        );
+      case "terms":
+        return <RouterTermsCard />;
+      case "rag":
+        return <RagIndexingCard />;
+      default:
+        return null;
+    }
+  };
 
-          <RagIndexingCard />
+  return (
+    <TooltipProvider delay={200}>
+      <div className="h-[calc(100vh-280px)] min-h-136 overflow-hidden pr-2 pt-1">
+        <div className="flex h-full flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            <AISettingsSectionRail
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              metrics={sectionMetrics}
+            />
 
-          <DeleteModelDialog 
+            <div
+              className="min-h-0 overflow-y-auto pr-3 custom-scrollbar"
+              role="tabpanel"
+              id={`ai-settings-panel-${activeSection}`}
+              aria-labelledby={`ai-settings-tab-${activeSection}`}
+            >
+              <div className="pb-8">
+                {renderActiveSection()}
+              </div>
+            </div>
+          </div>
+
+          <DeleteModelDialog
             isOpen={isDeleteDialogOpen}
             setIsOpen={setIsDeleteDialogOpen}
             onConfirm={handleConfirmDelete}
             isDeleting={deleteModelMutation.isPending}
             modelName={modelToDelete?.name || ""}
           />
-          
         </div>
       </div>
     </TooltipProvider>

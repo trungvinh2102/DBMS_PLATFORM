@@ -12,7 +12,8 @@ from sqlalchemy.orm import sessionmaker
 
 import services.ai.retrieval.index_service as index_module
 import services.ai.retrieval.retrieval_service as retrieval_module
-from models import Base, QueryHistory, RagChunk, RagRetrievalEvent, RagSource, SavedQuery
+from models import AIRouterTerm, AIRouterTermSet, Base, QueryHistory, RagChunk, RagRetrievalEvent, RagSource, SavedQuery
+from services.ai.router_terms import normalize_router_text, router_term_service
 from services.ai.retrieval.index_documents import mask_sql_literals
 from services.ai.retrieval.index_service import RagIndexService
 from services.ai.retrieval.pipeline import RagPipelineService
@@ -93,7 +94,115 @@ def test_query_understanding_uses_connected_database_context_without_domain_keyw
 
     assert understanding.intent == "text_to_sql"
     assert understanding.needs_retrieval is True
+    assert understanding.behavior == "data_exploration"
+    assert understanding.rag_mode == "deep"
+    assert understanding.reasoning_mode == "deep"
     assert "database_schema" in understanding.source_types
+
+
+def test_query_understanding_routes_simple_sql_to_shallow_rag():
+    understanding = query_understanding_service.understand(
+        "Write SQL to list the 10 latest orders",
+        database_id="db-1",
+        schema="public",
+    )
+
+    assert understanding.intent == "text_to_sql"
+    assert understanding.needs_retrieval is True
+    assert understanding.behavior == "sql_coding"
+    assert understanding.rag_mode == "shallow"
+    assert understanding.reasoning_mode == "normal"
+
+
+def test_query_understanding_does_not_use_database_context_for_casual_chat():
+    understanding = query_understanding_service.understand(
+        "hello",
+        database_id="db-1",
+        schema="public",
+    )
+
+    assert understanding.intent == "general_chat"
+    assert understanding.needs_retrieval is False
+    assert understanding.behavior == "general_chat"
+    assert understanding.rag_mode == "none"
+
+
+def test_query_understanding_loads_router_terms_from_metadata_db(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    monkeypatch.setattr("services.ai.router_terms.SessionLocal", factory)
+    router_term_service.clear_cache()
+
+    session = factory()
+    try:
+        router_term_service.seed_defaults(session)
+        term_set = session.get(AIRouterTermSet, "system:exploration_terms")
+        custom_term = "margin leakage"
+        session.add(AIRouterTerm(
+            id="router-term-custom-margin-leakage",
+            termSetId=term_set.id,
+            term=custom_term,
+            normalizedTerm=normalize_router_text(custom_term),
+            language="en",
+            matchType="phrase",
+            weight=1.0,
+            enabled=True,
+        ))
+        session.commit()
+    finally:
+        session.close()
+    router_term_service.clear_cache()
+
+    understanding = query_understanding_service.understand(
+        "Which customers have margin leakage?",
+        database_id="db-1",
+        schema="public",
+    )
+
+    assert understanding.intent == "text_to_sql"
+    assert understanding.behavior == "data_exploration"
+    assert understanding.rag_mode == "deep"
+    router_term_service.clear_cache()
+
+
+def test_router_term_service_crud_manages_individual_rows(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    monkeypatch.setattr("services.ai.router_terms.SessionLocal", factory)
+    router_term_service.clear_cache()
+
+    session = factory()
+    try:
+        router_term_service.seed_defaults(session)
+        session.commit()
+    finally:
+        session.close()
+
+    created = router_term_service.create_term({
+        "termSetKey": "sql_coding_terms",
+        "term": "cte helper",
+        "language": "en",
+        "matchType": "phrase",
+        "weight": 0.7,
+        "enabled": True,
+    })
+    updated = router_term_service.update_term(created["id"], {"enabled": False, "notes": "temporary"})
+    deleted = router_term_service.delete_term(created["id"])
+
+    assert created["term"] == "cte helper"
+    assert updated["enabled"] is False
+    assert updated["notes"] == "temporary"
+    assert deleted == {"deleted": True, "disabled": False, "id": created["id"]}
+
+    term_sets = router_term_service.list_term_sets()
+    sql_terms = next(item for item in term_sets if item["key"] == "sql_coding_terms")["terms"]
+    system_term = next(item for item in sql_terms if item["term"] == "sql")
+    disabled = router_term_service.delete_term(system_term["id"])
+
+    assert disabled == {"deleted": False, "disabled": True, "id": system_term["id"]}
+    router_term_service.clear_cache()
 
 
 def test_schema_index_text_preserves_postgres_mixed_case_column_references():
@@ -426,8 +535,11 @@ def test_rag_pipeline_plan_returns_understanding_and_context(monkeypatch):
     plan = pipeline.plan_query("show order totals", database_id="db-1", schema="public", user_id="user-1")
 
     assert plan["understanding"]["intent"] == "text_to_sql"
+    assert plan["understanding"]["behavior"] == "data_exploration"
+    assert plan["understanding"]["ragMode"] == "deep"
     assert plan["understanding"]["needsRetrieval"] is True
     assert plan["retrievalTrace"]["selectedCount"] == 1
+    assert plan["retrievalTrace"]["ragMode"] == "deep"
     assert plan["citations"][0]["id"] == "database:db-1/schema:public/table:orders"
     assert "RETRIEVED EVIDENCE" in plan["contextPreview"]
 

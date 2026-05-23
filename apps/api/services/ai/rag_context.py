@@ -45,12 +45,17 @@ class RagContextBuilder:
             )
 
         retrieval = self._retrieve_with_schema_bootstrap(understanding, user_id)
-        items = self._budget_items(retrieval.get("items") or [])
+        items = self._budget_items(retrieval.get("items") or [], understanding)
         citations = self._dedupe_citations(item.get("citation") for item in items if item.get("citation"))
         trace = dict(retrieval.get("retrievalTrace") or {})
         trace["intent"] = understanding.intent
+        trace["behavior"] = understanding.behavior
+        trace["ragMode"] = understanding.rag_mode
+        trace["reasoningMode"] = understanding.reasoning_mode
+        trace["routerConfidence"] = understanding.confidence
+        trace["explorationScore"] = understanding.exploration_score
         trace["rewrittenQuery"] = understanding.retrieval_query
-        trace["contextTokenBudget"] = self._max_context_tokens()
+        trace["contextTokenBudget"] = self._max_context_tokens(understanding)
         trace["selectedCount"] = len(items)
         trace["evidenceSufficiency"] = self._evaluate_evidence_sufficiency(understanding, items)
         warnings = self._warnings_for_trace(trace, items)
@@ -68,8 +73,8 @@ class RagContextBuilder:
             database_id=understanding.database_id,
             user_id=user_id,
             source_types=understanding.source_types,
-            top_k=self._top_k(),
-            candidate_limit=self._candidate_limit(),
+            top_k=self._top_k(understanding),
+            candidate_limit=self._candidate_limit(understanding),
         )
         if retrieval.get("items") or "database_schema" not in understanding.source_types or not understanding.database_id:
             return retrieval
@@ -91,8 +96,8 @@ class RagContextBuilder:
             database_id=understanding.database_id,
             user_id=user_id,
             source_types=understanding.source_types,
-            top_k=self._top_k(),
-            candidate_limit=self._candidate_limit(),
+            top_k=self._top_k(understanding),
+            candidate_limit=self._candidate_limit(understanding),
         )
 
     def _format_context(self, understanding: QueryUnderstanding, items: List[Dict[str, Any]], warnings: List[str]) -> str:
@@ -100,6 +105,8 @@ class RagContextBuilder:
         lines = [
             "TASK:",
             understanding.intent,
+            f"BEHAVIOR: {understanding.behavior}",
+            f"RAG MODE: {understanding.rag_mode}",
             "",
             "DATABASE CONTEXT:",
             f"- dialect: {db_type}",
@@ -114,7 +121,11 @@ class RagContextBuilder:
             lines.append("- none")
         for index, item in enumerate(items, start=1):
             citation = (item.get("citation") or {}).get("id") or f"item:{index}"
-            content = self._compress_item_content(understanding.retrieval_query, str(item.get("content") or ""))
+            content = self._compress_item_content(
+                understanding.retrieval_query,
+                str(item.get("content") or ""),
+                understanding,
+            )
             lines.extend([
                 f"[{index}] {item.get('title')} ({item.get('sourceType')}, score={item.get('score')})",
                 f"Citation: {citation}",
@@ -256,8 +267,8 @@ class RagContextBuilder:
             "- none",
         ])
 
-    def _budget_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        budget = self._max_context_tokens()
+    def _budget_items(self, items: List[Dict[str, Any]], understanding: QueryUnderstanding) -> List[Dict[str, Any]]:
+        budget = self._max_context_tokens(understanding)
         used = 0
         selected = []
         seen = set()
@@ -274,10 +285,10 @@ class RagContextBuilder:
             used += token_count
         return selected
 
-    def _compress_item_content(self, query: str, content: str) -> str:
+    def _compress_item_content(self, query: str, content: str, understanding: QueryUnderstanding) -> str:
         """Keeps prompt context bounded while preserving query-matched evidence."""
         words = content.strip().split()
-        max_words = self._max_chunk_words()
+        max_words = self._max_chunk_words(understanding)
         if len(words) <= max_words:
             return content.strip()
 
@@ -356,17 +367,24 @@ class RagContextBuilder:
             return ["database_schema"]
         return []
 
-    def _top_k(self) -> int:
-        return self._int_env("QURIODB_RAG_TABLE_BUDGET", 8, minimum=1, maximum=20)
+    def _top_k(self, understanding: Optional[QueryUnderstanding] = None) -> int:
+        default = 8 if self._is_deep_rag(understanding) else 4
+        return self._int_env("QURIODB_RAG_TABLE_BUDGET", default, minimum=1, maximum=20)
 
-    def _candidate_limit(self) -> int:
-        return self._int_env("QURIODB_RAG_CANDIDATE_BUDGET", 32, minimum=1, maximum=100)
+    def _candidate_limit(self, understanding: Optional[QueryUnderstanding] = None) -> int:
+        default = 32 if self._is_deep_rag(understanding) else 12
+        return self._int_env("QURIODB_RAG_CANDIDATE_BUDGET", default, minimum=1, maximum=100)
 
-    def _max_context_tokens(self) -> int:
-        return self._int_env("QURIODB_RAG_MAX_CONTEXT_TOKENS", 6000, minimum=512, maximum=20000)
+    def _max_context_tokens(self, understanding: Optional[QueryUnderstanding] = None) -> int:
+        default = 6000 if self._is_deep_rag(understanding) else 2500
+        return self._int_env("QURIODB_RAG_MAX_CONTEXT_TOKENS", default, minimum=512, maximum=20000)
 
-    def _max_chunk_words(self) -> int:
-        return self._int_env("QURIODB_RAG_MAX_CHUNK_WORDS", 900, minimum=120, maximum=4000)
+    def _max_chunk_words(self, understanding: Optional[QueryUnderstanding] = None) -> int:
+        default = 900 if self._is_deep_rag(understanding) else 420
+        return self._int_env("QURIODB_RAG_MAX_CHUNK_WORDS", default, minimum=120, maximum=4000)
+
+    def _is_deep_rag(self, understanding: Optional[QueryUnderstanding]) -> bool:
+        return bool(understanding and understanding.rag_mode == "deep")
 
     def _int_env(self, name: str, default: int, minimum: int, maximum: int) -> int:
         try:
