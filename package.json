@@ -11,9 +11,9 @@
     "bun": ">=1.3.6"
   },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "turbo -F web -F api dev",
     "dev:web": "turbo -F web dev",
-    "dev:backend": "cd apps/api && venv/Scripts/python app.py",
+    "dev:backend": "turbo -F api dev",
     "start": "turbo start",
     "build": "turbo build",
     "desktop:build": "powershell -ExecutionPolicy Bypass -Command \"& ./build-backend.ps1 -Target gnu; \\$env:RUSTUP_TOOLCHAIN='stable-x86_64-pc-windows-gnu'; \\$env:PATH='C:/ProgramData/mingw64/mingw64/bin;' + \\$env:PATH; cd apps/desktop; bun run tauri build --target x86_64-pc-windows-gnu\"",

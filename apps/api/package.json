@@ -1,0 +1,7 @@
+{
+  "name": "api",
+  "private": true,
+  "scripts": {
+    "dev": "venv/Scripts/python app.py"
+  }
+}
