@@ -159,7 +159,7 @@ const AIMessageComponent = ({
 
   return (
     <div className={cn(
-      "flex w-full gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300",
+      "flex w-full gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300",
       message.role === "user" ? "flex-row-reverse" : "flex-row"
     )}>
       {/* Avatar Icon */}
@@ -173,7 +173,7 @@ const AIMessageComponent = ({
       </div>
 
       <div className={cn(
-        "group flex min-w-0 flex-col gap-2",
+        "group flex min-w-0 flex-col gap-1.5",
         message.role === "user" ? "max-w-[78%] items-end" : "w-full flex-1 items-start ai-message",
       )}>
         {/* 1. Reasoning Section (Assistant only) */}
@@ -191,31 +191,31 @@ const AIMessageComponent = ({
         {/* 2. Primary Response Bubble */}
         {(showPrimaryBubble || message.role === "user") && (
           <div className={cn(
-            "relative w-full rounded-2xl p-3.5 text-[13px] leading-6 transition-all",
+            "relative w-full rounded-xl p-2.5 text-[11px] leading-5 transition-all",
             message.role === "user"
               ? "ml-auto w-fit rounded-tr-md bg-primary text-primary-foreground shadow-sm"
               : isDark ? "border border-white/10 bg-card/70 shadow-sm" : "border border-slate-200 bg-white shadow-sm"
           )}>
             {message.role === "assistant" && (
-              <div className="mb-3 flex items-center justify-between gap-3 border-b border-border/50 pb-2">
-                <div className="flex min-w-0 items-center gap-2">
+              <div className="mb-2 flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
+                <div className="flex min-w-0 items-center gap-1.5">
                   {status ? (
                     <span className="flex items-center gap-1.5 truncate text-[10px] font-semibold text-primary/80">
                       <BrainCircuit className="h-3 w-3" /> {status}
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       <MessageSquare className="h-3 w-3" /> Assistant
                     </span>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-1">
                   {shouldShowConfidence && <ConfidenceBadge score={score} />}
                   {canCopyResponse && (
                     <button
                       type="button"
                       onClick={handleCopyResponse}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={isResponseCopied ? "Response copied" : "Copy assistant response"}
                       title={isResponseCopied ? "Copied" : "Copy response"}
                     >
@@ -236,7 +236,7 @@ const AIMessageComponent = ({
             </div>
 
             {message.explanation && message.role === "assistant" && (
-              <div className="mt-4 border-t border-border/50 pt-3 text-[12px] leading-6 text-muted-foreground">
+              <div className="mt-2 border-t border-border/50 pt-2 text-[11px] leading-5 text-muted-foreground">
                 <MarkdownRenderer
                   content={message.explanation}
                   isDark={isDark}
@@ -249,7 +249,7 @@ const AIMessageComponent = ({
 
         {/* 3. Specialized Result Sections (SQL, Data, Analysis) */}
         {message.role === "assistant" && (
-          <div className="w-full flex flex-col gap-4 mt-1">
+          <div className="w-full flex flex-col gap-2 mt-0.5">
             {message.sql && (
               <SQLBlock
                 sql={message.sql}
@@ -268,7 +268,7 @@ const AIMessageComponent = ({
                 <DataTablePreview columns={sqlPreview.columns} data={sqlPreview.data} />
               ) : (
                 <div className={cn(
-                  "rounded-xl border px-3 py-2 text-[12px] text-muted-foreground",
+                  "rounded-lg border px-2.5 py-1.5 text-[11px] text-muted-foreground",
                   isDark ? "border-white/10 bg-card/70" : "border-slate-200 bg-white"
                 )}>
                   Query chạy thành công nhưng không trả về dòng dữ liệu nào.
@@ -280,7 +280,7 @@ const AIMessageComponent = ({
             )}
 
             {sqlPreviewError && (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-2.5 py-1.5 text-[11px] text-destructive">
                 {sqlPreviewError}
               </div>
             )}
@@ -291,10 +291,10 @@ const AIMessageComponent = ({
 
             {message.analysis && (
               <div className={cn(
-                "rounded-2xl border p-4 text-[13px] leading-6 shadow-sm",
+                "rounded-xl border p-2.5 text-[11px] leading-5 shadow-sm",
                 isDark ? "bg-card/70 border-white/10" : "bg-slate-50 border-slate-200"
               )}>
-                <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
                   <FileSearch className="h-3.5 w-3.5" /> Detailed Analysis
                 </div>
                 <MarkdownRenderer

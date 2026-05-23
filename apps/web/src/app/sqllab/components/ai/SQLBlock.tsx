@@ -37,14 +37,14 @@ export const SQLBlock = React.memo(({
 }: SQLBlockProps) => {
   return (
     <div className={cn(
-      "w-full rounded-2xl border shadow-lg overflow-hidden group/sql transition-all hover:border-primary/30",
+      "w-full rounded-xl border shadow-lg overflow-hidden group/sql transition-all hover:border-primary/30",
       isDark ? "bg-[#0d1117] border-white/10" : "bg-white border-slate-200"
     )}>
       <div className={cn(
-        "flex items-center justify-between px-3 py-2 border-b",
+        "flex items-center justify-between px-2.5 py-1.5 border-b",
         isDark ? "bg-white/5 border-white/5" : "bg-slate-50 border-slate-200"
       )}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <span className={cn(
             "text-[9px] font-black uppercase tracking-widest",
@@ -55,7 +55,7 @@ export const SQLBlock = React.memo(({
           variant="ghost"
           size="icon"
           className={cn(
-            "h-7 w-7 transition-colors rounded-lg",
+            "h-6 w-6 transition-colors rounded-lg",
             isDark ? "text-slate-500 hover:text-white hover:bg-white/10" : "text-slate-400 hover:text-slate-900 hover:bg-slate-200"
           )}
           onClick={onCopy}
@@ -67,7 +67,7 @@ export const SQLBlock = React.memo(({
       </div>
 
       <div className={cn(
-        "p-4 overflow-x-auto min-h-10 border-t-0",
+        "p-2.5 overflow-x-auto min-h-10 border-t-0",
         isDark ? "bg-[#0d1117]" : "bg-white"
       )}>
         <React.Suspense fallback={<div className="h-16 animate-pulse bg-muted/20" />}>
@@ -79,7 +79,7 @@ export const SQLBlock = React.memo(({
               padding: 0,
               margin: 0,
               fontSize: '11px',
-              lineHeight: '1.6',
+              lineHeight: '1.45',
               fontFamily: '"JetBrains Mono", "Fira Code", monospace'
             }}
           >
@@ -89,13 +89,13 @@ export const SQLBlock = React.memo(({
       </div>
 
       <div className={cn(
-        "p-2 flex flex-col gap-2",
+        "p-1.5 flex flex-col gap-1.5",
         isDark ? "bg-slate-900/40" : "bg-slate-50/50"
       )}>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
           <Button
             variant="outline"
-            className="h-8 rounded-xl px-2 text-[10px] font-bold"
+            className="h-7 rounded-lg px-2 text-[10px] font-bold"
             onClick={() => onShowData(sql)}
             disabled={isShowingData}
           >
@@ -104,7 +104,7 @@ export const SQLBlock = React.memo(({
           </Button>
           <Button
             variant="ghost"
-            className="h-8 text-[9px] font-bold uppercase tracking-widest transition-all text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 rounded-xl"
+            className="h-7 text-[9px] font-bold uppercase tracking-widest transition-all text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 rounded-lg"
             onClick={() => onExplain(sql)}
           >
             <FileSearch className="h-3.5 w-3.5 mr-1.5" />
@@ -113,7 +113,7 @@ export const SQLBlock = React.memo(({
           <Button
             variant="outline"
             className={cn(
-              "h-8 text-[9px] font-bold uppercase tracking-widest transition-all rounded-xl",
+              "h-7 text-[9px] font-bold uppercase tracking-widest transition-all rounded-lg",
               isDark
                 ? "border-white/10 bg-white/5 hover:bg-transparent text-slate-300 hover:text-white hover:border-primary/50"
                 : "border-slate-200 bg-white hover:bg-transparent hover:border-primary/40 text-slate-600 hover:text-slate-900"

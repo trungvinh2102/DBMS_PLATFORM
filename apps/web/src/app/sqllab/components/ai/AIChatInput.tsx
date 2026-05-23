@@ -73,8 +73,8 @@ const AIChatInputComponent = ({
       : "Auto Provider";
 
   return (
-    <div className="border-t border-border/70 bg-muted/10 p-3 backdrop-blur-3xl md:p-4">
-      <div className="flex w-full flex-col gap-3">
+    <div className="border-t border-border/70 bg-muted/10 p-2 backdrop-blur-3xl md:p-3">
+      <div className="flex w-full flex-col gap-2">
         <div className="relative rounded-xl border border-border/70 bg-background shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
           <SlashCommandMenu
             inputValue={input}
@@ -89,14 +89,14 @@ const AIChatInputComponent = ({
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder={showCommandMenu ? "Type a command..." : "Describe the query, chart, or analysis you need..."}
-            className="min-h-28 w-full resize-none border-none bg-transparent p-4 text-sm leading-6 focus-visible:ring-0"
+            className="min-h-20 w-full resize-none border-none bg-transparent p-3 text-xs leading-5 focus-visible:ring-0"
           />
 
-          <div className="flex flex-col gap-3 border-t border-border/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-2">
+          <div className="flex flex-col gap-2 border-t border-border/60 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-1.5">
               <BrainCircuit className="h-3.5 w-3.5 text-primary/70" />
               <Select value={selectedModel || AUTO_MODEL_VALUE} onValueChange={(val) => val && onModelChange(val)}>
-                <SelectTrigger className="min-h-8 h-auto min-w-0 max-w-full justify-between whitespace-normal rounded-lg border-border/70 bg-muted/50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest shadow-none hover:bg-muted focus:ring-0 sm:max-w-96">
+                <SelectTrigger className="min-h-7 h-auto min-w-0 max-w-full justify-between whitespace-normal rounded-lg border-border/70 bg-muted/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest shadow-none hover:bg-muted focus:ring-0 sm:max-w-96">
                   <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-4">
                     {selectedModelLabel}
                   </span>
@@ -131,7 +131,7 @@ const AIChatInputComponent = ({
 
             <Button
               className={cn(
-                "h-9 rounded-lg px-4 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95",
+                "h-8 rounded-lg px-3 text-[10px] font-black uppercase tracking-widest transition-all active:scale-95",
                 input.trim() ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-muted text-muted-foreground cursor-not-allowed"
               )}
               onClick={onSend}

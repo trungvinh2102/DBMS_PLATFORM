@@ -22,29 +22,29 @@ export const MarkdownRenderer = React.memo(({
 }: MarkdownRendererProps) => {
   const markdownComponents = useMemo(() => ({
     p({ children }: any) {
-      return <p className="my-2 first:mt-0 last:mb-0">{children}</p>;
+      return <p className="my-1.5 first:mt-0 last:mb-0">{children}</p>;
     },
     ul({ children }: any) {
-      return <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>;
+      return <ul className="my-1.5 list-disc space-y-0.5 pl-4">{children}</ul>;
     },
     ol({ children }: any) {
-      return <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>;
+      return <ol className="my-1.5 list-decimal space-y-0.5 pl-4">{children}</ol>;
     },
     li({ children }: any) {
       return <li className="pl-1">{children}</li>;
     },
     h1({ children }: any) {
-      return <h3 className="mb-2 mt-3 text-sm font-semibold first:mt-0">{children}</h3>;
+      return <h3 className="mb-1.5 mt-2 text-xs font-semibold first:mt-0">{children}</h3>;
     },
     h2({ children }: any) {
-      return <h3 className="mb-2 mt-3 text-sm font-semibold first:mt-0">{children}</h3>;
+      return <h3 className="mb-1.5 mt-2 text-xs font-semibold first:mt-0">{children}</h3>;
     },
     h3({ children }: any) {
-      return <h4 className="mb-1.5 mt-3 text-[13px] font-semibold first:mt-0">{children}</h4>;
+      return <h4 className="mb-1 mt-2 text-[12px] font-semibold first:mt-0">{children}</h4>;
     },
     blockquote({ children }: any) {
       return (
-        <blockquote className="my-3 border-l-2 border-primary/40 pl-3 text-muted-foreground">
+        <blockquote className="my-2 border-l-2 border-primary/40 pl-2.5 text-muted-foreground">
           {children}
         </blockquote>
       );
@@ -63,7 +63,7 @@ export const MarkdownRenderer = React.memo(({
     },
     table({ children }: any) {
       return (
-        <div className="my-3 overflow-x-auto rounded-lg border border-border">
+        <div className="my-2 overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-max border-collapse text-left text-[12px]">
             {children}
           </table>
@@ -71,10 +71,10 @@ export const MarkdownRenderer = React.memo(({
       );
     },
     th({ children }: any) {
-      return <th className="border-b border-border bg-muted/40 px-3 py-2 font-semibold">{children}</th>;
+      return <th className="border-b border-border bg-muted/40 px-2 py-1.5 font-semibold">{children}</th>;
     },
     td({ children }: any) {
-      return <td className="border-b border-border/60 px-3 py-2 align-top last:border-b-0">{children}</td>;
+      return <td className="border-b border-border/60 px-2 py-1.5 align-top last:border-b-0">{children}</td>;
     },
     pre({ children }: any) {
       return <>{children}</>;
@@ -84,7 +84,7 @@ export const MarkdownRenderer = React.memo(({
       return match ? (
         <pre
           className={cn(
-            "my-3 max-h-72 overflow-auto rounded-lg border p-3 font-mono text-[11px] leading-6",
+            "my-2 max-h-72 overflow-auto rounded-lg border p-2.5 font-mono text-[11px] leading-5",
             role === "user"
               ? "border-white/15 bg-black/20 text-primary-foreground"
               : "border-border bg-muted/40 text-foreground"

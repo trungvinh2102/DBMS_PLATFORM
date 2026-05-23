@@ -410,11 +410,11 @@ export function AIAssistant({
           />
         )}
 
-        <div className="flex shrink-0 items-center gap-2 border-t border-border/70 bg-muted/10 px-3 py-2 md:px-4">
+        <div className="flex shrink-0 items-center gap-1.5 border-t border-border/70 bg-muted/10 px-2 py-1.5 md:px-3">
           <Button
             type="button"
             variant="ghost"
-            className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest"
+            className="h-7 rounded-lg text-[10px] font-black uppercase tracking-widest"
             onClick={handleToggleDiagnostics}
           >
             <Activity className="mr-1.5 h-3.5 w-3.5" />

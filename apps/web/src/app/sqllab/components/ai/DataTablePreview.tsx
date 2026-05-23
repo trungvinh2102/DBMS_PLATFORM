@@ -20,8 +20,8 @@ export const DataTablePreview = React.memo(({ columns, data }: DataTablePreviewP
   const visibleRows = React.useMemo(() => data.slice(0, 5), [data]);
 
   return (
-    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/70 bg-white/80 p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur-sm dark:border-white/10 dark:bg-card/70 dark:shadow-[0_10px_30px_-18px_rgba(0,0,0,0.65)]">
-      <div className="flex items-center gap-2 mb-2 px-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
+    <div className="mt-2 overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 p-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] backdrop-blur-sm dark:border-white/10 dark:bg-card/70 dark:shadow-[0_10px_30px_-18px_rgba(0,0,0,0.65)]">
+      <div className="flex items-center gap-1.5 mb-1.5 px-1 text-[10px] font-black uppercase tracking-widest text-primary/70">
         <Sparkles className="h-3 w-3" />
         Sample Results Preview (Top 5)
       </div>
@@ -30,24 +30,24 @@ export const DataTablePreview = React.memo(({ columns, data }: DataTablePreviewP
           <thead>
             <tr>
               {visibleColumns.map(col => (
-                <th key={col} className="p-1.5 text-[9px] font-bold text-muted-foreground border-b border-border/50 truncate max-w-25">{col}</th>
+                <th key={col} className="p-1 text-[9px] font-bold text-muted-foreground border-b border-border/50 truncate max-w-25">{col}</th>
               ))}
-              {columns.length > 5 && <th className="p-1.5 text-[9px] font-bold text-muted-foreground border-b border-border/50 italic opacity-50">+ {columns.length - 5} more</th>}
+              {columns.length > 5 && <th className="p-1 text-[9px] font-bold text-muted-foreground border-b border-border/50 italic opacity-50">+ {columns.length - 5} more</th>}
             </tr>
           </thead>
           <tbody>
             {visibleRows.map((row, idx) => (
               <tr key={idx} className="hover:bg-primary/5 transition-colors">
                 {visibleColumns.map(col => (
-                  <td key={col} className="p-1.5 text-[10px] text-muted-foreground/80 truncate max-w-25 border-b border-border/20">{row[col]}</td>
+                  <td key={col} className="p-1 text-[10px] text-muted-foreground/80 truncate max-w-25 border-b border-border/20">{row[col]}</td>
                 ))}
-                {columns.length > 5 && <td className="p-1.5 border-b border-border/20" />}
+                {columns.length > 5 && <td className="p-1 border-b border-border/20" />}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <div className="mt-2 text-[8px] text-muted-foreground/60 italic px-1">
+      <div className="mt-1.5 text-[8px] text-muted-foreground/60 italic px-1">
         Showing top 5 of {data.length} records. Open in SQL Lab for full results.
       </div>
     </div>

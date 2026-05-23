@@ -35,12 +35,12 @@ export function ContextSources({ citations = [], isDark }: ContextSourcesProps) 
   return (
     <div
       className={cn(
-        "rounded-lg border p-3 text-[12px] leading-5 shadow-sm",
+        "rounded-lg border p-2 text-[11px] leading-5 shadow-sm",
         isDark ? "border-white/10 bg-card/70" : "border-slate-200 bg-white",
       )}
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           <Database className="h-3.5 w-3.5 shrink-0" />
           Context used
         </div>
@@ -48,13 +48,13 @@ export function ContextSources({ citations = [], isDark }: ContextSourcesProps) 
           {sources.length} reference{sources.length > 1 ? "s" : ""}
         </span>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {sources.map((source) => {
           const Icon = source.sourceType === "database_schema" ? Database : FileText;
           return (
             <span
               key={source.key}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/70 bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground"
+              className="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/30 px-1.5 py-0.5 text-[10px] text-muted-foreground"
               title={buildSourceTitle(source)}
             >
               <Icon className="h-3 w-3 shrink-0" />

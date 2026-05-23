@@ -21,14 +21,14 @@ export const SuggestionList = React.memo(({
   if (!suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2 animate-in fade-in slide-in-from-left-2 duration-300">
+    <div className="mt-2 flex flex-wrap gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
       {suggestions.map((suggestion, i) => (
         <button
           key={i}
           type="button"
           onClick={() => onSuggestionClick(suggestion.prompt)}
           className={cn(
-            "group/sug inline-flex max-w-full items-start gap-1.5 rounded-md border border-border/80 bg-muted/20 px-2.5 py-1.5",
+            "group/sug inline-flex max-w-full items-start gap-1 rounded-md border border-border/80 bg-muted/20 px-2 py-1",
             "text-left text-[11px] font-medium leading-4 text-muted-foreground transition-colors",
             "hover:border-primary/40 hover:bg-primary/5 hover:text-primary",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
