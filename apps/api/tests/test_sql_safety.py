@@ -16,6 +16,14 @@ def test_validator_allows_read_only_sql_and_applies_preview_limit():
     assert "LIMIT 25" in report.sanitizedSql
 
 
+def test_validator_does_not_apply_postgres_limit_to_mssql():
+    report = sql_safety_validator.validate("SELECT id, email FROM users", dialect="mssql", max_preview_rows=25)
+
+    assert report.isAllowed is True
+    assert report.limitApplied is False
+    assert "LIMIT 25" not in report.sanitizedSql
+
+
 def test_validator_blocks_destructive_sql():
     report = sql_safety_validator.validate("DROP TABLE users")
 

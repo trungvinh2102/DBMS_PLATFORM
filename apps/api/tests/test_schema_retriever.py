@@ -4,6 +4,8 @@ test_schema_retriever.py
 Regression tests for hybrid schema retrieval and RAG prompt context assembly.
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from services.ai.context import SchemaContextService
@@ -261,6 +263,61 @@ def test_stream_response_uses_rag_context_for_database_chat(monkeypatch):
     list(service.stream_generate_response("Những người dùng nào dùng từ ngữ nhạy cảm", db_id="db-1", schema="public", history=[]))
 
     assert called["rag"] is True
+
+
+def test_stream_response_repairs_sql_after_preview_error(monkeypatch):
+    """Generated SQL should be preview-tested and repaired before it is streamed."""
+    service = AIService()
+    previews = []
+
+    monkeypatch.setattr(
+        "services.ai_service.rag_pipeline_service.understand_query",
+        lambda *_args, **_kwargs: SimpleNamespace(intent="text_to_sql", needs_retrieval=True),
+    )
+    monkeypatch.setattr(
+        "services.ai_service.rag_pipeline_service.build_context_for_understanding",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            context="DATABASE CONTEXT:\n- dialect: postgresql",
+            retrieval_trace={},
+            citations=[],
+            warnings=[],
+        ),
+    )
+    monkeypatch.setattr("services.ai_service.feedback_context_service.get_feedback_context", lambda *_: "")
+    monkeypatch.setattr("services.ai_service.langchain_runtime.validate_model_ready", lambda **_: None)
+    monkeypatch.setattr("services.ai_service.task_model_router.resolve_model_id", lambda *_args, **_kwargs: "model-1")
+    monkeypatch.setattr("services.ai_service.langchain_runtime.resolve_provider", lambda **_: "google")
+    monkeypatch.setattr(
+        "services.ai_service.langchain_runtime.stream_text",
+        lambda **_: iter(["```sql\nSELECT * FROM missing_table\n```\n### ANALYSIS:\n- draft"]),
+    )
+    monkeypatch.setattr(
+        "services.ai_service.langchain_runtime.invoke_text",
+        lambda **_: "```sql\nSELECT id FROM users\n```\n### ANALYSIS:\n- fixed\n### SUGGESTIONS:\n[]",
+    )
+
+    def preview(_db_id, sql):
+        previews.append(sql)
+        if "missing_table" in sql:
+            return SimpleNamespace(
+                ok=False,
+                sql=sql,
+                error="relation missing_table does not exist",
+                to_dict=lambda: {"error": "relation missing_table does not exist"},
+            )
+        return SimpleNamespace(ok=True, sql=sql, error="", to_dict=lambda: {})
+
+    monkeypatch.setattr("services.ai_service.sql_execution_verifier.preview", preview)
+
+    events = list(service.stream_generate_response("show users", db_id="db-1", schema="public", history=[]))
+
+    sql_events = [chunk.strip() for event, chunk in events if event == "sql"]
+    thinking = [chunk for event, chunk in events if event == "thinking"]
+
+    assert previews == ["SELECT * FROM missing_table", "SELECT id FROM users"]
+    assert sql_events == ["SELECT id FROM users"]
+    assert any("đang sửa SQL" in chunk for chunk in thinking)
+    assert all("missing_table" not in chunk for event, chunk in events if event != "thinking")
 
 
 def test_rewrite_retrieval_intent_uses_previous_sql_for_followups():

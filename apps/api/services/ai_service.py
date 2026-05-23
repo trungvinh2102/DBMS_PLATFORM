@@ -5,6 +5,7 @@ Specialized AI service delegator that coordinates multiple AI strategies
 (SQL tasks, Agents, Semantic Context) for QurioDB.
 """
 import logging
+import json
 import re
 from typing import Dict, Any, Optional
 
@@ -15,14 +16,16 @@ from .ai.feedback_context import feedback_context_service
 from .ai.langchain_runtime import langchain_runtime
 from .ai.prompt_contracts import build_rag_prompt, build_results_analysis_prompt
 from .ai.retrieval.pipeline import rag_pipeline_service
+from .ai.sql_execution import sql_execution_verifier
 from .ai.stream_parser import TaggedResponseStreamParser
 from .ai.task_model_router import task_model_router
 from .prompts import VIETNAMESE_RESPONSE_POLICY
 
 logger = logging.getLogger(__name__)
 
-MODEL_PREFLIGHT_STATUS = "Đang kiểm tra model và hạn mức..."
 RESPONSE_START_STATUS = "Đang chuẩn bị phản hồi..."
+MODEL_PREFLIGHT_STATUS = "Đang kiểm tra model và hạn mức..."
+SQL_PREVIEW_INTENTS = {"text_to_sql", "sql_repair", "sql_optimize"}
 
 
 class AIService(SqlAIService, AgentAIService):
@@ -188,6 +191,18 @@ class AIService(SqlAIService, AgentAIService):
             if conv_id and not langchain_history:
                 langchain_history = self._load_langchain_history(conv_id)
 
+            if db_id and getattr(understanding, "intent", "") in SQL_PREVIEW_INTENTS and task_key != "results.analyze":
+                yield from self._stream_sql_with_preview_repair(
+                    system_prompt=system_prompt,
+                    prompt=prompt,
+                    db_id=db_id,
+                    model_id=model_id,
+                    user_id=user_id,
+                    provider=provider,
+                    history=langchain_history,
+                )
+                return
+
             parser = TaggedResponseStreamParser()
             for chunk in langchain_runtime.stream_text(
                 system_prompt=system_prompt,
@@ -208,6 +223,110 @@ class AIService(SqlAIService, AgentAIService):
 
         provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         yield "error", f"LangChain streaming failed for provider {provider}"
+
+    def _stream_sql_with_preview_repair(
+        self,
+        system_prompt: str,
+        prompt: str,
+        db_id: str,
+        model_id: Optional[str],
+        user_id: Optional[str],
+        provider: str,
+        history: list,
+    ):
+        """Generates SQL, preview-executes it, and asks the model to repair failures."""
+        current_prompt = prompt
+        failed_sql = ""
+        last_preview = None
+        max_retries = 2
+
+        for attempt in range(max_retries + 1):
+            if attempt == 0:
+                yield "thinking", "Đang tạo SQL..."
+                response = "".join(langchain_runtime.stream_text(
+                    system_prompt=system_prompt,
+                    prompt=current_prompt,
+                    db_id=db_id,
+                    model_id=model_id,
+                    user_id=user_id,
+                    provider=provider,
+                    history=history,
+                ))
+            else:
+                yield "thinking", f"Bản chạy thử thất bại; đang sửa SQL ({attempt}/{max_retries})..."
+                response = langchain_runtime.invoke_text(
+                    system_prompt=system_prompt,
+                    prompt=current_prompt,
+                    db_id=db_id,
+                    model_id=model_id,
+                    user_id=user_id,
+                    provider=provider,
+                    temperature=0,
+                )
+
+            sql = self._extract_executable_sql(response)
+            if not sql:
+                yield from self._emit_parsed_response(response)
+                return
+
+            yield "thinking", "Đang chạy thử SQL đã tạo một cách an toàn..."
+            preview = sql_execution_verifier.preview(db_id, sql)
+            last_preview = preview
+            failed_sql = preview.sql or sql
+            if preview.ok:
+                yield "thinking", "SQL đã chạy thử thành công."
+                yield from self._emit_parsed_response(response)
+                return
+
+            current_prompt = self._build_sql_repair_prompt(prompt, failed_sql, preview.to_dict())
+
+        yield "warnings", ["sql_preview_failed"]
+        yield from self._emit_parsed_response(
+            self._build_preview_failure_response(failed_sql, last_preview.to_dict() if last_preview else {})
+        )
+
+    def _emit_parsed_response(self, response: str):
+        parser = TaggedResponseStreamParser()
+        for event, parsed_chunk in parser.feed(response):
+            yield event, parsed_chunk
+        for event, parsed_chunk in parser.flush():
+            yield event, parsed_chunk
+
+    def _extract_executable_sql(self, response: str) -> str:
+        sql = self._extract_sql(str(response or ""))
+        if not sql:
+            return ""
+        if sql.strip() == str(response or "").strip() and not re.match(
+            r"^\s*(select|with|show|describe|desc|explain|pragma)\b",
+            sql,
+            re.IGNORECASE,
+        ):
+            return ""
+        return sql
+
+    def _build_sql_repair_prompt(self, user_prompt: str, failed_sql: str, preview: Dict[str, Any]) -> str:
+        return "\n\n".join([
+            "The previous SQL failed QurioDB's read-only preview execution.",
+            "Repair it using the same database context and output contract.",
+            "Return exactly one corrected read-only SQL block if possible.",
+            "If the error cannot be fixed from available evidence, ask one concise clarification and do not output SQL.",
+            f"USER REQUEST:\n{user_prompt}",
+            f"FAILED SQL:\n```sql\n{failed_sql}\n```",
+            f"PREVIEW RESULT JSON:\n{json.dumps(preview, ensure_ascii=False)[:4000]}",
+        ])
+
+    def _build_preview_failure_response(self, failed_sql: str, preview: Dict[str, Any]) -> str:
+        error = str(preview.get("error") or "Unknown SQL preview error")
+        return (
+            "<confidence>1</confidence>\n"
+            "Tôi chưa tạo được truy vấn vượt qua bước kiểm tra read-only preview.\n\n"
+            "### ANALYSIS:\n"
+            f"- Lỗi preview: {error}\n"
+            "- Truy vấn không được tự động chạy tiếp để tránh trả về SQL sai hoặc không an toàn.\n"
+            f"- SQL cuối cùng đã thử:\n```sql\n{failed_sql}\n```\n\n"
+            "### SUGGESTIONS:\n"
+            "[{\"label\":\"Bổ sung ngữ cảnh\",\"prompt\":\"Tôi cần bổ sung bảng/cột nào để viết lại truy vấn này?\",\"intent\":\"other\"}]"
+        )
 
     def _rewrite_retrieval_intent(self, prompt: str, history: list) -> str:
         """Adds recent SQL context for follow-up retrieval without an LLM call."""

@@ -146,7 +146,8 @@ class SqlSafetyValidator:
             return sql, False
         if LIMIT_PATTERN.search(sql) or OFFSET_ONLY_PATTERN.search(sql):
             return sql, False
-        if str(dialect or "").lower() in {"oracle"}:
+        normalized_dialect = str(dialect or "").lower()
+        if normalized_dialect in {"oracle", "mssql", "sqlserver"}:
             return sql, False
 
         trimmed = sql.rstrip().rstrip(";")
