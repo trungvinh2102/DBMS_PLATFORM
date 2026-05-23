@@ -5,7 +5,7 @@
 
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import { BrainCircuit, CheckCircle2, Loader2 } from "lucide-react";
+import { BrainCircuit, CheckCircle2, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIStep } from "./types";
 
@@ -44,9 +44,9 @@ export const ReasoningSection = React.memo(({
       >
         <div className={cn(
           "p-1 rounded-md transition-all duration-500",
-          showThought ? "rotate-180 text-primary" : "rotate-0 text-muted-foreground group-hover/thought:text-primary"
+          showThought ? "text-primary" : "text-muted-foreground group-hover/thought:text-primary"
         )}>
-          <BrainCircuit className="h-3.5 w-3.5" />
+          {showThought ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </div>
         <span className="text-[10.5px] font-black uppercase tracking-widest group-hover/thought:text-primary transition-colors">
           {showThought ? "Ẩn hoạt động trợ lý" : "Xem hoạt động trợ lý"}
