@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_dynamic_libs
+
 
 block_cipher = None
 
@@ -7,7 +9,7 @@ block_cipher = None
 a = Analysis(
     ['../app.py'],
     pathex=[],
-    binaries=[],
+    binaries=collect_dynamic_libs('sqlite_vec'),
     datas=[],
     hiddenimports=[
         'passlib.handlers.bcrypt',
@@ -25,6 +27,7 @@ a = Analysis(
         'langchain_google_genai',
         'langgraph',
         'langsmith',
+        'sqlite_vec',
     ],
     hookspath=[],
     hooksconfig={},

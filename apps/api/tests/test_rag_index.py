@@ -12,7 +12,17 @@ from sqlalchemy.orm import sessionmaker
 
 import services.ai.retrieval.index_service as index_module
 import services.ai.retrieval.retrieval_service as retrieval_module
-from models import AIRouterTerm, AIRouterTermSet, Base, QueryHistory, RagChunk, RagRetrievalEvent, RagSource, SavedQuery
+from models import (
+    AIRouterTerm,
+    AIRouterTermSet,
+    Base,
+    QueryHistory,
+    RagChunk,
+    RagEmbedding,
+    RagRetrievalEvent,
+    RagSource,
+    SavedQuery,
+)
 from services.ai.router_terms import normalize_router_text, router_term_service
 from services.ai.retrieval.index_documents import mask_sql_literals
 from services.ai.retrieval.index_service import RagIndexService
@@ -430,6 +440,96 @@ def test_vector_store_config_sanitizes_unknown_backend(monkeypatch):
     monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "unknown-cloud")
 
     assert resolve_vector_store_config().backend == "sqlite_json"
+
+
+def test_vector_store_config_supports_sqlite_vec_without_external_service(monkeypatch):
+    monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "sqlite_vec")
+
+    status = resolve_vector_store_config().to_status()
+
+    assert status["backend"] == "sqlite_vec"
+    assert status["requiresExternalService"] is False
+
+
+def test_index_writes_sqlite_vec_when_backend_is_enabled(rag_session_factory, monkeypatch):
+    monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "sqlite_vec")
+    service = RagIndexService()
+    monkeypatch.setattr(service.embeddings, "is_available", lambda: True)
+    monkeypatch.setattr(service.embeddings, "embed_document", lambda _content: [0.1, 0.2, 0.3])
+    upserted = []
+    monkeypatch.setattr(index_module.sqlite_vec_store, "upsert_embedding", lambda *_args: upserted.append(True) or True)
+    monkeypatch.setattr(index_module.sqlite_vec_store, "delete_source", lambda *_args: None)
+
+    result = service.index_text_source(
+        "document",
+        "Vector Source",
+        "QurioDB indexes local vector chunks.",
+        source_id="document:sqlite-vec",
+    )
+
+    session = rag_session_factory()
+    try:
+        embedding_count = session.query(RagEmbedding).count()
+    finally:
+        session.close()
+
+    assert result["embeddingCount"] == 1
+    assert embedding_count == 1
+    assert upserted == [True]
+
+
+def test_retrieval_prefers_sqlite_vec_semantic_scores(rag_session_factory, monkeypatch):
+    monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "sqlite_vec")
+    session = rag_session_factory()
+    try:
+        source = RagSource(
+            id="document:semantic",
+            sourceType="document",
+            title="Semantic Source",
+            contentHash="hash",
+            status="indexed",
+            accessScope="user",
+            userId="user-1",
+        )
+        alpha = RagChunk(
+            id="chunk-alpha",
+            sourceId=source.id,
+            chunkType="document",
+            content="alpha lexical text",
+            contentHash="alpha",
+            ordinal=0,
+        )
+        beta = RagChunk(
+            id="chunk-beta",
+            sourceId=source.id,
+            chunkType="document",
+            content="unrelated terms",
+            contentHash="beta",
+            ordinal=1,
+        )
+        session.add_all([source, alpha, beta])
+        session.commit()
+    finally:
+        session.close()
+
+    retrieval_service = RagRetrievalService()
+    monkeypatch.setattr(retrieval_service.embeddings, "is_available", lambda: True)
+    monkeypatch.setattr(retrieval_service.embeddings, "embed_query", lambda _query: [0.1, 0.2, 0.3])
+    monkeypatch.setattr(
+        retrieval_module.sqlite_vec_store,
+        "semantic_scores",
+        lambda *_args, **_kwargs: {"chunk-beta": 0.99},
+    )
+
+    result = retrieval_service.retrieve(
+        "semantic intent",
+        user_id="user-1",
+        source_types=["document"],
+        top_k=1,
+    )
+
+    assert result["items"][0]["chunkId"] == "chunk-beta"
+    assert result["retrievalTrace"]["retrievalMode"] == "hybrid"
 
 
 def test_rag_disabled_short_circuits_index_and_retrieve(rag_session_factory, monkeypatch):

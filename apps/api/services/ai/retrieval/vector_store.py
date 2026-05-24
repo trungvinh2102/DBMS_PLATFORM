@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 
-SUPPORTED_VECTOR_BACKENDS = {"sqlite_json", "milvus_lite", "qdrant", "pinecone", "pgvector"}
+SUPPORTED_VECTOR_BACKENDS = {"sqlite_json", "sqlite_vec"}
 
 
 @dataclass(frozen=True)

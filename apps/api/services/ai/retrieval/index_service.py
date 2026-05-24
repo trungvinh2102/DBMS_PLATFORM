@@ -20,6 +20,7 @@ from .index_documents import (
     rough_token_count,
 )
 from .metadata_source import SchemaMetadataSource
+from .sqlite_vec_store import sqlite_vec_store
 from .vector_store import resolve_vector_store_config
 
 
@@ -210,6 +211,7 @@ class RagIndexService:
                     session.query(RagChunk.id).filter(RagChunk.sourceId == source_id)
                 )
             ).delete(synchronize_session=False)
+            sqlite_vec_store.delete_source(session, source_id)
             session.query(RagChunk).filter(RagChunk.sourceId == source_id).delete()
 
             embedding_count = 0
@@ -261,6 +263,9 @@ class RagIndexService:
             dimensions=len(vector),
             vectorJson=vector,
         ))
+        source = session.get(RagSource, chunk.sourceId)
+        if source:
+            sqlite_vec_store.upsert_embedding(session, chunk, source, vector)
         return 1
 
 

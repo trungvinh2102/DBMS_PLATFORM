@@ -12,6 +12,7 @@ from models import RagChunk, RagEmbedding, RagRetrievalEvent, RagSource, Session
 from .embedding_gateway import GeminiEmbeddingGateway
 from .ranking import cosine_similarity, fuse_scores
 from .reranking import DeterministicRagReranker, RagReranker
+from .sqlite_vec_store import sqlite_vec_store
 from .text import build_reasons, expand_query_terms, lexical_score, matched_terms
 from .types import RagRetrievalResult
 from .vector_store import resolve_vector_store_config
@@ -56,7 +57,15 @@ class RagRetrievalService:
                 chunk.id: lexical_score(query_text, expanded_terms, chunk.content)
                 for source, chunk, _embedding in rows
             }
-            semantic_scores = self._semantic_scores(query_text, rows)
+            semantic_scores = self._semantic_scores(
+                session,
+                query_text,
+                rows,
+                database_id=database_id,
+                user_id=user_id,
+                source_types=source_types,
+                candidate_limit=candidate_limit,
+            )
             candidate_budget = max(top_k, candidate_limit)
             fused = fuse_scores(semantic_scores, lexical_scores)[:candidate_budget]
             row_by_chunk_id = {chunk.id: (source, chunk, embedding) for source, chunk, embedding in rows}
@@ -178,6 +187,7 @@ class RagRetrievalService:
             if not self._can_access_source(source, user_id):
                 return {"deleted": False, "reason": "forbidden"}
 
+            sqlite_vec_store.delete_source(session, source_id)
             chunk_ids = session.query(RagChunk.id).filter(RagChunk.sourceId == source_id)
             session.query(RagEmbedding).filter(RagEmbedding.chunkId.in_(chunk_ids)).delete(synchronize_session=False)
             session.query(RagChunk).filter(RagChunk.sourceId == source_id).delete()
@@ -235,13 +245,38 @@ class RagRetrievalService:
     def _can_access_source(self, source: RagSource, user_id: Optional[str]) -> bool:
         return not source.userId or not user_id or source.userId == user_id
 
-    def _semantic_scores(self, query_text: str, rows) -> Dict[str, float]:
+    def _semantic_scores(
+        self,
+        session,
+        query_text: str,
+        rows,
+        database_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        source_types: Optional[List[str]] = None,
+        candidate_limit: int = 32,
+    ) -> Dict[str, float]:
         if not self.embeddings.is_available():
             return {}
 
         query_vector = self.embeddings.embed_query(query_text)
         if not query_vector:
             return {}
+
+        sqlite_vec_scores = sqlite_vec_store.semantic_scores(
+            session,
+            query_vector,
+            database_id=database_id,
+            user_id=user_id,
+            source_types=source_types,
+            k=max(candidate_limit, 32),
+        )
+        if sqlite_vec_scores:
+            candidate_chunk_ids = {chunk.id for _source, chunk, _embedding in rows}
+            return {
+                chunk_id: score
+                for chunk_id, score in sqlite_vec_scores.items()
+                if chunk_id in candidate_chunk_ids
+            }
 
         scores = {}
         for _source, chunk, embedding in rows:
