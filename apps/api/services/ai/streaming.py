@@ -238,6 +238,13 @@ def _parse_legacy_history_content(content: str, payload: Dict[str, Any]) -> Dict
         payload["events"].append({"type": "sql", "content": text})
     working = re.sub(r"\s*```sql[\s\S]*?```\s*", "\n\n", working, flags=re.I)
 
+    legacy_sql_match = re.search(r"(?:^|\n)\s*SQL:\s*([\s\S]*?)(?=\n\s*(?:###\s*)?Analysis:|\n\s*### SUGGESTIONS:|$)", working, flags=re.I)
+    if legacy_sql_match:
+        text = legacy_sql_match.group(1).strip()
+        payload["sql"] = text
+        payload["events"].append({"type": "sql", "content": text})
+    working = re.sub(r"\s*(?:^|\n)\s*SQL:\s*[\s\S]*?(?=\n\s*(?:###\s*)?Analysis:|\n\s*### SUGGESTIONS:|$)", "\n\n", working, count=1, flags=re.I)
+
     suggestions_match = re.search(r"### SUGGESTIONS:\s*([\s\S]*)", working, flags=re.I)
     if suggestions_match:
         text = suggestions_match.group(1).strip()
@@ -251,6 +258,13 @@ def _parse_legacy_history_content(content: str, payload: Dict[str, Any]) -> Dict
         payload["analysis"] = text
         payload["events"].append({"type": "analysis", "content": text})
     working = re.sub(r"\s*### ANALYSIS:[\s\S]*", "", working, flags=re.I)
+
+    legacy_analysis_match = re.search(r"(?:^|\n)\s*Analysis:\s*([\s\S]*)", working, flags=re.I)
+    if legacy_analysis_match:
+        text = legacy_analysis_match.group(1).strip()
+        payload["analysis"] = text
+        payload["events"].append({"type": "analysis", "content": text})
+    working = re.sub(r"\s*(?:^|\n)\s*Analysis:[\s\S]*", "", working, count=1, flags=re.I)
 
     payload["content"] = working.strip()
     if payload["content"]:

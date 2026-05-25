@@ -192,6 +192,23 @@ def test_parse_legacy_history_returns_structured_fields_without_tags():
     assert payload["analysis"] == "Reads a constant."
 
 
+def test_parse_legacy_labeled_sql_history_returns_structured_fields():
+    payload = parse_assistant_history_content(
+        "SQL: SELECT p.\"fullName\", COUNT(*) AS total_bookings\n"
+        "FROM public.\"Profile\" p\n"
+        "JOIN public.\"Experience\" e ON e.\"hostId\" = p.id\n"
+        "Analysis: Truy van tinh tong dat cho theo host."
+    )
+
+    assert payload["content"] == ""
+    assert payload["sql"] == (
+        "SELECT p.\"fullName\", COUNT(*) AS total_bookings\n"
+        "FROM public.\"Profile\" p\n"
+        "JOIN public.\"Experience\" e ON e.\"hostId\" = p.id"
+    )
+    assert payload["analysis"] == "Truy van tinh tong dat cho theo host."
+
+
 def test_conversation_message_dict_returns_structured_assistant_fields():
     class Message:
         id = "msg-1"

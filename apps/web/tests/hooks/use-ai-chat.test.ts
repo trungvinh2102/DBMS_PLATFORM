@@ -144,6 +144,61 @@ describe("useAIChat stream status handling", () => {
     expect(result.current.conversationId).toBe("conv-stream");
   });
 
+  it("extracts SQL from legacy labeled assistant text", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk, onHeaders) => {
+      onHeaders?.(new Headers({ "X-Conversation-Id": "conv-legacy-sql" }));
+      onChunk(
+        'SQL: SELECT p."fullName", COUNT(*) AS total_bookings\nFROM public."Profile" p\nAnalysis: Truy van tinh tong dat cho theo host.',
+        "message",
+      );
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("Tinh doanh thu trung binh");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)).toEqual(
+        expect.objectContaining({
+          role: "assistant",
+          content: "",
+          sql: 'SELECT p."fullName", COUNT(*) AS total_bookings\nFROM public."Profile" p',
+          analysis: "Truy van tinh tong dat cho theo host.",
+          isStreaming: false,
+        }),
+      );
+    });
+  });
+
+  it("extracts SQL from legacy labeled persisted assistant content", async () => {
+    vi.spyOn(aiApi, "getConversationMessages").mockResolvedValue({
+      id: "conv-legacy-history",
+      messages: [{
+        id: "msg-legacy",
+        role: "assistant",
+        content: "SQL: SELECT 1;\nAnalysis: Reads a constant.",
+        events: [{ type: "message", content: "SQL: SELECT 1;\nAnalysis: Reads a constant." }],
+      }],
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.loadConversation("conv-legacy-history");
+    });
+
+    expect(result.current.messages.at(-1)).toEqual(
+      expect.objectContaining({
+        content: "",
+        sql: "SELECT 1;",
+        analysis: "Reads a constant.",
+      }),
+    );
+  });
+
   it("strips labels from streamed thinking steps", async () => {
     vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
     vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk, onHeaders) => {

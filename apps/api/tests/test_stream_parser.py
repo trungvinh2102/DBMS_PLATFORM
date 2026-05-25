@@ -37,6 +37,21 @@ def test_parser_splits_model_thinking_sql_and_analysis():
     assert by_event["analysis"] == "Uses the users table."
 
 
+def test_parser_splits_legacy_labeled_sql_and_analysis():
+    events = collect_events([
+        "SQL: SELECT u.id, COUNT(*) AS bookings",
+        "\nFROM users u\nJOIN bookings b ON b.user_id = u.id",
+        "\nAnalysis: Counts bookings per user.",
+    ])
+
+    by_event = {}
+    for event, chunk in events:
+        by_event[event] = by_event.get(event, "") + chunk
+
+    assert by_event["sql"].strip() == "SELECT u.id, COUNT(*) AS bookings\nFROM users u\nJOIN bookings b ON b.user_id = u.id"
+    assert by_event["analysis"].strip() == "Counts bookings per user."
+
+
 def test_parser_splits_analysis_and_suggestions():
     events = collect_events([
         "Here are the insights.\n\n### ANALYSIS:\nSample-level only.",

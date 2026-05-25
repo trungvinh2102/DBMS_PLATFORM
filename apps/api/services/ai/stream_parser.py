@@ -23,7 +23,19 @@ def strip_thinking_label(text: str) -> str:
 class TaggedResponseStreamParser:
     """Parses model output tags into stable SSE event names."""
 
-    DEFAULT_MARKERS = ("<thinking>", "<confidence>", "```sql", "### ANALYSIS:", "### SUGGESTIONS:")
+    DEFAULT_MARKERS = (
+        "<thinking>",
+        "<confidence>",
+        "```sql",
+        "SQL:",
+        "Sql:",
+        "sql:",
+        "### ANALYSIS:",
+        "Analysis:",
+        "ANALYSIS:",
+        "analysis:",
+        "### SUGGESTIONS:",
+    )
     INTERNAL_TOOL_NAMES = {"SchemaContextLoader", "RetrievalTrace"}
     CLOSE_MARKERS = {
         "thinking": "</thinking>",
@@ -159,6 +171,24 @@ class TaggedResponseStreamParser:
                 self.mode = "suggestions"
                 return [("analysis", text)]
 
+        if self.mode == "legacy_sql":
+            marker, index = self._find_next_legacy_sql_close_marker()
+            if marker and index >= 0:
+                text = self.buffer[:index]
+                self.buffer = self.buffer[index + len(marker):]
+                self.mode = "analysis"
+                if self.buffer.startswith("\n"):
+                    self.buffer = self.buffer[1:]
+                return [("sql", text)]
+
+            keep_len = self.keep_len
+            if len(self.buffer) <= keep_len:
+                return []
+
+            safe_text = self.buffer[:-keep_len]
+            self.buffer = self.buffer[-keep_len:]
+            return [("sql", safe_text)]
+
         if not close_marker:
             text = self.buffer
             self.buffer = ""
@@ -185,10 +215,16 @@ class TaggedResponseStreamParser:
         found_index = -1
         for marker in self.DEFAULT_MARKERS:
             index = self.buffer.find(marker)
+            while index >= 0 and marker.lower() in {"sql:", "analysis:"} and not self._is_line_marker_position(index):
+                index = self.buffer.find(marker, index + len(marker))
             if index >= 0 and (found_index == -1 or index < found_index):
                 found_marker = marker
                 found_index = index
         return found_marker, found_index
+
+    def _is_line_marker_position(self, index: int) -> bool:
+        line_start = self.buffer.rfind("\n", 0, index) + 1
+        return not self.buffer[line_start:index].strip()
 
     def _enter_mode(self, marker: str) -> None:
         self.buffer = self.buffer[len(marker):]
@@ -200,7 +236,14 @@ class TaggedResponseStreamParser:
             self.mode = "sql"
             if self.buffer.startswith("\n"):
                 self.buffer = self.buffer[1:]
+        elif marker.lower() == "sql:":
+            self.mode = "legacy_sql"
+            self.buffer = self.buffer.lstrip()
         elif marker == "### ANALYSIS:":
+            self.mode = "analysis"
+            if self.buffer.startswith("\n"):
+                self.buffer = self.buffer[1:]
+        elif marker.lower() == "analysis:":
             self.mode = "analysis"
             if self.buffer.startswith("\n"):
                 self.buffer = self.buffer[1:]
@@ -210,7 +253,7 @@ class TaggedResponseStreamParser:
                 self.buffer = self.buffer[1:]
 
     def _event_name_for_mode(self) -> str:
-        if self.mode == "sql":
+        if self.mode in {"sql", "legacy_sql"}:
             return "sql"
         if self.mode == "analysis":
             return "analysis"
@@ -236,8 +279,21 @@ class TaggedResponseStreamParser:
             return True
         if self.mode != "message":
             close_marker = self.CLOSE_MARKERS.get(self.mode)
-            return bool(close_marker and len(self.buffer) < len(close_marker))
+            if close_marker:
+                return len(self.buffer) < len(close_marker)
+            return self.mode == "legacy_sql" and len(self.buffer) <= self.keep_len
         return len(self.buffer) <= self.keep_len and not any(self.buffer.startswith(marker) for marker in self.DEFAULT_MARKERS)
+
+    def _find_next_legacy_sql_close_marker(self):
+        markers = ("\n### ANALYSIS:", "\nAnalysis:", "\nANALYSIS:", "\nanalysis:", "\n### SUGGESTIONS:")
+        found_marker = None
+        found_index = -1
+        for marker in markers:
+            index = self.buffer.find(marker)
+            if index >= 0 and (found_index == -1 or index < found_index):
+                found_marker = marker
+                found_index = index
+        return found_marker, found_index
 
     def _clean_events(self, events: Iterable[StreamEvent]) -> List[StreamEvent]:
         cleaned = []

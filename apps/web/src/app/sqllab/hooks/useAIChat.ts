@@ -280,6 +280,26 @@ export const stripInternalToolEnvelopes = (text: string) => {
   return cleaned.trim();
 };
 
+const extractLegacyLabeledSections = (value: string) => {
+  let content = String(value || "");
+  let sql = "";
+  let analysis = "";
+
+  const sqlMatch = content.match(/(?:^|\n)\s*SQL:\s*([\s\S]*?)(?=\n\s*(?:#{3}\s*)?Analysis:|\n\s*### SUGGESTIONS:|$)/i);
+  if (sqlMatch) {
+    sql = sqlMatch[1].trim();
+    content = content.replace(sqlMatch[0], "\n").trim();
+  }
+
+  const analysisMatch = content.match(/(?:^|\n)\s*(?:#{3}\s*)?Analysis:\s*([\s\S]*?)(?=\n\s*### SUGGESTIONS:|$)/i);
+  if (analysisMatch) {
+    analysis = analysisMatch[1].trim();
+    content = content.replace(analysisMatch[0], "\n").trim();
+  }
+
+  return { content: content.trim(), sql, analysis };
+};
+
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -299,13 +319,15 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
 
     if (message.events || message.sql || message.analysis || message.thought || message.confidence !== undefined) {
       const steps = Array.isArray(message.events) ? toThinkingSteps(message.events) : undefined;
+      const legacySections = extractLegacyLabeledSections(message.content || "");
+      const hasLegacySections = Boolean(legacySections.sql || legacySections.analysis);
 
       return {
-        content: message.content || "",
+        content: hasLegacySections ? legacySections.content : message.content || "",
         explanation: message.explanation || "",
         thought: translateThinkingContent(message.thought || message.thinking || ""),
-        sql: message.sql || "",
-        analysis: message.analysis || "",
+        sql: message.sql || legacySections.sql || "",
+        analysis: message.analysis || legacySections.analysis || "",
         confidence: message.confidence,
         columns: message.columns,
         data: message.data,
@@ -425,6 +447,13 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         sql = partialSql[1].trim();
         content = content.replace(partialSql[0], "").trim();
       }
+    }
+
+    if (!sql) {
+      const legacySections = extractLegacyLabeledSections(content);
+      content = legacySections.content;
+      sql = legacySections.sql;
+      analysis = legacySections.analysis;
     }
 
     // Extract Analysis Section
