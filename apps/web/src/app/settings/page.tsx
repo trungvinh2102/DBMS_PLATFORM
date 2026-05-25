@@ -50,7 +50,7 @@ let hasSyncedWithServer = false;
 function SettingsContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "general";
-  
+
   const { setTheme: setNextTheme } = useTheme();
   const store = useSettingsStore();
   const { user } = useAuth();
@@ -119,10 +119,10 @@ function SettingsContent() {
   useEffect(() => {
     const storeTabs = ["general", "editor", "data"];
     storeTabs.forEach(tab => {
-        registerActions(tab, {
-            onSave: handleSaveStore,
-            onReset: handleRefreshStore
-        });
+      registerActions(tab, {
+        onSave: handleSaveStore,
+        onReset: handleRefreshStore
+      });
     });
   }, [registerActions, handleSaveStore, handleRefreshStore]);
 
@@ -162,7 +162,7 @@ function SettingsContent() {
 
 
   return (
-    <div className="container mx-auto py-4 px-2 md:px-2 max-w-6xl">
+    <div className="container mx-auto py-4 px-2 md:px-2">
       <header className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">Settings</h2>
@@ -194,15 +194,15 @@ function SettingsContent() {
         </div>
       </header>
 
-      <Tabs 
-        value={activeTab} 
+      <Tabs
+        value={activeTab}
         onValueChange={(val) => setSearchParams({ tab: val })}
       >
         <div className="flex items-center justify-between border-b border-border/40 pb-4">
           <TabsList className="flex h-14 items-center bg-card/40 backdrop-blur-md border border-border/60 p-1.5 rounded-[1.2rem] shadow-premium gap-1 w-fit">
             {TABS.map((tab) => (
-              <TabsTrigger 
-                key={tab.value} 
+              <TabsTrigger
+                key={tab.value}
                 value={tab.value}
                 className="flex items-center py-2.5 px-6 rounded-xl transition-all data-active:bg-primary data-active:text-primary-foreground data-active:shadow-lg data-active:shadow-primary/20 hover:bg-muted/50 group whitespace-nowrap h-full border border-transparent data-active:border-primary/10"
               >
@@ -211,7 +211,7 @@ function SettingsContent() {
               </TabsTrigger>
             ))}
           </TabsList>
-        
+
         </div>
 
         <div className="w-full animate-in fade-in duration-500">

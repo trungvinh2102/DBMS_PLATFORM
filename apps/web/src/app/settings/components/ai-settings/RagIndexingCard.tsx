@@ -93,6 +93,7 @@ export function RagIndexingCard() {
     queryClient.invalidateQueries({ queryKey: ["rag-sources"] });
     queryClient.invalidateQueries({ queryKey: ["rag-status"] });
     queryClient.invalidateQueries({ queryKey: ["rag-pipeline-status"] });
+    queryClient.invalidateQueries({ queryKey: ["rag-source-detail"] });
   };
 
   const syncPipelineMutation = useMutation({
@@ -160,171 +161,171 @@ export function RagIndexingCard() {
 
   return (
     <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm group/card relative">
-      <div className="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-emerald-500 to-teal-600 transition-all group-hover/card:w-1.5" />
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2">
-              <Database className="h-5 w-5 text-emerald-500" />
+        <div className="absolute top-0 left-0 h-full w-1 bg-gradient-to-b from-emerald-500 to-teal-600 transition-all group-hover/card:w-1.5" />
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-2">
+                <Database className="h-5 w-5 text-emerald-500" />
+              </div>
+              <div>
+                <CardTitle className="text-xl font-bold">RAG Index</CardTitle>
+                <CardDescription>Manage local retrieval sources for grounded assistant answers.</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-xl font-bold">RAG Index</CardTitle>
-              <CardDescription>Manage local retrieval sources for grounded assistant answers.</CardDescription>
+            <div className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              {pipelineStatus?.stageCount || 0} stages / {vectorStatus?.backend || "sqlite_json"}
             </div>
           </div>
-          <div className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            {pipelineStatus?.stageCount || 0} stages / {vectorStatus?.backend || "sqlite_json"}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5 pt-2">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
-          <Select
-            value={selectedDatabase}
-            onValueChange={setSelectedDatabaseId}
-            disabled={!databaseOptions.length}
-          >
-            <SelectTrigger
-              className="h-10 w-full rounded-xl border-border/40 bg-muted/20 px-3 text-xs font-medium focus:ring-1 focus:ring-primary/20"
-              aria-label="Database for RAG indexing"
+        </CardHeader>
+        <CardContent className="space-y-5 pt-2">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+            <Select
+              value={selectedDatabase}
+              onValueChange={setSelectedDatabaseId}
+              disabled={!databaseOptions.length}
             >
-              <span
-                className={cn(
-                  "flex-1 truncate text-left",
-                  !selectedDatabaseLabel && "text-muted-foreground",
-                )}
+              <SelectTrigger
+                className="h-10 w-full rounded-xl border-border/40 bg-muted/20 px-3 text-xs font-medium focus:ring-1 focus:ring-primary/20"
+                aria-label="Database for RAG indexing"
               >
-                {selectedDatabaseLabel || "Select database"}
-              </span>
-            </SelectTrigger>
-            <SelectContent align="start" side="top" sideOffset={8} className="rounded-xl p-1">
-              {databaseOptions.map((database: any) => (
-                <SelectItem key={database.id} value={database.id} className="rounded-lg">
-                  {getDatabaseLabel(database)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            type="button"
-            className="gap-2"
-            disabled={!selectedDatabase || syncPipelineMutation.isPending}
-            onClick={() => syncPipelineMutation.mutate()}
-          >
-            {syncPipelineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Sync pipeline
-          </Button>
-        </div>
-
-        <div className="grid gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 md:grid-cols-[1fr_auto_auto]">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Badge variant="outline" className={cn(
-              "rounded-md text-[9px] font-bold uppercase tracking-widest",
-              pipelineStatus?.enabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600" : "border-amber-500/20 bg-amber-500/5 text-amber-600",
-            )}>
-              {pipelineStatus?.enabled ? "Enabled" : "Disabled"}
-            </Badge>
-            <span className="truncate text-xs font-semibold">
-              {stages.length ? `${stages.length} production stages mapped` : "Pipeline status unavailable"}
-            </span>
-          </div>
-          <label className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground md:justify-end">
-            History
-            <Switch
-              checked={includeQueryHistory}
-              onCheckedChange={(checked: boolean) => setIncludeQueryHistory(checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground md:justify-end">
-            Failed
-            <Switch
-              checked={includeFailedHistory}
-              disabled={!includeQueryHistory}
-              onCheckedChange={(checked: boolean) => setIncludeFailedHistory(checked)}
-            />
-          </label>
-        </div>
-
-        {stages.length > 0 && (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {stages.map((stage, index) => (
-              <div key={stage.key} className="flex min-w-0 items-center gap-2 rounded-md border border-border/50 bg-background/70 px-2.5 py-2">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-black tabular-nums text-emerald-600">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-[11px] font-bold">{stage.name}</div>
-                  <div className="truncate text-[9px] uppercase tracking-widest text-muted-foreground">
-                    {stage.status}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <RagSourceIngestionPanel
-          databaseId={selectedDatabase || undefined}
-          onIndexed={invalidateRag}
-        />
-
-        <div className="space-y-2">
-          {sourcesQuery.isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : sources.length ? (
-            sources.slice(0, 8).map((source) => (
-              <div key={source.id} className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/15 px-3 py-2">
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-bold">{source.title}</div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-                    <span>{source.sourceType}</span>
-                    <span className={cn("h-1.5 w-1.5 rounded-full", source.status === "indexed" ? "bg-emerald-500" : "bg-amber-500")} />
-                    <span>{source.status}</span>
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteSourceMutation.mutate(source.id)}
-                  aria-label={`Delete ${source.title}`}
+                <span
+                  className={cn(
+                    "flex-1 truncate text-left",
+                    !selectedDatabaseLabel && "text-muted-foreground",
+                  )}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))
-          ) : (
-            <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 py-8 text-center text-xs text-muted-foreground">
-              No RAG sources indexed yet.
+                  {selectedDatabaseLabel || "Select database"}
+                </span>
+              </SelectTrigger>
+              <SelectContent align="start" side="top" sideOffset={8} className="rounded-xl p-1">
+                {databaseOptions.map((database: any) => (
+                  <SelectItem key={database.id} value={database.id} className="rounded-lg">
+                    {getDatabaseLabel(database)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              className="gap-2"
+              disabled={!selectedDatabase || syncPipelineMutation.isPending}
+              onClick={() => syncPipelineMutation.mutate()}
+            >
+              {syncPipelineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Sync pipeline
+            </Button>
+          </div>
+
+          <div className="grid gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 md:grid-cols-[1fr_auto_auto]">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Badge variant="outline" className={cn(
+                "rounded-md text-[9px] font-bold uppercase tracking-widest",
+                pipelineStatus?.enabled ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-600" : "border-amber-500/20 bg-amber-500/5 text-amber-600",
+              )}>
+                {pipelineStatus?.enabled ? "Enabled" : "Disabled"}
+              </Badge>
+              <span className="truncate text-xs font-semibold">
+                {stages.length ? `${stages.length} production stages mapped` : "Pipeline status unavailable"}
+              </span>
+            </div>
+            <label className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground md:justify-end">
+              History
+              <Switch
+                checked={includeQueryHistory}
+                onCheckedChange={(checked: boolean) => setIncludeQueryHistory(checked)}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground md:justify-end">
+              Failed
+              <Switch
+                checked={includeFailedHistory}
+                disabled={!includeQueryHistory}
+                onCheckedChange={(checked: boolean) => setIncludeFailedHistory(checked)}
+              />
+            </label>
+          </div>
+
+          {stages.length > 0 && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {stages.map((stage, index) => (
+                <div key={stage.key} className="flex min-w-0 items-center gap-2 rounded-md border border-border/50 bg-background/70 px-2.5 py-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-emerald-500/20 bg-emerald-500/10 text-[10px] font-black tabular-nums text-emerald-600">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] font-bold">{stage.name}</div>
+                    <div className="truncate text-[9px] uppercase tracking-widest text-muted-foreground">
+                      {stage.status}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-        </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/10 px-3 py-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Activity className="h-4 w-4 shrink-0 text-primary" />
-            <div className="min-w-0">
-              <div className="truncate text-xs font-bold">Retrieval evaluation</div>
-              <div className="truncate text-[10px] text-muted-foreground">
-                {evalSummary ? `${evalSummary.passedCases}/${evalSummary.totalCases} passed, recall ${Math.round((evalSummary.recallAtK || 0) * 100)}%` : "No evaluation run yet"}
+          <RagSourceIngestionPanel
+            databaseId={selectedDatabase || undefined}
+            onIndexed={invalidateRag}
+          />
+
+          <div className="space-y-2">
+            {sourcesQuery.isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : sources.length ? (
+              sources.slice(0, 8).map((source) => (
+                <div key={source.id} className="flex items-center justify-between rounded-xl border border-border/40 bg-muted/15 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-bold">{source.title}</div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                      <span>{source.sourceType}</span>
+                      <span className={cn("h-1.5 w-1.5 rounded-full", source.status === "indexed" ? "bg-emerald-500" : "bg-amber-500")} />
+                      <span>{source.status}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => deleteSourceMutation.mutate(source.id)}
+                    aria-label={`Delete ${source.title}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 py-8 text-center text-xs text-muted-foreground">
+                No RAG sources indexed yet.
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 bg-muted/10 px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Activity className="h-4 w-4 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold">Retrieval evaluation</div>
+                <div className="truncate text-[10px] text-muted-foreground">
+                  {evalSummary ? `${evalSummary.passedCases}/${evalSummary.totalCases} passed, recall ${Math.round((evalSummary.recallAtK || 0) * 100)}%` : "No evaluation run yet"}
+                </div>
               </div>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-2 rounded-lg text-[10px] font-black uppercase tracking-widest"
+              disabled={!sources.length || evaluatePipelineMutation.isPending}
+              onClick={() => evaluatePipelineMutation.mutate()}
+            >
+              {evaluatePipelineMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
+              Run eval
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 gap-2 rounded-lg text-[10px] font-black uppercase tracking-widest"
-            disabled={!sources.length || evaluatePipelineMutation.isPending}
-            onClick={() => evaluatePipelineMutation.mutate()}
-          >
-            {evaluatePipelineMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
-            Run eval
-          </Button>
-        </div>
-      </CardContent>
+        </CardContent>
     </Card>
   );
 }

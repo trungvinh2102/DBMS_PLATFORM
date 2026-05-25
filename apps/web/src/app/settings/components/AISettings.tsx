@@ -19,6 +19,7 @@ import { DeleteModelDialog } from "./ai-settings/DeleteModelDialog";
 import { RagIndexingCard } from "./ai-settings/RagIndexingCard";
 import { RouterTermsCard } from "./ai-settings/RouterTermsCard";
 import { TaskRoutingCard } from "./ai-settings/TaskRoutingCard";
+import { VectorStoreMapScreen } from "./ai-settings/VectorStoreMapScreen";
 import { AIModel, AITaskAssignment, AITaskCatalogItem, NewAIModel } from "./ai-settings/types";
 import {
   AISettingsSectionKey,
@@ -192,6 +193,7 @@ export function AISettings() {
     routing: String(taskCatalog.length),
     terms: "db",
     rag: statusQuery.data?.rag?.enabled ? "on" : "local",
+    "vector-store": "map",
   };
 
   const renderActiveSection = () => {
@@ -242,6 +244,8 @@ export function AISettings() {
         return <RouterTermsCard />;
       case "rag":
         return <RagIndexingCard />;
+      case "vector-store":
+        return <VectorStoreMapScreen />;
       default:
         return null;
     }
