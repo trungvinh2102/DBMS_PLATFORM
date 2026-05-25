@@ -45,3 +45,5 @@ pandas>=3.0.3
 pyarrow>=24.0.0
 fastparquet>=2026.5.0
 openpyxl>=3.1.5
+pypdf>=6.4.1
+python-docx>=1.2.0

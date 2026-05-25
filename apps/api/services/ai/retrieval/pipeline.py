@@ -20,8 +20,8 @@ PRODUCTION_RAG_STAGES = [
         "key": "ingestion",
         "name": "Data ingestion",
         "status": "available",
-        "capabilities": ["database_schema", "saved_query", "query_history", "document", "web_page"],
-        "endpoints": ["/api/rag/index/source", "/api/rag/pipeline/sync/database/{database_id}"],
+        "capabilities": ["database_schema", "saved_query", "query_history", "document", "web_page", "file_upload", "url_fetch"],
+        "endpoints": ["/api/rag/index/source", "/api/rag/ingest/file", "/api/rag/ingest/url", "/api/rag/pipeline/sync/database/{database_id}"],
     },
     {
         "key": "preprocessing",

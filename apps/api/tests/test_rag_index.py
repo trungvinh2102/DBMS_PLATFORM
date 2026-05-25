@@ -110,6 +110,20 @@ def test_query_understanding_uses_connected_database_context_without_domain_keyw
     assert "database_schema" in understanding.source_types
 
 
+def test_query_understanding_routes_vietnamese_metric_commands_to_database_context():
+    understanding = query_understanding_service.understand(
+        "T\u00ednh doanh thu trung b\u00ecnh tr\u00ean m\u1ed7i \u0111\u1eb7t ch\u1ed7 cho t\u1eebng host",
+        database_id="db-1",
+        schema="public",
+    )
+
+    assert understanding.intent == "text_to_sql"
+    assert understanding.needs_retrieval is True
+    assert understanding.behavior == "data_exploration"
+    assert understanding.rag_mode == "deep"
+    assert "database_schema" in understanding.source_types
+
+
 def test_query_understanding_routes_simple_sql_to_shallow_rag():
     understanding = query_understanding_service.understand(
         "Write SQL to list the 10 latest orders",

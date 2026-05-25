@@ -4,14 +4,13 @@
  */
 
 import { useMemo, useState } from "react";
-import { Activity, Database, FileText, Loader2, PlayCircle, RefreshCw, Trash2 } from "lucide-react";
+import { Activity, Database, Loader2, PlayCircle, RefreshCw, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -19,9 +18,9 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { aiApi, databaseApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { RagSourceIngestionPanel } from "./RagSourceIngestionPanel";
 
 interface RagSource {
   id: string;
@@ -64,8 +63,6 @@ export function RagIndexingCard() {
   const [selectedDatabaseId, setSelectedDatabaseId] = useState("");
   const [includeQueryHistory, setIncludeQueryHistory] = useState(false);
   const [includeFailedHistory, setIncludeFailedHistory] = useState(false);
-  const [documentTitle, setDocumentTitle] = useState("");
-  const [documentContent, setDocumentContent] = useState("");
   const [evaluationResult, setEvaluationResult] = useState<any>(null);
 
   const statusQuery = useQuery({
@@ -113,22 +110,6 @@ export function RagIndexingCard() {
     onError: (err: any) => toast.error(`Pipeline sync failed: ${err.message}`),
   });
 
-  const indexDocumentMutation = useMutation({
-    mutationFn: () => aiApi.indexRagSource({
-      title: documentTitle,
-      content: documentContent,
-      sourceType: "document",
-      databaseId: selectedDatabaseId || databaseOptions[0]?.id,
-    }),
-    onSuccess: () => {
-      toast.success("Document source indexed.");
-      setDocumentTitle("");
-      setDocumentContent("");
-      invalidateRag();
-    },
-    onError: (err: any) => toast.error(`Document indexing failed: ${err.message}`),
-  });
-
   const deleteSourceMutation = useMutation({
     mutationFn: (sourceId: string) => aiApi.deleteRagSource(sourceId),
     onSuccess: () => {
@@ -172,7 +153,6 @@ export function RagIndexingCard() {
     const database = databaseOptions.find((option: any) => option.id === selectedDatabase);
     return database ? getDatabaseLabel(database) : "";
   }, [databaseOptions, selectedDatabase]);
-  const canIndexDocument = Boolean(documentTitle.trim() && documentContent.trim());
   const vectorStatus = statusQuery.data?.vectorStore;
   const pipelineStatus = pipelineStatusQuery.data as RagPipelineStatus | undefined;
   const stages = pipelineStatus?.stages || [];
@@ -283,28 +263,10 @@ export function RagIndexingCard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr_auto]">
-          <Input
-            value={documentTitle}
-            onChange={(event) => setDocumentTitle(event.target.value)}
-            placeholder="Document title"
-            className="h-10 rounded-xl bg-muted/20"
-          />
-          <Textarea
-            value={documentContent}
-            onChange={(event) => setDocumentContent(event.target.value)}
-            placeholder="Markdown or text content"
-            className="min-h-10 rounded-xl bg-muted/20 text-xs"
-          />
-          <Button
-            className="gap-2"
-            disabled={!canIndexDocument || indexDocumentMutation.isPending}
-            onClick={() => indexDocumentMutation.mutate()}
-          >
-            {indexDocumentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-            Add
-          </Button>
-        </div>
+        <RagSourceIngestionPanel
+          databaseId={selectedDatabase || undefined}
+          onIndexed={invalidateRag}
+        />
 
         <div className="space-y-2">
           {sourcesQuery.isLoading ? (

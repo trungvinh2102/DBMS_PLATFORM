@@ -4,10 +4,13 @@ rag.py
 Debug and indexing routes for QurioDB's generalized RAG layer.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from schemas.rag import (
     RagEvaluateRequest,
+    RagIngestUrlRequest,
     RagIndexQueryHistoryRequest,
     RagIndexSavedQueriesRequest,
     RagIndexSourceRequest,
@@ -15,6 +18,7 @@ from schemas.rag import (
     RagRetrieveRequest,
     RagSyncDatabaseRequest,
 )
+from services.ai.retrieval.ingestion import IngestionError, rag_ingestion_service
 from services.ai.retrieval.evaluation import RagEvalCase, evaluate_retrieval_cases
 from services.ai.retrieval.index_service import rag_index_service
 from services.ai.retrieval.pipeline import rag_pipeline_service
@@ -106,6 +110,48 @@ def index_source(data: RagIndexSourceRequest, current_user: dict = Depends(get_c
         source_id=data.sourceId,
         access_scope=data.accessScope,
     )
+
+
+@router.post("/ingest/url")
+def ingest_url(data: RagIngestUrlRequest, current_user: dict = Depends(get_current_user)):
+    """Fetches a public URL, extracts text, and indexes it as a RAG web source."""
+    try:
+        return rag_ingestion_service.ingest_url(
+            data.url,
+            title=data.title,
+            database_id=data.databaseId,
+            user_id=current_user.get("userId"),
+            source_id=data.sourceId,
+            access_scope=data.accessScope,
+        )
+    except IngestionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/ingest/file")
+async def ingest_file(
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    databaseId: Optional[str] = Form(None),
+    sourceId: Optional[str] = Form(None),
+    accessScope: str = Form("user"),
+    current_user: dict = Depends(get_current_user),
+):
+    """Extracts text from an uploaded document and indexes it as a RAG source."""
+    try:
+        payload = await file.read()
+        return rag_ingestion_service.ingest_file(
+            payload,
+            file.filename or "document",
+            content_type=file.content_type,
+            title=title,
+            database_id=databaseId,
+            user_id=current_user.get("userId"),
+            source_id=sourceId,
+            access_scope=accessScope,
+        )
+    except IngestionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/sources")

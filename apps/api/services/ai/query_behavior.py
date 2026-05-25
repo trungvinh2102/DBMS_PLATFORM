@@ -234,6 +234,22 @@ class QueryBehaviorAnalyzer:
             or normalized.startswith(("which ", "what ", "why ", "how many ", "how much "))
             or "?" in normalized
         )
+        data_command = normalized.startswith((
+            "show ", "list ", "find ", "get ", "calculate ", "compute ", "analyze ",
+            "compare ", "rank ", "tinh ", "liet ke ", "hien thi ", "xem ", "tim ",
+            "lay ", "dem ", "thong ke ", "so sanh ", "phan tich ",
+        ))
+        grouping_or_metric_shape = any(
+            marker in f" {normalized} "
+            for marker in (
+                " theo ", " cho tung ", " tren moi ", " by ", " per ", " trung binh ",
+                " tong ", " so luong ", " doanh thu ",
+            )
+        )
+        has_data_terms = (
+            router_term_service.any_match(normalized, "exploration_terms")
+            or router_term_service.any_match(normalized, "metric_terms")
+        )
         metric_command = normalized.startswith(("show ", "list ", "find ", "get ")) and router_term_service.any_match(
             normalized,
             "metric_terms",
@@ -241,7 +257,7 @@ class QueryBehaviorAnalyzer:
         return (
             question_shapes
             and router_term_service.any_match(normalized, "exploration_terms")
-        ) or metric_command
+        ) or metric_command or (has_data_terms and (data_command or grouping_or_metric_shape))
 
     def looks_like_sql_coding_request(self, normalized: str) -> bool:
         return router_term_service.any_match(normalized, "sql_coding_terms")

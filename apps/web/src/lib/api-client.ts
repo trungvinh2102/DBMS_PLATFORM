@@ -98,6 +98,7 @@ api.interceptors.response.use(
     const message =
       error.response?.data?.message ||
       error.response?.data?.error ||
+      error.response?.data?.detail ||
       error.message ||
       "An unknown error occurred";
       
@@ -274,6 +275,30 @@ export const aiApi = {
     sourceId?: string;
     accessScope?: string;
   }) => req(api.post("rag/index/source", data)),
+  ingestRagUrl: (data: {
+    url: string;
+    title?: string;
+    databaseId?: string;
+    sourceId?: string;
+    accessScope?: string;
+  }) => req(api.post("rag/ingest/url", data)),
+  ingestRagFile: (data: {
+    file: File;
+    title?: string;
+    databaseId?: string;
+    sourceId?: string;
+    accessScope?: string;
+  }) => {
+    const formData = new FormData();
+    formData.append("file", data.file);
+    if (data.title) formData.append("title", data.title);
+    if (data.databaseId) formData.append("databaseId", data.databaseId);
+    if (data.sourceId) formData.append("sourceId", data.sourceId);
+    if (data.accessScope) formData.append("accessScope", data.accessScope);
+    return req(api.post("rag/ingest/file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }));
+  },
   streamChat: async (data: any, onChunk: (chunk: string, event?: string) => void, onHeaders?: (headers: Headers) => void) => {
     const token = useAuth.getState().token;
     const headers: Record<string, string> = {

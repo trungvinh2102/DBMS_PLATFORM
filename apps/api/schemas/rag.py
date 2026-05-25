@@ -37,6 +37,14 @@ class RagIndexSourceRequest(BaseModel):
     accessScope: str = "user"
 
 
+class RagIngestUrlRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+    title: Optional[str] = Field(default=None, max_length=240)
+    databaseId: Optional[str] = None
+    sourceId: Optional[str] = None
+    accessScope: str = "user"
+
+
 class RagEvalCaseRequest(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     query: str = Field(min_length=1)
