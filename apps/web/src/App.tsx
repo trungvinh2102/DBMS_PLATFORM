@@ -10,6 +10,7 @@ const AiPage = lazy(() => import('./app/ai/page'));
 const LoginPage = lazy(() => import('./app/auth/login/page'));
 const RegisterPage = lazy(() => import('./app/auth/register/page'));
 const ConnectionsPage = lazy(() => import('./app/connections/page'));
+const SchemaDiffPage = lazy(() => import('./app/schema-diff/page'));
 
 const SettingsPage = lazy(() => import('./app/settings/page'));
 const SqlLabPage = lazy(() => import('./app/sqllab/page'));
@@ -29,6 +30,7 @@ function App() {
                 <Route path="/auth/login" element={<LoginPage />} />
                 <Route path="/auth/register" element={<RegisterPage />} />
                 <Route path="/connections" element={<ConnectionsPage />} />
+                <Route path="/schema-diff" element={<SchemaDiffPage />} />
 
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/sqllab" element={<SqlLabPage />} />

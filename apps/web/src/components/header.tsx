@@ -15,6 +15,7 @@ import {
   Sparkles,
   SquareTerminal,
   Database,
+  GitCompare,
   LayoutDashboard,
 } from "lucide-react";
 
@@ -54,6 +55,11 @@ const data = {
       title: "SQL Lab",
       url: "/sqllab",
       icon: SquareTerminal,
+    },
+    {
+      title: "Schema Diff",
+      url: "/schema-diff",
+      icon: GitCompare,
     },
 
     {

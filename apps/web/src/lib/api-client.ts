@@ -162,6 +162,13 @@ export const databaseApi = {
     req(api.get("database/all-foreign-keys", { params: { databaseId, schema } })),
   getDiagnostics: (databaseId: string, table: string) =>
     req(api.get("database/diagnostics", { params: { databaseId, table } })),
+  compareSchema: (data: {
+    sourceDatabaseId: string;
+    targetDatabaseId: string;
+    sourceSchema?: string;
+    targetSchema?: string;
+    includeDestructive?: boolean;
+  }) => req(api.post("database/schema-diff", data)),
 
   // Execution
   execute: (
