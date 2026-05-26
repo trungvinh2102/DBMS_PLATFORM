@@ -223,7 +223,7 @@ export const aiApi = {
   fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
   validateSQL: (data: { sql: string; databaseId?: string; dialect?: string; allowWrite?: boolean; maxPreviewRows?: number }) =>
     req(api.post("ai/validate-sql", data)),
-  completeSql: (data: { databaseId: string, schema: string, prefix: string, suffix: string, modelId?: string }) => req(api.post("ai/complete", data)),
+  completeSql: (data: { databaseId: string, schema_name: string, prefix: string, suffix: string, modelId?: string }, signal?: AbortSignal) => req(api.post("ai/complete", data, { signal })),
   executeAgent: (data: any) => req(api.post("ai/agent", data)),
   getDiagnostics: (params?: { databaseId?: string; limit?: number }) => req(api.get("ai/diagnostics", { params })),
   deleteModel: (id: string) => req(api.delete(`ai/models/${id}`)),

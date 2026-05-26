@@ -33,7 +33,7 @@ export function useSQLLab() {
 
   const {
     dataSources, schemas, isLoadingSchemas, tables, refetchTables, isLoadingTables,
-    isLoadingColumns: isMetaLoadingCols, allColumns, indexes, foreignKeys, tableInfo, tableDDL,
+    isLoadingColumns: isMetaLoadingCols, allColumns, autocompleteColumns, indexes, foreignKeys, tableInfo, tableDDL,
     refetchAll, ...metadata
   } = useSQLLabMetadata({
     selectedDS: activeTab.selectedDS,
@@ -190,7 +190,7 @@ export function useSQLLab() {
     // Data & Results
     dataSources, schemas, isLoadingSchemas, tables, ...metadata,
     indexes, foreignKeys, tableInfo, tableDDL,
-    refetchTables, isLoadingTables, allColumns,
+    refetchTables, isLoadingTables, allColumns, autocompleteColumns,
     results: activeTab.results, columns: activeTab.columns, error: activeTab.error,
     executing, executionTime: (runSQLMutation as any).data?.executionTime || 0,
     currentTData: (tableDataMutation.data as any)?.data || [],

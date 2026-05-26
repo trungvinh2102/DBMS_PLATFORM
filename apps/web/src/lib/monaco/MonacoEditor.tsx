@@ -33,12 +33,28 @@ interface SQLEditorProps {
   onSave?: () => void;
   tabSize?: number;
   tables?: string[];
-  columns?: Array<{ table: string; name: string; type: string }>;
+  columns?: Array<{
+    table?: string | null;
+    tableName?: string | null;
+    table_name?: string | null;
+    name?: string | null;
+    columnName?: string | null;
+    column_name?: string | null;
+    type?: string | null;
+    dataType?: string | null;
+    data_type?: string | null;
+  }>;
   undoTrigger?: number;
   redoTrigger?: number;
   enableValidation?: boolean;
   showErrorPanel?: boolean;
-  sqlDialect?: "mysql" | "postgresql" | "sqlite" | "mariadb" | "bigquery" | "clickhouse";
+  sqlDialect?:
+    | "mysql"
+    | "postgresql"
+    | "sqlite"
+    | "mariadb"
+    | "bigquery"
+    | "clickhouse";
   language?: string;
   databaseId?: string;
   schemaId?: string;
@@ -187,18 +203,6 @@ export function SQLEditor({
         currentTheme === "dark" ? "quriodb-dark" : "quriodb-light",
       );
 
-      // Clean up previously registered autocomplete providers
-      if (autocompleteDisposablesRef.current.length > 0) {
-        autocompleteDisposablesRef.current.forEach((d) => d.dispose());
-        autocompleteDisposablesRef.current = [];
-      }
-
-      autocompleteDisposablesRef.current.push(
-        registerSqlAutocomplete(monaco, tablesRef, columnsRef, databaseId, schemaId),
-        registerMongoAutocomplete(monaco, tablesRef, columnsRef),
-        registerRedisAutocomplete(monaco, tablesRef)
-      );
-
       registerEditorCommands({
         editor,
         monaco,
@@ -219,6 +223,33 @@ export function SQLEditor({
     [onPositionChange, onSelectionChange, currentTheme],
   );
 
+  useEffect(() => {
+    if (!mounted || !monacoRef.current) return;
+
+    autocompleteDisposablesRef.current.forEach((disposable) =>
+      disposable.dispose(),
+    );
+    autocompleteDisposablesRef.current = [
+      registerSqlAutocomplete(
+        monacoRef.current,
+        tablesRef,
+        columnsRef,
+        databaseId,
+        schemaId,
+        sqlDialect,
+      ),
+      registerMongoAutocomplete(monacoRef.current, tablesRef, columnsRef),
+      registerRedisAutocomplete(monacoRef.current, tablesRef),
+    ];
+
+    return () => {
+      autocompleteDisposablesRef.current.forEach((disposable) =>
+        disposable.dispose(),
+      );
+      autocompleteDisposablesRef.current = [];
+    };
+  }, [mounted, databaseId, schemaId, sqlDialect]);
+
   return (
     <div className="sql-editor-container h-full flex flex-col overflow-hidden">
       <div className="editor-area flex-1 min-h-0 overflow-hidden">
@@ -236,7 +267,7 @@ export function SQLEditor({
           options={{
             inlineSuggest: {
               enabled: settings.editorInlineSuggestions ?? true,
-              mode: "prefix"
+              mode: "prefix",
             },
             minimap: { enabled: settings.editorMinimap },
             tabSize: settings.editorTabSize,
@@ -258,7 +289,7 @@ export function SQLEditor({
             quickSuggestions: {
               other: true,
               comments: false,
-              strings: false
+              strings: false,
             },
           }}
         />

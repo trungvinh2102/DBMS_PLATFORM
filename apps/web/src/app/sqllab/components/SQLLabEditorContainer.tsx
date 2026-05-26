@@ -217,7 +217,7 @@ export function SQLLabEditorContainer({
               onSave={lab.handleSave}
               tabSize={lab.tabSize}
               tables={lab.tables}
-              columns={lab.allColumns as any}
+              columns={lab.autocompleteColumns as any}
               undoTrigger={lab.undoTrigger}
               redoTrigger={lab.redoTrigger}
               enableValidation={enableValidation}
@@ -232,6 +232,7 @@ export function SQLLabEditorContainer({
         )}
         <Suspense fallback={<EditorLoadingSkeleton />}>
           <AIAssistant
+            lab={lab}
             showHistory={aiShowHistory}
             onShowHistoryChange={setAiShowHistory}
             newChatSignal={aiNewChatSignal}

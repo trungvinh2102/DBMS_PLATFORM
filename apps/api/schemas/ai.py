@@ -6,7 +6,7 @@ Pydantic request schemas for AI Assistant endpoints.
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class AddModelRequest(BaseModel):
@@ -45,7 +45,10 @@ class FixSqlRequest(BaseModel):
 
 class CompleteSqlRequest(BaseModel):
     databaseId: str
-    schema_name: Optional[str] = None
+    schema_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("schema_name", "schema"),
+    )
     prefix: str = ""
     suffix: str = ""
     modelId: Optional[str] = None

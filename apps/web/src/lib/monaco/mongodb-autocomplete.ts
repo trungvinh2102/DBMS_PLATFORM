@@ -162,12 +162,25 @@ const MONGODB_OPERATORS = [
   "$slice",
 ];
 
+interface MongoFieldCompletion {
+  table?: string | null;
+  tableName?: string | null;
+  table_name?: string | null;
+  name?: string | null;
+  columnName?: string | null;
+  column_name?: string | null;
+  type?: string | null;
+  dataType?: string | null;
+  data_type?: string | null;
+}
+
+const cleanMetadataValue = (value: unknown): string =>
+  String(value ?? "").trim();
+
 export const registerMongoAutocomplete = (
   monaco: Monaco,
   collectionsRef: React.MutableRefObject<string[]>,
-  fieldsRef: React.MutableRefObject<
-    Array<{ table: string; name: string; type: string }>
-  >,
+  fieldsRef: React.MutableRefObject<MongoFieldCompletion[]>,
 ) => {
   return monaco.languages.registerCompletionItemProvider("javascript", {
     triggerCharacters: [".", "$", '"', "'"],
@@ -263,11 +276,25 @@ export const registerMongoAutocomplete = (
 
       // Add Fields
       fieldsRef.current.forEach((field) => {
+        const fieldName = cleanMetadataValue(
+          field.name ?? field.columnName ?? field.column_name,
+        );
+        if (!fieldName) return;
+
+        const collectionName = cleanMetadataValue(
+          field.table ?? field.tableName ?? field.table_name,
+        );
+        const fieldType = cleanMetadataValue(
+          field.type ?? field.dataType ?? field.data_type,
+        );
+
         suggestions.push({
-          label: field.name,
+          label: fieldName,
           kind: monaco.languages.CompletionItemKind.Field,
-          detail: `${field.table} (${field.type})`,
-          insertText: field.name,
+          detail: collectionName
+            ? `${collectionName} (${fieldType})`
+            : fieldType,
+          insertText: fieldName,
           range: range,
           sortText: "3",
         });

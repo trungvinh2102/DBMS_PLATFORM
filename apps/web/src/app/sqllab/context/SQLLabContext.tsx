@@ -6,7 +6,7 @@
 import React, { createContext, useContext, ReactNode } from "react";
 import { useSQLLab } from "../hooks/useSQLLab";
 
-type SQLLabContextType = ReturnType<typeof useSQLLab>;
+export type SQLLabContextType = ReturnType<typeof useSQLLab>;
 
 const SQLLabContext = createContext<SQLLabContextType | null>(null);
 

@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { aiApi, databaseApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useSQLLabContext } from "../context/SQLLabContext";
+import type { SQLLabContextType } from "../context/SQLLabContext";
 import { useAIChat } from "../hooks/useAIChat";
 import { parseSlashCommand, filterCommands, type SlashCommand } from "../utils/slash-commands";
 
@@ -22,6 +22,7 @@ import { AIDiagnosticsPanel } from "./ai/AIDiagnosticsPanel";
 import type { AIRuntimeStatus } from "./ai/types";
 
 interface AIAssistantProps {
+  lab: SQLLabContextType;
   showHistory: boolean;
   onShowHistoryChange: (show: boolean) => void;
   newChatSignal: number;
@@ -41,11 +42,11 @@ const buildVietnamesePrompt = (prompt: string) =>
     : `${VIETNAMESE_RESPONSE_INSTRUCTION}\n\n${prompt}`;
 
 export function AIAssistant({
+  lab,
   showHistory,
   onShowHistoryChange,
   newChatSignal,
 }: AIAssistantProps) {
-  const lab = useSQLLabContext();
   const selectedDatabaseId = lab.selectedDS || undefined;
   const selectedSchema = lab.selectedSchema;
   const selectedDatabaseType = lab.selectedDSType;

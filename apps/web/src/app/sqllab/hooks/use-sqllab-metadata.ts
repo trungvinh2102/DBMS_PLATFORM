@@ -14,6 +14,25 @@ interface MetadataProps {
   selectedTable: string | null;
 }
 
+type ColumnsByTable = Record<string, any[]> | any[] | null | undefined;
+
+export function flattenSchemaColumnsForAutocomplete(
+  columnsByTable: ColumnsByTable,
+) {
+  if (Array.isArray(columnsByTable)) return columnsByTable;
+  if (!columnsByTable || typeof columnsByTable !== "object") return [];
+
+  return Object.entries(columnsByTable).flatMap(([tableName, columns]) => {
+    if (!Array.isArray(columns)) return [];
+    return columns.map((column) => ({
+      ...column,
+      table: column.table ?? column.tableName ?? column.table_name ?? tableName,
+      tableName: column.tableName ?? column.table ?? column.table_name ?? tableName,
+      table_name: column.table_name ?? column.table ?? column.tableName ?? tableName,
+    }));
+  });
+}
+
 export function useSQLLabMetadata({
   selectedDS,
   selectedSchema,
@@ -126,6 +145,15 @@ export function useSQLLabMetadata({
   });
   const allColumns = (allColumnsQuery.data as any[]) || [];
 
+  const schemaColumnsQuery = useQuery({
+    queryKey: ["all-columns", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getAllColumns(selectedDS, selectedSchema),
+    enabled: !!selectedDS && !!selectedSchema,
+  });
+  const autocompleteColumns = flattenSchemaColumnsForAutocomplete(
+    schemaColumnsQuery.data as ColumnsByTable,
+  );
+
   useEffect(() => {
     const error = schemasError || tablesQuery.error;
     if (error) {
@@ -145,7 +173,7 @@ export function useSQLLabMetadata({
         allColumnsQuery.refetch(),
       ]);
     }
-    await tablesQuery.refetch();
+    await Promise.all([tablesQuery.refetch(), schemaColumnsQuery.refetch()]);
   };
 
   return {
@@ -155,8 +183,9 @@ export function useSQLLabMetadata({
     tables,
     refetchTables: refetchAll,
     isLoadingTables: tablesQuery.isLoading,
-    isLoadingColumns: allColumnsQuery.isLoading,
+    isLoadingColumns: allColumnsQuery.isLoading || schemaColumnsQuery.isLoading,
     allColumns,
+    autocompleteColumns,
     ...metadata,
     indexes: (indexesQuery.data as any[]) || [],
     foreignKeys: (foreignKeysQuery.data as any[]) || [],

@@ -105,7 +105,7 @@ describe("api-client", () => {
     await aiApi.getAIConfig(true);
     await aiApi.saveAIConfig({});
     await aiApi.fixSQL({});
-    await aiApi.completeSql({ databaseId: "1", schema: "public", prefix: "SELECT", suffix: ";" });
+    await aiApi.completeSql({ databaseId: "1", schema_name: "public", prefix: "SELECT", suffix: ";" });
     await aiApi.executeAgent({});
     await aiApi.deleteModel("1");
     await aiApi.getHistory("1");
