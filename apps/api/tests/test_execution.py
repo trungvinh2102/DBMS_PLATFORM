@@ -62,3 +62,64 @@ def test_execute_update(client, mock_session, mock_engine):
     assert res['data'] == []
     assert res['columns'] == []
     assert res['error'] is None
+
+
+def test_explain_plan_returns_graph(client, mock_session, mock_engine):
+    """Test EXPLAIN normalizes a PostgreSQL JSON plan into graph nodes."""
+    _, mock_conn = mock_engine
+
+    db_mock = MagicMock()
+    db_mock.type = "postgres"
+    mock_session.query.return_value.filter.return_value.first.return_value = db_mock
+    mock_conn.engine.dialect.name = "postgresql"
+
+    mock_result = MagicMock()
+    mock_result.returns_rows = True
+    mock_result.__iter__.return_value = [([
+        {
+            "Plan": {
+                "Node Type": "Seq Scan",
+                "Relation Name": "users",
+                "Startup Cost": 0.0,
+                "Total Cost": 1200.0,
+                "Plan Rows": 10000,
+                "Actual Total Time": 75.5,
+            }
+        }
+    ],)]
+    mock_conn.execute.return_value = mock_result
+
+    response = client.post("/api/database/explain", json={"databaseId": "1", "sql": "SELECT * FROM users"})
+
+    assert response.status_code == 200
+    res = response.json
+    assert res["dialect"] == "postgresql"
+    assert res["graph"]["nodes"][0]["operation"] == "Seq Scan"
+    assert res["graph"]["nodes"][0]["relation"] == "users"
+    assert "Full scan" in res["graph"]["nodes"][0]["warnings"]
+    assert res["summary"]["warningCount"] == 1
+
+
+def test_explain_plan_parses_postgres_json_string(client, mock_session, mock_engine):
+    """PostgreSQL JSON EXPLAIN may come back as text depending on the driver."""
+    _, mock_conn = mock_engine
+
+    db_mock = MagicMock()
+    db_mock.type = "postgres"
+    mock_session.query.return_value.filter.return_value.first.return_value = db_mock
+    mock_conn.engine.dialect.name = "postgresql"
+
+    mock_result = MagicMock()
+    mock_result.returns_rows = True
+    mock_result.__iter__.return_value = [(
+        '[{"Plan":{"Node Type":"Aggregate","Plans":[{"Node Type":"Hash Join","Plans":[{"Node Type":"Seq Scan","Relation Name":"Booking"}]}]}}]',
+    )]
+    mock_conn.execute.return_value = mock_result
+
+    response = client.post("/api/database/explain", json={"databaseId": "1", "sql": "SELECT 1"})
+
+    assert response.status_code == 200
+    res = response.json
+    assert res["summary"]["nodeCount"] == 3
+    assert res["graph"]["nodes"][0]["operation"] == "Aggregate"
+    assert res["graph"]["nodes"][2]["relation"] == "Booking"

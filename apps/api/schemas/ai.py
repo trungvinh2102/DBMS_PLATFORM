@@ -4,7 +4,7 @@ ai.py
 Pydantic request schemas for AI Assistant endpoints.
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import AliasChoices, BaseModel, Field
 
@@ -25,6 +25,16 @@ class GenerateSqlRequest(BaseModel):
 
 class ExplainSqlRequest(BaseModel):
     sql: str
+    modelId: Optional[str] = None
+
+
+class ExplainPlanRequest(BaseModel):
+    sql: str
+    dialect: str
+    plan: Optional[Any] = None
+    graph: Optional[Dict] = None
+    summary: Optional[Dict] = None
+    databaseId: Optional[str] = None
     modelId: Optional[str] = None
 
 

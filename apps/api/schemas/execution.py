@@ -21,6 +21,34 @@ class ExplainQueryRequest(BaseModel):
     sql: str
 
 
+class ExplainPlanGraphNode(BaseModel):
+    id: str
+    label: str
+    operation: str
+    relation: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class ExplainPlanGraphEdge(BaseModel):
+    id: str
+    source: str
+    target: str
+    label: Optional[str] = None
+
+
+class ExplainPlanGraph(BaseModel):
+    nodes: List[ExplainPlanGraphNode] = Field(default_factory=list)
+    edges: List[ExplainPlanGraphEdge] = Field(default_factory=list)
+
+
+class ExplainQueryResponse(BaseModel):
+    plan: Any = None
+    dialect: str
+    graph: ExplainPlanGraph = Field(default_factory=ExplainPlanGraph)
+    summary: Dict[str, Any] = Field(default_factory=dict)
+
+
 class SaveQueryRequest(BaseModel):
     sql: str
     name: str

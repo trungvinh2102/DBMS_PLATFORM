@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from schemas.ai import (
     CompleteSqlRequest,
     ExecuteAgentRequest,
+    ExplainPlanRequest,
     ExplainSqlRequest,
     FixSqlRequest,
     GenerateSqlRequest,
@@ -40,6 +41,20 @@ def explain_sql(data: ExplainSqlRequest, current_user: dict = Depends(get_curren
     return _raise_or_return(ai_service.explain_sql(
         data.sql,
         user_id=current_user.get("userId"),
+        model_id=data.modelId,
+    ))
+
+
+@router.post("/explain-plan")
+def explain_plan(data: ExplainPlanRequest, current_user: dict = Depends(get_current_user)):
+    return _raise_or_return(ai_service.explain_execution_plan(
+        data.sql,
+        data.dialect,
+        data.plan or {},
+        data.graph or {},
+        data.summary or {},
+        user_id=current_user.get("userId"),
+        db_id=data.databaseId,
         model_id=data.modelId,
     ))
 

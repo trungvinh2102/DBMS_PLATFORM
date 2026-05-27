@@ -227,6 +227,7 @@ export const aiApi = {
   generateSQL: (data: any) => req(api.post("ai/generate-sql", data)),
   explainSQL: (data: any) => req(api.post("ai/explain-sql", data)),
   optimizeSQL: (data: any) => req(api.post("ai/optimize-sql", data)),
+  explainPlan: (data: any) => req(api.post("ai/explain-plan", data)),
   fixSQL: (data: any) => req(api.post("ai/fix-sql", data)),
   validateSQL: (data: { sql: string; databaseId?: string; dialect?: string; allowWrite?: boolean; maxPreviewRows?: number }) =>
     req(api.post("ai/validate-sql", data)),

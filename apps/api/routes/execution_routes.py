@@ -12,6 +12,7 @@ from schemas.execution import (
     ExecuteQueryRequest,
     ExecuteQueryResponse,
     ExplainQueryRequest,
+    ExplainQueryResponse,
     QueryHistoryResponse,
     SavedQueryResponse,
     SaveQueryRequest,
@@ -30,7 +31,7 @@ def execute_query(data: ExecuteQueryRequest, db: Session = Depends(get_db)):
     except Exception as exc:
         raise_http_error(exc)
 
-@execution_bp.post('/explain')
+@execution_bp.post('/explain', response_model=ExplainQueryResponse)
 def explain_query(data: ExplainQueryRequest, db: Session = Depends(get_db)):
     """Generates an EXPLAIN plan for a given query and returns performance metrics."""
     try:

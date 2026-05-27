@@ -4,6 +4,7 @@ sql.py
 SQL task specialized service for SQL generation, explanation, optimization, and error fixing.
 """
 import logging
+import json
 from typing import Dict, Any, Optional
 
 from .base import BaseAIService
@@ -68,6 +69,44 @@ class SqlAIService(BaseAIService):
             return {"error": response or "Failed to explain"}
             
         self._save_chat("assistant", str(response), user_id)
+        return {"explanation": str(response)}
+
+    def explain_execution_plan(
+        self,
+        sql: str,
+        dialect: str,
+        plan: Any,
+        graph: Dict[str, Any],
+        summary: Dict[str, Any],
+        user_id: Optional[str] = None,
+        db_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Explains a normalized execution plan with bottlenecks and tuning actions."""
+        prompt = (
+            "Analyze this database execution plan for QurioDB.\n"
+            "Return a concise Vietnamese explanation with these sections: "
+            "Tóm tắt, Điểm nghẽn, Vì sao chậm, Khuyến nghị tối ưu.\n"
+            "Focus on scan type, joins, sort/filter steps, row estimates, actual time/cost, and index usage. "
+            "Do not invent table columns or indexes that are not visible in the plan.\n\n"
+            f"DIALECT: {dialect}\n"
+            f"SQL:\n{sql}\n\n"
+            f"GRAPH SUMMARY:\n{json.dumps(summary, ensure_ascii=False, default=str)[:4000]}\n\n"
+            f"GRAPH NODES:\n{json.dumps((graph or {}).get('nodes', []), ensure_ascii=False, default=str)[:8000]}\n\n"
+            f"RAW PLAN SAMPLE:\n{json.dumps(plan, ensure_ascii=False, default=str)[:8000]}"
+        )
+        self._save_chat("user", f"Explain execution plan: {sql}", user_id, db_id)
+        response = self._generate_response(
+            prompt,
+            model_id=model_id,
+            user_id=user_id,
+            task_key="sql.explain",
+            db_id=db_id,
+        )
+        if not response or response.startswith("AI Error:"):
+            return {"error": response or "Failed to explain execution plan"}
+
+        self._save_chat("assistant", str(response), user_id, db_id)
         return {"explanation": str(response)}
 
     def optimize_sql(self, sql: str, db_id: str, schema: str = "public", user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:

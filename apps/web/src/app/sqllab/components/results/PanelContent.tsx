@@ -41,7 +41,15 @@ export function PanelContent({
 
   if (tab === "results") {
     if (results && (results as any).isExplain) {
-      return <ExplainPlanViewer planData={(results as any).plan} dialect={(results as any).dialect} />
+      return (
+        <ExplainPlanViewer
+          planData={(results as any).plan}
+          dialect={(results as any).dialect}
+          graph={(results as any).graph}
+          summary={(results as any).summary}
+          sql={sql}
+        />
+      );
     }
     if (results.length > 0) {
       return isMongoDB ? (
