@@ -104,12 +104,68 @@ export function useSQLLabMetadata({
   });
   const events = skipFunctionsProcsEvents ? [] : ((eventsQuery.data as any) || []);
 
+  const canLoadEngineObjects = !!selectedDS && !["mongodb", "redis"].includes(selectedDSType);
+  const materializedViewsQuery = useQuery({
+    queryKey: ["materialized-views", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getMaterializedViews(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+  const sequencesQuery = useQuery({
+    queryKey: ["sequences", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getSequences(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+  const partitionsQuery = useQuery({
+    queryKey: ["partitions", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getPartitions(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+  const rolesQuery = useQuery({
+    queryKey: ["roles", selectedDS],
+    queryFn: () => databaseApi.getRoles(selectedDS),
+    enabled: canLoadEngineObjects,
+  });
+  const grantsQuery = useQuery({
+    queryKey: ["grants", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getGrants(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+  const tablespacesQuery = useQuery({
+    queryKey: ["tablespaces", selectedDS],
+    queryFn: () => databaseApi.getTablespaces(selectedDS),
+    enabled: canLoadEngineObjects,
+  });
+  const extensionsQuery = useQuery({
+    queryKey: ["extensions", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getExtensions(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+  const synonymsQuery = useQuery({
+    queryKey: ["synonyms", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getSynonyms(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+  const jobsQuery = useQuery({
+    queryKey: ["jobs", selectedDS, selectedSchema],
+    queryFn: () => databaseApi.getJobs(selectedDS, selectedSchema),
+    enabled: canLoadEngineObjects,
+  });
+
   const metadata = {
     views,
     functions,
     procedures,
     triggers,
     events,
+    materializedViews: (materializedViewsQuery.data as any) || [],
+    sequences: (sequencesQuery.data as any) || [],
+    partitions: (partitionsQuery.data as any) || [],
+    roles: (rolesQuery.data as any) || [],
+    grants: (grantsQuery.data as any) || [],
+    tablespaces: (tablespacesQuery.data as any) || [],
+    extensions: (extensionsQuery.data as any) || [],
+    synonyms: (synonymsQuery.data as any) || [],
+    jobs: (jobsQuery.data as any) || [],
   };
 
   const indexesQuery = useQuery({
@@ -173,7 +229,19 @@ export function useSQLLabMetadata({
         allColumnsQuery.refetch(),
       ]);
     }
-    await Promise.all([tablesQuery.refetch(), schemaColumnsQuery.refetch()]);
+    await Promise.all([
+      tablesQuery.refetch(),
+      schemaColumnsQuery.refetch(),
+      materializedViewsQuery.refetch(),
+      sequencesQuery.refetch(),
+      partitionsQuery.refetch(),
+      rolesQuery.refetch(),
+      grantsQuery.refetch(),
+      tablespacesQuery.refetch(),
+      extensionsQuery.refetch(),
+      synonymsQuery.refetch(),
+      jobsQuery.refetch(),
+    ]);
   };
 
   return {

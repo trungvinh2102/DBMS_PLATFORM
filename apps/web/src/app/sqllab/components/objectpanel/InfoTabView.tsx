@@ -5,8 +5,12 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { AdminActionsPanel } from "./AdminActionsPanel";
 
-export function InfoTabView({ tableInfo }: any) {
+export function InfoTabView({
+  tableInfo,
+  adminActions,
+}: any) {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -41,6 +45,8 @@ export function InfoTabView({ tableInfo }: any) {
           No info available
         </div>
       )}
+
+      {adminActions ? <AdminActionsPanel {...adminActions} /> : null}
     </div>
   );
 }

@@ -6,9 +6,10 @@ API routes for database schema and object discovery (metadata).
 
 from fastapi import APIRouter, Depends, Query
 from typing import Optional
+from schemas.metadata import AdminActionRequest, AdminActionResponse
 from services.metadata import metadata_service
 from services.local_db_service import local_db_service
-from utils.auth_middleware import get_current_user
+from utils.auth_middleware import get_admin_user, get_current_user
 from utils.http_errors import raise_http_error
 
 metadata_bp = APIRouter(dependencies=[Depends(get_current_user)])
@@ -92,6 +93,95 @@ def get_events(databaseId: str, schema: Optional[str] = Query(None)):
         return metadata_service.get_events(databaseId, schema)
     except Exception as exc:
         raise_http_error(exc)
+
+@metadata_bp.get('/materialized-views')
+def get_materialized_views(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves engine-specific materialized or indexed views."""
+    try:
+        return metadata_service.get_materialized_views(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/sequences')
+def get_sequences(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves sequence objects within a specific schema."""
+    try:
+        return metadata_service.get_sequences(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/partitions')
+def get_partitions(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves partition objects within a specific schema."""
+    try:
+        return metadata_service.get_partitions(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/roles')
+def get_roles(databaseId: str):
+    """Retrieves roles or principals visible to the connection."""
+    try:
+        return metadata_service.get_roles(databaseId)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/grants')
+def get_grants(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves grants or permissions visible to the connection."""
+    try:
+        return metadata_service.get_grants(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/tablespaces')
+def get_tablespaces(databaseId: str):
+    """Retrieves tablespaces or equivalent storage groups."""
+    try:
+        return metadata_service.get_tablespaces(databaseId)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/extensions')
+def get_extensions(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves installed extensions or plugin-like capabilities."""
+    try:
+        return metadata_service.get_extensions(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/synonyms')
+def get_synonyms(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves synonym objects within a specific schema."""
+    try:
+        return metadata_service.get_synonyms(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.get('/jobs')
+def get_jobs(databaseId: str, schema: Optional[str] = Query(None)):
+    """Retrieves scheduled jobs visible to the connection."""
+    try:
+        return metadata_service.get_jobs(databaseId, schema)
+    except Exception as exc:
+        raise_http_error(exc)
+
+@metadata_bp.post('/admin-action', response_model=AdminActionResponse)
+def run_admin_action(data: AdminActionRequest, _admin_user: dict = Depends(get_admin_user)):
+    """Builds or executes a guarded administration action for a metadata object."""
+    try:
+        return metadata_service.run_admin_action(
+            data.databaseId,
+            data.objectType,
+            data.objectName,
+            data.action,
+            data.schemaName,
+            data.options,
+            data.execute,
+            data.confirmation,
+        )
+    except Exception as exc:
+        raise_http_error(exc, allow_not_found=False)
 
 @metadata_bp.get('/all-foreign-keys')
 def get_all_foreign_keys(databaseId: str, schema: Optional[str] = Query(None)):

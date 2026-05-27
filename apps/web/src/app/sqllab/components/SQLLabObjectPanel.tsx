@@ -22,6 +22,15 @@ import {
   FunctionSquare,
   Settings2,
   Zap,
+  BadgeCheck,
+  BriefcaseBusiness,
+  GitBranch,
+  HardDrive,
+  KeyRound,
+  Layers3,
+  Link2,
+  Package,
+  Shield,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -69,6 +78,24 @@ const ObjectIcon = ({
       return <Settings2 className="h-3.5 w-3.5 text-slate-500 shrink-0" />;
     case "trigger":
       return <Zap className="h-3.5 w-3.5 text-green-500 shrink-0" />;
+    case "materialized_view":
+      return <Layers3 className="h-3.5 w-3.5 text-fuchsia-500 shrink-0" />;
+    case "sequence":
+      return <KeyRound className="h-3.5 w-3.5 text-cyan-600 shrink-0" />;
+    case "partition":
+      return <GitBranch className="h-3.5 w-3.5 text-emerald-600 shrink-0" />;
+    case "role":
+      return <Shield className="h-3.5 w-3.5 text-red-500 shrink-0" />;
+    case "grant":
+      return <BadgeCheck className="h-3.5 w-3.5 text-lime-600 shrink-0" />;
+    case "tablespace":
+      return <HardDrive className="h-3.5 w-3.5 text-stone-600 shrink-0" />;
+    case "extension":
+      return <Package className="h-3.5 w-3.5 text-teal-600 shrink-0" />;
+    case "synonym":
+      return <Link2 className="h-3.5 w-3.5 text-pink-500 shrink-0" />;
+    case "job":
+      return <BriefcaseBusiness className="h-3.5 w-3.5 text-amber-600 shrink-0" />;
     default:
       return <TableIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />;
   }
@@ -98,12 +125,20 @@ export function SQLLabObjectPanel() {
   ];
   if (lab.selectedObjectType === "view") {
     availableTabs = ["Info", "Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), ...(hasScriptSupport ? ["Script"] : [])];
+  } else if (lab.selectedObjectType === "materialized_view") {
+    availableTabs = ["Info", "Data", "Structure", ...(hasScriptSupport ? ["Script"] : [])];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
       lab.selectedObjectType || "",
     )
   ) {
     availableTabs = ["Info", ...(hasScriptSupport ? ["Script"] : [])];
+  } else if (
+    ["sequence", "partition", "role", "grant", "tablespace", "extension", "synonym", "job"].includes(
+      lab.selectedObjectType || "",
+    )
+  ) {
+    availableTabs = ["Info"];
   }
 
   const activeTabLower = lab.activeRightTab.toLowerCase();
@@ -228,7 +263,17 @@ export function SQLLabObjectPanel() {
         ) : effectiveTab === "trigger" ? (
           <TriggerTabView triggers={lab.triggers} />
         ) : effectiveTab === "info" ? (
-          <InfoTabView tableInfo={lab.tableInfo} />
+          <InfoTabView
+            tableInfo={lab.tableInfo}
+            adminActions={{
+              databaseId: lab.selectedDS,
+              schemaName: lab.selectedSchema,
+              objectType: lab.selectedObjectType,
+              objectName: lab.selectedTable,
+              databaseType: lab.selectedDSType,
+              onExecuted: lab.refetchTables,
+            }}
+          />
         ) : effectiveTab === "script" ? (
           <ScriptTabView tableDDL={lab.tableDDL} monacoTheme={monacoTheme} />
         ) : (

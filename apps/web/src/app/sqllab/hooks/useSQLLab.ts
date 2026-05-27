@@ -125,6 +125,15 @@ export function useSQLLab() {
     if (metadata.functions?.includes(ui.selectedTable)) return "function";
     if (metadata.procedures?.includes(ui.selectedTable)) return "procedure";
     if (metadata.triggers?.includes(ui.selectedTable)) return "trigger";
+    if (metadata.materializedViews?.includes(ui.selectedTable)) return "materialized_view";
+    if (metadata.sequences?.includes(ui.selectedTable)) return "sequence";
+    if (metadata.partitions?.includes(ui.selectedTable)) return "partition";
+    if (metadata.roles?.includes(ui.selectedTable)) return "role";
+    if (metadata.grants?.includes(ui.selectedTable)) return "grant";
+    if (metadata.tablespaces?.includes(ui.selectedTable)) return "tablespace";
+    if (metadata.extensions?.includes(ui.selectedTable)) return "extension";
+    if (metadata.synonyms?.includes(ui.selectedTable)) return "synonym";
+    if (metadata.jobs?.includes(ui.selectedTable)) return "job";
     return "table";
   }, [ui.selectedTable, metadata]);
 

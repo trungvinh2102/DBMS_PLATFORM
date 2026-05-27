@@ -11,6 +11,15 @@ import {
   Settings2,
   Zap,
   Eye,
+  BadgeCheck,
+  BriefcaseBusiness,
+  GitBranch,
+  HardDrive,
+  KeyRound,
+  Layers3,
+  Link2,
+  Package,
+  Shield,
 } from "lucide-react";
 import { SQLLabSidebarHeader } from "./SQLLabSidebarHeader";
 import { SidebarFolder } from "./sidebar/SidebarFolder";
@@ -36,6 +45,15 @@ export function SQLLabSidebar() {
   const filteredProcedures = filterList(lab.procedures);
   const filteredTriggers = filterList(lab.triggers);
   const filteredEvents = filterList(lab.events);
+  const filteredMaterializedViews = filterList(lab.materializedViews);
+  const filteredSequences = filterList(lab.sequences);
+  const filteredPartitions = filterList(lab.partitions);
+  const filteredRoles = filterList(lab.roles);
+  const filteredGrants = filterList(lab.grants);
+  const filteredTablespaces = filterList(lab.tablespaces);
+  const filteredExtensions = filterList(lab.extensions);
+  const filteredSynonyms = filterList(lab.synonyms);
+  const filteredJobs = filterList(lab.jobs);
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) =>
@@ -137,6 +155,128 @@ export function SQLLabSidebar() {
               items={filteredProcedures}
               count={filteredProcedures?.length}
               isExpanded={expandedFolders.includes("procedures")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+          </>
+        )}
+
+        {lab.isRelational && (
+          <>
+            <SidebarFolder
+              id="materialized-views"
+              label="Materialized Views"
+              icon={<Layers3 className="h-4 w-4 text-fuchsia-500" />}
+              items={filteredMaterializedViews}
+              count={filteredMaterializedViews?.length}
+              isExpanded={expandedFolders.includes("materialized-views")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="sequences"
+              label="Sequences"
+              icon={<KeyRound className="h-4 w-4 text-cyan-600" />}
+              items={filteredSequences}
+              count={filteredSequences?.length}
+              isExpanded={expandedFolders.includes("sequences")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="partitions"
+              label="Partitions"
+              icon={<GitBranch className="h-4 w-4 text-emerald-600" />}
+              items={filteredPartitions}
+              count={filteredPartitions?.length}
+              isExpanded={expandedFolders.includes("partitions")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="roles"
+              label="Roles"
+              icon={<Shield className="h-4 w-4 text-red-500" />}
+              items={filteredRoles}
+              count={filteredRoles?.length}
+              isExpanded={expandedFolders.includes("roles")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="grants"
+              label="Grants"
+              icon={<BadgeCheck className="h-4 w-4 text-lime-600" />}
+              items={filteredGrants}
+              count={filteredGrants?.length}
+              isExpanded={expandedFolders.includes("grants")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="tablespaces"
+              label="Tablespaces"
+              icon={<HardDrive className="h-4 w-4 text-stone-600" />}
+              items={filteredTablespaces}
+              count={filteredTablespaces?.length}
+              isExpanded={expandedFolders.includes("tablespaces")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="extensions"
+              label="Extensions"
+              icon={<Package className="h-4 w-4 text-teal-600" />}
+              items={filteredExtensions}
+              count={filteredExtensions?.length}
+              isExpanded={expandedFolders.includes("extensions")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="synonyms"
+              label="Synonyms"
+              icon={<Link2 className="h-4 w-4 text-pink-500" />}
+              items={filteredSynonyms}
+              count={filteredSynonyms?.length}
+              isExpanded={expandedFolders.includes("synonyms")}
+              isLoading={lab.isLoadingTables}
+              searchQuery={searchQuery}
+              selectedItem={lab.selectedTable}
+              onToggle={toggleFolder}
+              onSelectItem={lab.setSelectedTable}
+            />
+            <SidebarFolder
+              id="jobs"
+              label="Jobs"
+              icon={<BriefcaseBusiness className="h-4 w-4 text-amber-600" />}
+              items={filteredJobs}
+              count={filteredJobs?.length}
+              isExpanded={expandedFolders.includes("jobs")}
               isLoading={lab.isLoadingTables}
               searchQuery={searchQuery}
               selectedItem={lab.selectedTable}

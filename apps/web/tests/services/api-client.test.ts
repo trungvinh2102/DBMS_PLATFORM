@@ -178,6 +178,21 @@ describe("api-client", () => {
     await databaseApi.getProcedures("1");
     await databaseApi.getTriggers("1");
     await databaseApi.getEvents("1");
+    await databaseApi.getMaterializedViews("1");
+    await databaseApi.getSequences("1");
+    await databaseApi.getPartitions("1");
+    await databaseApi.getRoles("1");
+    await databaseApi.getGrants("1");
+    await databaseApi.getTablespaces("1");
+    await databaseApi.getExtensions("1");
+    await databaseApi.getSynonyms("1");
+    await databaseApi.getJobs("1");
+    await databaseApi.runAdminAction({
+      databaseId: "1",
+      objectType: "materialized_view",
+      objectName: "sales_mv",
+      action: "refresh",
+    });
     await databaseApi.getColumns("1", "t");
     await databaseApi.getIndexes("1", "t");
     await databaseApi.getForeignKeys("1", "t");
@@ -210,4 +225,3 @@ describe("api-client", () => {
     api.interceptors.request.eject(badInterceptor);
   });
 });
-

@@ -14,6 +14,8 @@ from models import SessionLocal
 from .sql_provider import SqlMetadataProvider
 from .mongo_provider import MongoMetadataProvider
 from .redis_provider import RedisMetadataProvider
+from .engine_objects import SqlEngineObjectProvider
+from .admin_actions import SqlAdminActionProvider
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,8 @@ class MetadataService(BaseDatabaseService):
     def __init__(self):
         super().__init__()
         self.sql_provider = SqlMetadataProvider(self)
+        self.engine_object_provider = SqlEngineObjectProvider(self)
+        self.admin_action_provider = SqlAdminActionProvider(self)
         self.mongo_provider = MongoMetadataProvider(self)
         self.redis_provider = RedisMetadataProvider(self)
 
@@ -269,5 +273,105 @@ class MetadataService(BaseDatabaseService):
             return []
         finally:
             session.close()
+
+    def get_materialized_views(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists engine-specific materialized or indexed views."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_materialized_views(database_id, schema),
+        )
+
+    def get_sequences(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists sequence objects for engines that support them."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_sequences(database_id, schema),
+        )
+
+    def get_partitions(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists partitions for engines that expose partition metadata."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_partitions(database_id, schema),
+        )
+
+    def get_roles(self, database_id: str) -> List[str]:
+        """Lists roles or principals visible to the current connection."""
+        return self._get_sql_engine_objects(database_id, lambda: self.engine_object_provider.get_roles(database_id))
+
+    def get_grants(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists grants or permissions visible to the current connection."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_grants(database_id, schema),
+        )
+
+    def get_tablespaces(self, database_id: str) -> List[str]:
+        """Lists tablespaces or equivalent storage groups."""
+        return self._get_sql_engine_objects(database_id, lambda: self.engine_object_provider.get_tablespaces(database_id))
+
+    def get_extensions(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists installed extensions or plugin-like database capabilities."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_extensions(database_id, schema),
+        )
+
+    def get_synonyms(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists synonym objects for engines that support them."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_synonyms(database_id, schema),
+        )
+
+    def get_jobs(self, database_id: str, schema: Optional[str] = None) -> List[str]:
+        """Lists scheduled jobs where visible through metadata views."""
+        return self._get_sql_engine_objects(
+            database_id,
+            lambda: self.engine_object_provider.get_jobs(database_id, schema),
+        )
+
+    def _get_sql_engine_objects(self, database_id: str, fetcher) -> List[str]:
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type in ["mongodb", "redis"]:
+                return []
+            return fetcher()
+        except Exception as e:
+            logger.error(f"Error fetching engine-specific objects for {database_id}: {e}")
+            return []
+        finally:
+            session.close()
+
+    def run_admin_action(
+        self,
+        database_id: str,
+        object_type: str,
+        object_name: str,
+        action: str,
+        schema_name: Optional[str] = None,
+        options: Optional[Dict[str, Any]] = None,
+        execute: bool = False,
+        confirmation: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Builds or executes a guarded admin action for a supported SQL engine."""
+        session = SessionLocal()
+        try:
+            db_type, _ = self.get_db_config(database_id, session)
+            if db_type in ["mongodb", "redis"]:
+                raise ValueError(f"Admin actions are not supported for {db_type}.")
+        finally:
+            session.close()
+        return self.admin_action_provider.run_action(
+            database_id,
+            object_type,
+            object_name,
+            action,
+            schema_name,
+            options or {},
+            execute,
+            confirmation,
+        )
 
 metadata_service = MetadataService()

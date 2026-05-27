@@ -138,6 +138,34 @@ export const databaseApi = {
     req(api.get("database/triggers", { params: { databaseId, schema } })),
   getEvents: (databaseId: string, schema?: string) =>
     req(api.get("database/events", { params: { databaseId, schema } })),
+  getMaterializedViews: (databaseId: string, schema?: string) =>
+    req(api.get("database/materialized-views", { params: { databaseId, schema } })),
+  getSequences: (databaseId: string, schema?: string) =>
+    req(api.get("database/sequences", { params: { databaseId, schema } })),
+  getPartitions: (databaseId: string, schema?: string) =>
+    req(api.get("database/partitions", { params: { databaseId, schema } })),
+  getRoles: (databaseId: string) =>
+    req(api.get("database/roles", { params: { databaseId } })),
+  getGrants: (databaseId: string, schema?: string) =>
+    req(api.get("database/grants", { params: { databaseId, schema } })),
+  getTablespaces: (databaseId: string) =>
+    req(api.get("database/tablespaces", { params: { databaseId } })),
+  getExtensions: (databaseId: string, schema?: string) =>
+    req(api.get("database/extensions", { params: { databaseId, schema } })),
+  getSynonyms: (databaseId: string, schema?: string) =>
+    req(api.get("database/synonyms", { params: { databaseId, schema } })),
+  getJobs: (databaseId: string, schema?: string) =>
+    req(api.get("database/jobs", { params: { databaseId, schema } })),
+  runAdminAction: (data: {
+    databaseId: string;
+    objectType: string;
+    objectName: string;
+    action: string;
+    schemaName?: string;
+    options?: Record<string, any>;
+    execute?: boolean;
+    confirmation?: string;
+  }) => req(api.post("database/admin-action", data)),
   getColumns: (databaseId: string, table: string, schema?: string) =>
     req(api.get("database/columns", { params: { databaseId, table, schema } })),
   getIndexes: (databaseId: string, table: string, schema?: string) =>
