@@ -99,7 +99,7 @@ export function AIExplanation({ explanation, isLoading, onExplain, canExplain }:
       <div className="flex h-full flex-col items-center justify-center p-8 text-center">
         <Bot className="mb-4 h-10 w-10 text-muted-foreground/40" />
         <div className="text-sm font-bold">AI explanation is ready on demand.</div>
-        <button type="button" onClick={onExplain} disabled={!canExplain} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-xs font-bold text-primary-foreground disabled:opacity-50">
+        <button type="button" onClick={onExplain} disabled={!canExplain} className="mt-4 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-[11px] font-bold text-primary-foreground disabled:opacity-50">
           <Sparkles className="h-4 w-4" />
           Explain Plan
         </button>

@@ -4,7 +4,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Activity, Bot, FileJson, GitBranch, Loader2, Sparkles } from "lucide-react";
 import { Background, Controls, ReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -41,11 +41,16 @@ export function ExplainPlanViewer({
   const [activeTab, setActiveTab] = useState<ViewerTab>("graph");
   const normalizedGraph = useMemo(() => normalizeGraph(planData, dialect, graph), [dialect, graph, planData]);
   const flowGraph = useMemo(() => layoutGraph(normalizedGraph), [normalizedGraph]);
+  const explainCacheKey = useMemo(
+    () => JSON.stringify({ dialect, graph: normalizedGraph, plan: planData, sql, summary }),
+    [dialect, normalizedGraph, planData, sql, summary],
+  );
   const { theme, resolvedTheme } = useTheme();
   const currentTheme = (resolvedTheme || theme || "light") as "light" | "dark";
 
-  const explainMutation = useMutation({
-    mutationFn: () =>
+  const explainQuery = useQuery({
+    queryKey: ["sqllab", "explain-plan", explainCacheKey],
+    queryFn: () =>
       aiApi.explainPlan({
         sql,
         dialect,
@@ -53,9 +58,29 @@ export function ExplainPlanViewer({
         graph: normalizedGraph,
         summary,
       }),
-    onSuccess: () => setActiveTab("ai"),
-    onError: (error: Error) => toast.error(error.message || "Failed to explain execution plan"),
+    enabled: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
   });
+
+  const explanation = (explainQuery.data as any)?.explanation;
+  const isExplaining = explainQuery.isFetching;
+  const handleExplain = () => {
+    if (explanation) {
+      setActiveTab("ai");
+      return;
+    }
+
+    void explainQuery.refetch()
+      .then((result) => {
+        if (result.error) throw result.error;
+        setActiveTab("ai");
+      })
+      .catch((error: Error) => toast.error(error.message || "Failed to explain execution plan"));
+  };
+  const handleAITabClick = () => {
+    setActiveTab("ai");
+  };
 
   const warningCount = normalizedGraph.nodes.filter((node) => node.warnings?.length).length;
 
@@ -78,16 +103,16 @@ export function ExplainPlanViewer({
 
         <div className="flex items-center gap-2">
           <TabButton active={activeTab === "graph"} onClick={() => setActiveTab("graph")} icon={Activity}>Graph</TabButton>
-          <TabButton active={activeTab === "ai"} onClick={() => setActiveTab("ai")} icon={Bot}>AI</TabButton>
+          <TabButton active={activeTab === "ai"} onClick={handleAITabClick} icon={Bot}>AI</TabButton>
           <TabButton active={activeTab === "raw"} onClick={() => setActiveTab("raw")} icon={FileJson}>Raw</TabButton>
           <button
             type="button"
-            onClick={() => explainMutation.mutate()}
-            disabled={explainMutation.isPending || !normalizedGraph.nodes.length}
-            className="ml-2 inline-flex h-8 items-center gap-2 rounded-md border border-primary/25 bg-primary px-3 text-[10px] font-black uppercase tracking-widest text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleExplain}
+            disabled={isExplaining || !normalizedGraph.nodes.length}
+            className="ml-2 inline-flex h-8 items-center gap-2 rounded-md border border-primary/25 bg-primary px-3 text-[11px] font-black uppercase tracking-widest text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {explainMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            Explain
+            {isExplaining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {explanation ? "Explained" : "Explain"}
           </button>
         </div>
       </div>
@@ -126,9 +151,9 @@ export function ExplainPlanViewer({
 
         {activeTab === "ai" ? (
           <AIExplanation
-            explanation={(explainMutation.data as any)?.explanation}
-            isLoading={explainMutation.isPending}
-            onExplain={() => explainMutation.mutate()}
+            explanation={explanation}
+            isLoading={isExplaining}
+            onExplain={handleExplain}
             canExplain={normalizedGraph.nodes.length > 0}
           />
         ) : null}

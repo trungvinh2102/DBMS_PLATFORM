@@ -104,7 +104,7 @@ export const SQLBlock = React.memo(({
           </Button>
           <Button
             variant="ghost"
-            className="h-7 text-[9px] font-bold uppercase tracking-widest transition-all text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 rounded-lg"
+            className="h-7 text-[11px] font-bold uppercase tracking-widest transition-all text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-primary/5 rounded-lg"
             onClick={() => onExplain(sql)}
           >
             <FileSearch className="h-3.5 w-3.5 mr-1.5" />
