@@ -29,14 +29,19 @@ class MongoExecutor:
             sql = sql.strip()
             # Match formats like db.collection.find(...) or collection.find(...)
             mql_match = re.match(
-                r'^(db|[\w\.-]+)\.(find|aggregate|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|replaceOne|createView)\s*\((.*)\)\s*$', 
+                r'^(db|[\w\.-]+)\.(find|aggregate|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|replaceOne|createView)\s*\((.*)\)\s*$',
                 sql, re.DOTALL | re.IGNORECASE
+            )
+            get_collection_match = re.match(
+                r'^db\.getCollection\([\'"]([^\'"]+)[\'"]\)\.(find|aggregate|insertOne|insertMany|updateOne|updateMany|deleteOne|deleteMany|replaceOne)\s*\((.*)\)\s*$',
+                sql,
+                re.DOTALL | re.IGNORECASE,
             )
             
             # Simple SQL-like fallback: SELECT * FROM collection
             sql_match = re.search(r'FROM\s+["\']?([\w\.-]+)["\']?', sql, re.IGNORECASE)
             
-            collection_name, query_type, args = self._parse_query(mql_match, sql_match, sql)
+            collection_name, query_type, args = self._parse_query(mql_match, get_collection_match, sql_match, sql)
             
             # Resolve database and collection
             target_db, collection_name = self._resolve_target(collection_name, config)
@@ -60,13 +65,25 @@ class MongoExecutor:
 
     # --- Private Helpers ---
 
-    def _parse_query(self, mql_match, sql_match, sql: str) -> Tuple[str, str, List[Any]]:
+    def _parse_query(self, mql_match, get_collection_match, sql_match, sql: str) -> Tuple[str, str, List[Any]]:
         """Extracts operation details from the input query string."""
-        if mql_match:
+        if get_collection_match:
+            args_str = get_collection_match.group(3).strip()
+            collection_name = get_collection_match.group(1)
+            query_type = get_collection_match.group(2)
+        elif mql_match:
             args_str = mql_match.group(3).strip()
+            collection_name = mql_match.group(1)
+            query_type = mql_match.group(2)
+        else:
+            args_str = ""
+            collection_name = ""
+            query_type = ""
+
+        if mql_match or get_collection_match:
             try:
                 args = json_util.loads(f"[{args_str}]") if args_str else []
-                return mql_match.group(1), mql_match.group(2), args
+                return collection_name, query_type, args
             except Exception as e:
                 raise Exception(f"MQL Parse Error: {e}. Use valid JSON with double quotes.")
         elif sql_match:
@@ -87,14 +104,15 @@ class MongoExecutor:
 
     def _get_method_name(self, query_type: str) -> str:
         """Translates camelCase JS method names to PyMongo snake_case equivalents."""
+        normalized_query_type = query_type.lower()
         method_map = {
             'find': 'find', 'aggregate': 'aggregate',
-            'insertOne': 'insert_one', 'insertMany': 'insert_many',
-            'updateOne': 'update_one', 'updateMany': 'update_many',
-            'deleteOne': 'delete_one', 'deleteMany': 'delete_many',
-            'replaceOne': 'replace_one', 'createView': 'command'
+            'insertone': 'insert_one', 'insertmany': 'insert_many',
+            'updateone': 'update_one', 'updatemany': 'update_many',
+            'deleteone': 'delete_one', 'deletemany': 'delete_many',
+            'replaceone': 'replace_one', 'createview': 'command'
         }
-        return method_map.get(query_type, query_type)
+        return method_map.get(normalized_query_type, query_type)
 
     def _run_operation(self, method, py_name, orig_name, args, limit, client, db_name) -> Tuple[List[Dict[str, Any]], List[str]]:
         """Executes the PyMongo operation and formats the result."""
@@ -102,10 +120,12 @@ class MongoExecutor:
             cursor = method(*args).limit(limit)
             return self._process_documents(list(cursor))
         elif py_name == 'aggregate':
+            if not args or not isinstance(args[0], list):
+                raise Exception("MongoDB aggregate requires a pipeline array, for example collection.aggregate([{\"$match\": {}}]).")
             cursor = method(*args)
             docs = [doc for i, doc in enumerate(cursor) if i < limit]
             return self._process_documents(docs)
-        elif py_name == 'command' and orig_name == 'createView':
+        elif py_name == 'command' and orig_name.lower() == 'createview':
             # createView: [viewName, sourceColl, pipeline]
             result = client[db_name].command({'create': args[0], 'viewOn': args[1], 'pipeline': args[2]})
             return self._format_result({"status": "success", "command": orig_name, "view": args[0]})

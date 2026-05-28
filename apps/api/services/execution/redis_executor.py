@@ -42,7 +42,7 @@ class RedisExecutor:
             
             # Run the command and process result
             result = client.execute_command(cmd, *args)
-            return self._process_result(result, limit)
+            return self._process_result(cmd, result, limit)
         finally:
             session.close()
 
@@ -72,19 +72,33 @@ class RedisExecutor:
         
         return cmd, args
 
-    def _process_result(self, result, limit: int) -> Tuple[List[Dict[str, Any]], List[str]]:
+    def _process_result(self, cmd: str, result, limit: int) -> Tuple[List[Dict[str, Any]], List[str]]:
         """Formats the Redis command result (list, dict, or scalar) for tabular display."""
         processed, columns = [], ["result"]
+        normalized_cmd = cmd.lower()
+
+        if normalized_cmd == "scan" and isinstance(result, (list, tuple)) and len(result) == 2:
+            cursor, keys = result
+            return (
+                [{"cursor": str(cursor), "key": self._stringify(key)} for key in list(keys)[:limit]],
+                ["cursor", "key"],
+            )
         
         if isinstance(result, (list, tuple, set)):
             columns = ["index", "value"]
             for i, val in enumerate(result):
                 if i >= limit: break
-                processed.append({"index": i, "value": str(val)})
+                processed.append({"index": i, "value": self._stringify(val)})
         elif isinstance(result, dict):
-            columns = sorted(result.keys()) if result else ["result"]
-            processed.append({k: str(v) for k, v in result.items()})
+            processed.append({self._stringify(k): self._stringify(v) for k, v in result.items()})
+            columns = sorted(processed[0].keys()) if processed[0] else ["result"]
         else:
-            processed.append({"result": str(result)})
+            processed.append({"result": self._stringify(result)})
             
         return processed, sorted(list(columns))
+
+    def _stringify(self, value: Any) -> str:
+        """Converts Redis response values into display-safe strings."""
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return str(value)

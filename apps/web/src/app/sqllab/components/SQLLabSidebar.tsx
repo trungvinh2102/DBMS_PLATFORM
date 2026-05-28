@@ -25,6 +25,7 @@ import { SQLLabSidebarHeader } from "./SQLLabSidebarHeader";
 import { SidebarFolder } from "./sidebar/SidebarFolder";
 import { getDBIcon } from "./sidebar/sidebar-utils";
 import { useSQLLabContext } from "../context/SQLLabContext";
+import { RedisKeyBrowser } from "./RedisKeyBrowser";
 
 /**
  * The main sidebar for the SQL Lab. Handles schema browsing and database selection.
@@ -72,10 +73,25 @@ export function SQLLabSidebar() {
       />
 
       <div className="flex-1 overflow-auto scrollbar-thin py-2">
+        {lab.selectedDSType === "redis" && (
+          <RedisKeyBrowser
+            keys={filteredTables || []}
+            selectedKey={lab.selectedTable}
+            isLoading={lab.isLoadingTables}
+            onSelectKey={lab.setSelectedTable}
+            onRefresh={lab.refetchTables}
+            onApplyCommand={lab.setSql}
+            onRunCommand={(command) => {
+              lab.setSql(command);
+              lab.handleRun(command);
+            }}
+          />
+        )}
+
         <SidebarFolder
           id="tables"
-          label="Tables"
-          icon={<Table2 className="h-4 w-4 text-blue-500" />}
+          label={lab.selectedDSType === "mongodb" ? "Collections" : lab.selectedDSType === "redis" ? "Keys" : "Tables"}
+          icon={<Table2 className={lab.selectedDSType === "redis" ? "h-4 w-4 text-red-500" : "h-4 w-4 text-blue-500"} />}
           items={filteredTables}
           count={filteredTables?.length}
           hasRefresh

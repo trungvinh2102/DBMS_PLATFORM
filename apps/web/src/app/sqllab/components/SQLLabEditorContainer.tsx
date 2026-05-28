@@ -25,6 +25,7 @@ export interface SyntaxError {
 
 import { useSQLLabContext } from "../context/SQLLabContext";
 import { formatDBName } from "./sidebar/sidebar-utils";
+import { MongoAggregationBuilder } from "./MongoAggregationBuilder";
 
 export function SQLLabEditorContainer({
   enableValidation = true,
@@ -203,31 +204,47 @@ export function SQLLabEditorContainer({
         )}
       </div>
 
-      <div className="flex-1 relative overflow-hidden bg-background">
+      <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
         {!lab.showAISidebar && (
           <Suspense fallback={<EditorLoadingSkeleton />}>
-            <SQLEditor
-              key={lab.activeTabId} // Re-mount when switching tabs to ensure clean state
-              value={lab.sql}
-              onChange={(val) => lab.setSql(val || "")}
-              onPositionChange={lab.setCursorPos}
-              onRun={lab.handleRun}
-              onFormat={lab.handleFormat}
-              onStop={lab.handleStop}
-              onSave={lab.handleSave}
-              tabSize={lab.tabSize}
-              tables={lab.tables}
-              columns={lab.autocompleteColumns as any}
-              undoTrigger={lab.undoTrigger}
-              redoTrigger={lab.redoTrigger}
-              enableValidation={enableValidation}
-              showErrorPanel={showErrorPanel}
-              sqlDialect={sqlDialect}
-              language={language}
-              databaseId={lab.selectedDS}
-              schemaId={lab.selectedSchema}
-              onErrorsChange={onErrorsChange}
-            />
+            <>
+              {lab.selectedDSType === "mongodb" && (
+                <MongoAggregationBuilder
+                  collectionName={lab.selectedTable}
+                  databaseName={lab.selectedSchema}
+                  fields={lab.allColumns}
+                  onApply={lab.setSql}
+                  onRun={(query) => {
+                    lab.setSql(query);
+                    lab.handleRun(query);
+                  }}
+                />
+              )}
+              <div className="min-h-0 flex-1">
+                <SQLEditor
+                  key={lab.activeTabId} // Re-mount when switching tabs to ensure clean state
+                  value={lab.sql}
+                  onChange={(val) => lab.setSql(val || "")}
+                  onPositionChange={lab.setCursorPos}
+                  onRun={lab.handleRun}
+                  onFormat={lab.handleFormat}
+                  onStop={lab.handleStop}
+                  onSave={lab.handleSave}
+                  tabSize={lab.tabSize}
+                  tables={lab.tables}
+                  columns={lab.autocompleteColumns as any}
+                  undoTrigger={lab.undoTrigger}
+                  redoTrigger={lab.redoTrigger}
+                  enableValidation={enableValidation}
+                  showErrorPanel={showErrorPanel}
+                  sqlDialect={sqlDialect}
+                  language={language}
+                  databaseId={lab.selectedDS}
+                  schemaId={lab.selectedSchema}
+                  onErrorsChange={onErrorsChange}
+                />
+              </div>
+            </>
           </Suspense>
         )}
         <Suspense fallback={<EditorLoadingSkeleton />}>
