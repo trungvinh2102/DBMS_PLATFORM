@@ -108,8 +108,32 @@ class ExecutionService(BaseDatabaseService):
              logger.error(f"Failed to save history: {ex}")
 
     def save_query(self, data: Dict[str, Any], session: Session) -> Dict[str, str]:
-        """Stores a named query in the user's library."""
+        """Creates or updates a named query in the user's library."""
         try:
+            query_id = data.get("id")
+            if query_id:
+                q = session.get(SavedQuery, query_id)
+                if not q:
+                    raise ValueError("Saved query not found")
+                if q.userId and data.get("userId") and q.userId != data["userId"]:
+                    raise ValueError("Saved query does not belong to the current user")
+
+                q.name = data.get("name") or q.name
+                if "description" in data:
+                    q.description = data.get("description")
+                q.sql = data["sql"]
+                q.databaseId = data["databaseId"]
+                if data.get("userId") and not q.userId:
+                    q.userId = data["userId"]
+                session.commit()
+                return {
+                    "id": q.id,
+                    "name": q.name,
+                    "description": q.description,
+                    "sql": q.sql,
+                    "databaseId": q.databaseId,
+                }
+
             q = SavedQuery(
                 id=str(uuid.uuid4()),
                 name=data['name'],
@@ -120,7 +144,13 @@ class ExecutionService(BaseDatabaseService):
             )
             session.add(q)
             session.commit()
-            return {"id": q.id, "name": q.name}
+            return {
+                "id": q.id,
+                "name": q.name,
+                "description": q.description,
+                "sql": q.sql,
+                "databaseId": q.databaseId,
+            }
         except Exception as e:
             logger.error(f"Failed to save query: {e}")
             raise

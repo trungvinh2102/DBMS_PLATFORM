@@ -50,6 +50,7 @@ class ExplainQueryResponse(BaseModel):
 
 
 class SaveQueryRequest(BaseModel):
+    id: Optional[str] = None
     sql: str
     name: str
     databaseId: str

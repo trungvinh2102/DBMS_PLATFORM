@@ -48,10 +48,16 @@ def get_history(databaseId: str | None = None, db: Session = Depends(get_db)):
         raise_http_error(exc, allow_not_found=False)
 
 @execution_bp.post('/save-query', response_model=SavedQueryResponse)
-def save_query(data: SaveQueryRequest, db: Session = Depends(get_db)):
+def save_query(
+    data: SaveQueryRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Saves a SQL query with a custom label for reuse or future reference."""
     try:
-        return execution_service.save_query(data.model_dump(exclude_none=True), db)
+        payload = data.model_dump(exclude_none=True)
+        payload["userId"] = current_user["userId"]
+        return execution_service.save_query(payload, db)
     except Exception as exc:
         raise_http_error(exc, allow_not_found=False)
 
