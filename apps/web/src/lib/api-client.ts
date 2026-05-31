@@ -256,7 +256,14 @@ export const workspaceApi = {
     req(api.get("workspace/git/diff", { params: { path } })),
   getGitHistory: (limit: number = 50) =>
     req(api.get("workspace/git/history", { params: { limit } })),
+  getGitCommit: (commitHash: string) =>
+    req(api.get(`workspace/git/commits/${commitHash}`)),
+  getGitCommitFileDiff: (commitHash: string, path: string) =>
+    req(api.get(`workspace/git/commits/${commitHash}/diff`, { params: { path } })),
   getGitWorktrees: () => req(api.get("workspace/git/worktrees")),
+  getGitBranches: () => req(api.get("workspace/git/branches")),
+  checkoutGitBranch: (data: { branch: string; create?: boolean; startPoint?: string }) =>
+    req(api.post("workspace/git/branches/checkout", data)),
   activateGitWorktree: (path: string) =>
     req(api.post("workspace/git/worktrees/activate", { path })),
   removeGitWorktree: (data: { path: string; force?: boolean }) =>

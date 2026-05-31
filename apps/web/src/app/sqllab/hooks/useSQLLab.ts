@@ -359,7 +359,6 @@ export function useSQLLab() {
       lastWorkspaceAutosaveRef.current = { path: loaded.path, content: loaded.content };
       updateActiveTab({ sql: loaded.content, scriptPath: loaded.path, workspaceBaseSql: loaded.content });
       renameTab(activeTabId, loaded.path.split("/").pop()?.replace(/\.sql$/i, "") || "script");
-      toast.success(`Loaded ${loaded.path}`);
     },
     setSelectedText: (txt: string) => { /* localized in ui trigger if needed */ },
     fixSQLError: ui.fixSQLError,

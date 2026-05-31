@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import subprocess
 import uuid
+import re
 from datetime import datetime, timezone
 from difflib import unified_diff
 from pathlib import Path
@@ -18,6 +19,9 @@ from models import SessionLocal, UserSetting, WorkspaceGitWorktree
 
 DEFAULT_WORKSPACE_NAME = "Local Workspace"
 DEFAULT_SCRIPTS_FOLDER = "sql"
+DEFAULT_GIT_COMMAND_TIMEOUT_SECONDS = 5
+GIT_HISTORY_TIMEOUT_SECONDS = 30
+GIT_NETWORK_TIMEOUT_SECONDS = 120
 
 
 class WorkspaceService:
@@ -215,6 +219,55 @@ class WorkspaceService:
         self.list_git_worktrees(user_id)
         return {"ok": True, "message": output or f"Removed worktree {target_path}"}
 
+    def list_git_branches(self, user_id: str) -> Dict[str, Any]:
+        """Return local and remote branches available to the selected workspace."""
+        root = Path(self.get_config(user_id)["rootPath"]).resolve()
+        if not self._is_git_repository(root):
+            return {"branches": [], "currentBranch": None}
+
+        current_branch = self._git_branch(root)
+        local_rows = self._git_branch_rows(root, remote=False)
+        remote_rows = self._git_branch_rows(root, remote=True)
+        local_names = {branch["name"] for branch in local_rows}
+        branches = local_rows + [
+            branch
+            for branch in remote_rows
+            if branch["name"] not in {"origin/HEAD"} and self._local_branch_name(branch["name"]) not in local_names
+        ]
+
+        return {"branches": branches, "currentBranch": current_branch}
+
+    def checkout_git_branch(
+        self,
+        user_id: str,
+        branch: str,
+        create: bool = False,
+        start_point: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Checkout an existing branch or create a branch from an optional start point."""
+        root = Path(self.get_config(user_id)["rootPath"]).resolve()
+        if not self._is_git_repository(root):
+            raise ValueError("Workspace root is not a Git repository")
+
+        branch_name = self._validated_branch_name(root, branch)
+        if create:
+            args = ["switch", "-c", branch_name]
+            if start_point:
+                args.append(self._validated_branch_name(root, start_point))
+        else:
+            local_names = {item["name"] for item in self._git_branch_rows(root, remote=False)}
+            remote_names = {item["name"] for item in self._git_branch_rows(root, remote=True)}
+            args = ["switch", branch_name]
+            if branch_name not in local_names and branch_name in remote_names:
+                args = ["switch", "--track", branch_name]
+
+        output = self._run_git(root, args, check=False).strip()
+        lowered = output.lower()
+        if "fatal:" in lowered or "error:" in lowered:
+            raise RuntimeError(output)
+
+        return {"ok": True, "message": output or f"Checked out {branch_name}"}
+
     def activate_git_worktree(self, user_id: str, path: str) -> Dict[str, Any]:
         """Make an existing worktree the active SQL project root."""
         target_path = Path(path).expanduser().resolve()
@@ -225,28 +278,30 @@ class WorkspaceService:
         self.list_git_worktrees(user_id)
         return self.get_config(user_id)
 
-    def get_git_history(self, user_id: str, limit: int = 50) -> Dict[str, Any]:
+    def get_git_history(self, user_id: str, limit: int = 0) -> Dict[str, Any]:
         """Return recent commits plus a compact text graph."""
         config = self.get_config(user_id)
         root = Path(config["rootPath"]).resolve()
         if not self._is_git_repository(root):
             return {"commits": [], "graph": ""}
 
-        safe_limit = max(1, min(limit, 100))
+        limit_arg = [f"-{min(limit, 5000)}"] if limit and limit > 0 else []
         graph = self._run_git(
             root,
-            ["log", f"-{safe_limit}", "--graph", "--decorate", "--oneline", "--all"],
+            ["log", *limit_arg, "--graph", "--decorate", "--oneline", "--all"],
             check=False,
+            timeout=GIT_HISTORY_TIMEOUT_SECONDS,
         )
         raw_commits = self._run_git(
             root,
             [
                 "log",
-                f"-{safe_limit}",
+                *limit_arg,
                 "--all",
                 "--pretty=format:%H%x1f%h%x1f%P%x1f%an%x1f%ar%x1f%s%x1f%D%x1e",
             ],
             check=False,
+            timeout=GIT_HISTORY_TIMEOUT_SECONDS,
         )
         if self._is_git_failure_output(graph):
             graph = ""
@@ -254,9 +309,10 @@ class WorkspaceService:
             raw_commits = ""
         commits = []
         for entry in [item for item in raw_commits.split("\x1e") if item.strip()]:
-            parts = entry.strip().split("\x1f")
-            if len(parts) < 7:
+            parts = entry.rstrip("\r\n").split("\x1f")
+            if len(parts) < 6:
                 continue
+            refs = parts[6] if len(parts) > 6 else ""
             commits.append(
                 {
                     "hash": parts[0],
@@ -265,11 +321,29 @@ class WorkspaceService:
                     "author": parts[3],
                     "relativeDate": parts[4],
                     "subject": parts[5],
-                    "refs": parts[6] or None,
+                    "refs": refs or None,
                 }
             )
 
         return {"commits": commits, "graph": graph}
+
+    def get_git_commit_detail(self, user_id: str, commit_hash: str) -> Dict[str, Any]:
+        """Return commit metadata and changed files for one commit."""
+        root = Path(self.get_config(user_id)["rootPath"]).resolve()
+        commit = self._git_commit_metadata(root, commit_hash)
+        files = self._git_commit_files(root, commit_hash)
+        return {**commit, "files": files}
+
+    def get_git_commit_file_diff(self, user_id: str, commit_hash: str, relative_path: str) -> Dict[str, Any]:
+        """Return a unified diff for one file inside one commit."""
+        root = Path(self.get_config(user_id)["rootPath"]).resolve()
+        self._validate_commit_hash(root, commit_hash)
+        safe_path = self._resolve_workspace_path(root, relative_path)
+        git_path = safe_path.relative_to(root).as_posix()
+        output = self._run_git(root, ["show", "--format=", "--find-renames", commit_hash, "--", git_path], check=False)
+        if self._is_git_failure_output(output):
+            raise RuntimeError(output)
+        return {"path": git_path, "diff": output, "isBinary": "Binary files" in output}
 
     def stage_git_paths(self, user_id: str, paths: List[str]) -> Dict[str, Any]:
         root, git_paths = self._validated_git_paths(user_id, paths)
@@ -305,7 +379,7 @@ class WorkspaceService:
             raise ValueError("Workspace root is not a Git repository")
         upstream = self._git_upstream(root)
         args = ["push"] if upstream else ["push", "-u", "origin", self._git_branch(root) or "HEAD"]
-        output = self._run_git(root, args, check=False).strip()
+        output = self._run_git(root, args, check=False, timeout=GIT_NETWORK_TIMEOUT_SECONDS).strip()
         if self._is_non_fast_forward_push(output):
             raise ValueError("Remote has new commits. Pull remote changes before pushing again.")
         if "fatal:" in output.lower() or "error:" in output.lower():
@@ -323,7 +397,7 @@ class WorkspaceService:
             raise ValueError("Cannot pull while the workspace is detached from a branch")
 
         args = ["pull", "--rebase", "--autostash"] if upstream else ["pull", "--rebase", "--autostash", "origin", branch]
-        output = self._run_git(root, args, check=False).strip()
+        output = self._run_git(root, args, check=False, timeout=GIT_NETWORK_TIMEOUT_SECONDS).strip()
         lowered = output.lower()
         if "conflict" in lowered or "could not apply" in lowered or "automatic merge failed" in lowered:
             raise RuntimeError("Pull stopped because Git found conflicts. Resolve the conflicts, then continue or abort the rebase.")
@@ -484,6 +558,125 @@ class WorkspaceService:
         if len(parts) != 2 or not all(part.isdigit() for part in parts):
             return 0, 0
         return int(parts[0]), int(parts[1])
+
+    def _git_branch_rows(self, root: Path, remote: bool = False) -> List[Dict[str, Any]]:
+        format_arg = "%(refname:short)%00%(HEAD)%00%(upstream:short)"
+        branch_args = ["branch", "--format", format_arg]
+        if remote:
+            branch_args.insert(1, "-r")
+        output = self._run_git(root, branch_args, check=False)
+        if self._is_git_failure_output(output):
+            return []
+
+        branches = []
+        for line in output.splitlines():
+            parts = line.split("\0")
+            if not parts or not parts[0]:
+                continue
+            branches.append(
+                {
+                    "name": parts[0],
+                    "isCurrent": len(parts) > 1 and parts[1] == "*",
+                    "isRemote": remote,
+                    "upstream": parts[2] if len(parts) > 2 and parts[2] else None,
+                }
+            )
+        return branches
+
+    def _validated_branch_name(self, root: Path, branch: str) -> str:
+        branch_name = branch.strip()
+        if not branch_name:
+            raise ValueError("Branch name is required")
+        output = self._run_git(root, ["check-ref-format", "--branch", branch_name], check=False).strip()
+        if self._is_git_failure_output(output):
+            raise ValueError("Branch name is invalid")
+        return branch_name
+
+    def _local_branch_name(self, branch: str) -> str:
+        return branch.split("/", 1)[1] if "/" in branch else branch
+
+    def _git_commit_metadata(self, root: Path, commit_hash: str) -> Dict[str, Any]:
+        self._validate_commit_hash(root, commit_hash)
+        raw_commit = self._run_git(
+            root,
+            ["show", "-s", "--pretty=format:%H%x1f%h%x1f%P%x1f%an%x1f%ar%x1f%s%x1f%D", commit_hash],
+            check=False,
+        ).rstrip("\r\n")
+        if self._is_git_failure_output(raw_commit):
+            raise RuntimeError(raw_commit)
+        parts = raw_commit.split("\x1f")
+        if len(parts) < 6:
+            raise RuntimeError("Unable to read commit metadata")
+        refs = parts[6] if len(parts) > 6 else ""
+        return {
+            "hash": parts[0],
+            "shortHash": parts[1],
+            "parents": [parent for parent in parts[2].split(" ") if parent],
+            "author": parts[3],
+            "relativeDate": parts[4],
+            "subject": parts[5],
+            "refs": refs or None,
+        }
+
+    def _git_commit_files(self, root: Path, commit_hash: str) -> List[Dict[str, Any]]:
+        self._validate_commit_hash(root, commit_hash)
+        raw_stats = self._run_git(root, ["show", "--numstat", "--format=", "--find-renames", commit_hash], check=False)
+        raw_names = self._run_git(root, ["show", "--name-status", "--format=", "--find-renames", commit_hash], check=False)
+        stats_by_path = self._parse_commit_numstat(raw_stats)
+        files = []
+        for line in raw_names.splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            status_code = parts[0]
+            if status_code.startswith("R") and len(parts) >= 3:
+                old_path, path = parts[1].replace("\\", "/"), parts[2].replace("\\", "/")
+            elif len(parts) >= 2:
+                old_path, path = None, parts[1].replace("\\", "/")
+            else:
+                continue
+            additions, deletions = stats_by_path.get(path, (0, 0))
+            files.append(
+                {
+                    "path": path,
+                    "oldPath": old_path,
+                    "status": self._describe_commit_file_status(status_code),
+                    "additions": additions,
+                    "deletions": deletions,
+                }
+            )
+        return files
+
+    def _parse_commit_numstat(self, raw_stats: str) -> Dict[str, tuple[int, int]]:
+        stats: Dict[str, tuple[int, int]] = {}
+        for line in raw_stats.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            additions = int(parts[0]) if parts[0].isdigit() else 0
+            deletions = int(parts[1]) if parts[1].isdigit() else 0
+            path = parts[-1].replace("\\", "/")
+            stats[path] = (additions, deletions)
+        return stats
+
+    def _describe_commit_file_status(self, status_code: str) -> str:
+        status = status_code[0]
+        if status == "A":
+            return "added"
+        if status == "D":
+            return "deleted"
+        if status == "R":
+            return "renamed"
+        if status == "C":
+            return "copied"
+        return "modified"
+
+    def _validate_commit_hash(self, root: Path, commit_hash: str) -> None:
+        if not re.fullmatch(r"[0-9a-fA-F]{4,40}", commit_hash):
+            raise ValueError("Invalid commit hash")
+        result = self._run_git(root, ["cat-file", "-e", f"{commit_hash}^{{commit}}"], check=False).strip()
+        if self._is_git_failure_output(result):
+            raise ValueError("Commit was not found in this workspace repository")
 
     def _git_status_by_path(self, root: Path) -> Dict[str, str]:
         status = {}
@@ -671,7 +864,13 @@ class WorkspaceService:
         finally:
             session.close()
 
-    def _run_git(self, root: Path, args: List[str], check: bool = True) -> str:
+    def _run_git(
+        self,
+        root: Path,
+        args: List[str],
+        check: bool = True,
+        timeout: int = DEFAULT_GIT_COMMAND_TIMEOUT_SECONDS,
+    ) -> str:
         try:
             completed = subprocess.run(
                 ["git", "-c", "i18n.logOutputEncoding=utf-8", "-c", "core.quotepath=false", "-C", str(root), *args],
@@ -680,11 +879,14 @@ class WorkspaceService:
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=5,
+                timeout=timeout,
             )
             return completed.stdout if check else f"{completed.stdout}{completed.stderr}"
         except FileNotFoundError as exc:
             raise RuntimeError("Git executable was not found on this machine") from exc
+        except subprocess.TimeoutExpired as exc:
+            command = "git " + " ".join(args[:2])
+            raise RuntimeError(f"{command} timed out after {timeout} seconds. Check your remote connection and try again.") from exc
 
     def _pick_folder_with_tkinter(self, initial_path: Optional[str]) -> Optional[str]:
         try:

@@ -12,6 +12,9 @@ from schemas.workspace import (
     WorkspaceFileList,
     WorkspaceGitActionPaths,
     WorkspaceGitActionResponse,
+    WorkspaceGitBranchCheckout,
+    WorkspaceGitBranchList,
+    WorkspaceGitCommitDetail,
     WorkspaceGitCommitRequest,
     WorkspaceFolderPickRequest,
     WorkspaceFolderPickResponse,
@@ -78,10 +81,28 @@ def get_workspace_git_diff(path: str, current_user: dict = Depends(get_current_u
 
 
 @workspace_bp.get("/git/history", response_model=WorkspaceGitHistory)
-def get_workspace_git_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
+def get_workspace_git_history(limit: int = 0, current_user: dict = Depends(get_current_user)):
     """Return recent commits and a compact commit graph for the workspace repository."""
     try:
         return workspace_service.get_git_history(current_user["userId"], limit=limit)
+    except Exception as exc:
+        raise_http_error(exc, allow_not_found=False)
+
+
+@workspace_bp.get("/git/commits/{commit_hash}", response_model=WorkspaceGitCommitDetail)
+def get_workspace_git_commit(commit_hash: str, current_user: dict = Depends(get_current_user)):
+    """Return files changed by one commit in the workspace repository."""
+    try:
+        return workspace_service.get_git_commit_detail(current_user["userId"], commit_hash)
+    except Exception as exc:
+        raise_http_error(exc, allow_not_found=False)
+
+
+@workspace_bp.get("/git/commits/{commit_hash}/diff", response_model=WorkspaceGitDiff)
+def get_workspace_git_commit_file_diff(commit_hash: str, path: str, current_user: dict = Depends(get_current_user)):
+    """Return a unified diff for one file at one commit."""
+    try:
+        return workspace_service.get_git_commit_file_diff(current_user["userId"], commit_hash, path)
     except Exception as exc:
         raise_http_error(exc, allow_not_found=False)
 
@@ -91,6 +112,29 @@ def get_workspace_git_worktrees(current_user: dict = Depends(get_current_user)):
     """Return worktrees attached to the selected workspace repository."""
     try:
         return workspace_service.list_git_worktrees(current_user["userId"])
+    except Exception as exc:
+        raise_http_error(exc, allow_not_found=False)
+
+
+@workspace_bp.get("/git/branches", response_model=WorkspaceGitBranchList)
+def get_workspace_git_branches(current_user: dict = Depends(get_current_user)):
+    """Return local and remote branches for the workspace Git repository."""
+    try:
+        return workspace_service.list_git_branches(current_user["userId"])
+    except Exception as exc:
+        raise_http_error(exc, allow_not_found=False)
+
+
+@workspace_bp.post("/git/branches/checkout", response_model=WorkspaceGitActionResponse)
+def checkout_workspace_git_branch(data: WorkspaceGitBranchCheckout, current_user: dict = Depends(get_current_user)):
+    """Checkout an existing branch or create a new branch in the workspace."""
+    try:
+        return workspace_service.checkout_git_branch(
+            current_user["userId"],
+            data.branch,
+            create=data.create,
+            start_point=data.startPoint,
+        )
     except Exception as exc:
         raise_http_error(exc, allow_not_found=False)
 

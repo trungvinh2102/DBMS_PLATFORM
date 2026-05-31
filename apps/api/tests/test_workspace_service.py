@@ -5,6 +5,7 @@ Regression tests for local SQL script workspace path safety and persistence.
 """
 
 from pathlib import Path
+import subprocess
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -195,6 +196,85 @@ def test_workspace_stage_commit_and_history_graph(tmp_path, monkeypatch):
     assert "Add revenue query" in history["graph"]
 
 
+def test_workspace_checkout_creates_and_switches_branch(tmp_path, monkeypatch):
+    service, _ = make_workspace_service(tmp_path, monkeypatch)
+    root = init_git_repo(service, tmp_path / "workspace")
+    service.update_config("user-1", {"rootPath": str(root), "initializeGit": True})
+    service._run_git(root, ["config", "user.email", "quriodb@example.local"])
+    service._run_git(root, ["config", "user.name", "QurioDB Test"])
+    service.save_script("user-1", "reports/revenue.sql", "SELECT 1;")
+    service.stage_git_paths("user-1", ["sql/reports/revenue.sql"])
+    service.commit_git_paths("user-1", "Add revenue query", [])
+    default_branch = service._git_branch(root)
+
+    created = service.checkout_git_branch("user-1", "feature/branch-picker", create=True)
+    feature_status = service.get_git_status("user-1")
+    switched = service.checkout_git_branch("user-1", default_branch)
+    branches = service.list_git_branches("user-1")
+
+    assert created["ok"] is True
+    assert feature_status["branch"] == "feature/branch-picker"
+    assert switched["ok"] is True
+    assert {item["name"] for item in branches["branches"]} >= {default_branch, "feature/branch-picker"}
+    assert branches["currentBranch"] == default_branch
+
+
+def test_workspace_checkout_rejects_invalid_branch_name(tmp_path, monkeypatch):
+    service, _ = make_workspace_service(tmp_path, monkeypatch)
+    root = init_git_repo(service, tmp_path / "workspace")
+    service.update_config("user-1", {"rootPath": str(root), "initializeGit": True})
+
+    try:
+        service.checkout_git_branch("user-1", "../bad branch", create=True)
+    except ValueError as exc:
+        assert "Branch name is invalid" in str(exc)
+    else:
+        raise AssertionError("Expected invalid branch names to be rejected")
+
+
+def test_workspace_git_history_keeps_commits_without_refs(tmp_path, monkeypatch):
+    service, _ = make_workspace_service(tmp_path, monkeypatch)
+    root = init_git_repo(service, tmp_path / "workspace")
+    service.update_config("user-1", {"rootPath": str(root), "initializeGit": True})
+    service._run_git(root, ["config", "user.email", "quriodb@example.local"])
+    service._run_git(root, ["config", "user.name", "QurioDB Test"])
+
+    service.save_script("user-1", "reports/base.sql", "SELECT 1;\n")
+    service.stage_git_paths("user-1", ["sql/reports/base.sql"])
+    service.commit_git_paths("user-1", "Add base query", [])
+    service.save_script("user-1", "reports/next.sql", "SELECT 2;\n")
+    service.stage_git_paths("user-1", ["sql/reports/next.sql"])
+    service.commit_git_paths("user-1", "Add next query", [])
+
+    history = service.get_git_history("user-1")
+    subjects = [commit["subject"] for commit in history["commits"]]
+
+    assert subjects == ["Add next query", "Add base query"]
+    assert history["commits"][1]["refs"] is None
+
+
+def test_workspace_commit_detail_lists_files_and_commit_diff(tmp_path, monkeypatch):
+    service, _ = make_workspace_service(tmp_path, monkeypatch)
+    root = init_git_repo(service, tmp_path / "workspace")
+    service.update_config("user-1", {"rootPath": str(root), "initializeGit": True})
+    service._run_git(root, ["config", "user.email", "quriodb@example.local"])
+    service._run_git(root, ["config", "user.name", "QurioDB Test"])
+    service.save_script("user-1", "reports/revenue.sql", "SELECT 1;\n")
+    service.stage_git_paths("user-1", ["sql/reports/revenue.sql"])
+    service.commit_git_paths("user-1", "Add revenue query", [])
+    commit_hash = service.get_git_history("user-1")["commits"][0]["hash"]
+
+    detail = service.get_git_commit_detail("user-1", commit_hash)
+    diff = service.get_git_commit_file_diff("user-1", commit_hash, "sql/reports/revenue.sql")
+
+    assert detail["hash"] == commit_hash
+    assert detail["files"][0]["path"] == "sql/reports/revenue.sql"
+    assert detail["files"][0]["status"] == "added"
+    assert detail["files"][0]["additions"] == 1
+    assert "+++ b/sql/reports/revenue.sql" in diff["diff"]
+    assert "+SELECT 1;" in diff["diff"]
+
+
 def test_workspace_pull_integrates_remote_changes_before_push(tmp_path, monkeypatch):
     service, _ = make_workspace_service(tmp_path, monkeypatch)
     remote = tmp_path / "remote.git"
@@ -234,6 +314,43 @@ def test_workspace_pull_integrates_remote_changes_before_push(tmp_path, monkeypa
     assert pulled["ok"] is True
     assert pushed["ok"] is True
     assert (root / "sql" / "reports" / "remote.sql").read_text(encoding="utf-8") == "SELECT 2;"
+
+
+def test_workspace_push_uses_network_timeout(tmp_path, monkeypatch):
+    service, _ = make_workspace_service(tmp_path, monkeypatch)
+    root = tmp_path / "workspace"
+    captured = {}
+
+    monkeypatch.setattr(service, "get_config", lambda _user_id: {"rootPath": str(root)})
+    monkeypatch.setattr(service, "_is_git_repository", lambda _root: True)
+    monkeypatch.setattr(service, "_git_upstream", lambda _root: "origin/main")
+
+    def fake_run(*_args, **kwargs):
+        captured["timeout"] = kwargs["timeout"]
+        return subprocess.CompletedProcess(args=kwargs, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(workspace_module.subprocess, "run", fake_run)
+
+    pushed = service.push_git("user-1")
+
+    assert pushed["ok"] is True
+    assert captured["timeout"] == workspace_module.GIT_NETWORK_TIMEOUT_SECONDS
+
+
+def test_workspace_git_timeout_error_is_readable(tmp_path, monkeypatch):
+    service, _ = make_workspace_service(tmp_path, monkeypatch)
+
+    def fake_run(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=["git", "push"], timeout=1)
+
+    monkeypatch.setattr(workspace_module.subprocess, "run", fake_run)
+
+    try:
+        service._run_git(tmp_path, ["push"], timeout=1)
+    except RuntimeError as exc:
+        assert "git push timed out after 1 seconds" in str(exc)
+    else:
+        raise AssertionError("Expected git timeout to be converted to RuntimeError")
 
 
 def test_workspace_worktree_list_syncs_metadata_rows(tmp_path, monkeypatch):

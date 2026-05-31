@@ -55,6 +55,7 @@ export function SQLLabEditorContainer({
             onClick={() => {
               lab.setShowAISidebar(false);
               lab.setGitPreviewPath(null);
+              lab.setGitPreviewCommitHash(null);
               setAiShowHistory(false);
               lab.setActiveTabId(tab.id);
             }}
@@ -94,6 +95,7 @@ export function SQLLabEditorContainer({
           onClick={() => {
             lab.setShowAISidebar(false);
             lab.setGitPreviewPath(null);
+            lab.setGitPreviewCommitHash(null);
             setAiShowHistory(false);
             lab.addTab();
           }}
@@ -108,6 +110,7 @@ export function SQLLabEditorContainer({
           onClick={() => {
             lab.setShowAISidebar(true);
             lab.setGitPreviewPath(null);
+            lab.setGitPreviewCommitHash(null);
             lab.setShowRightPanel(false);
           }}
           onKeyDown={(e) => {
@@ -115,6 +118,7 @@ export function SQLLabEditorContainer({
               e.preventDefault();
               lab.setShowAISidebar(true);
               lab.setGitPreviewPath(null);
+              lab.setGitPreviewCommitHash(null);
               lab.setShowRightPanel(false);
             }
           }}

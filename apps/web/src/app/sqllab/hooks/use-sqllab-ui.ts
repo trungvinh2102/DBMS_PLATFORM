@@ -27,6 +27,7 @@ export function useSQLLabUI() {
   const [fixSQLError, setFixSQLError] = useState<string | null>(null);
   const [queryLimit, setQueryLimit] = useState<number>(1000);
   const [gitPreviewPath, setGitPreviewPath] = useState<string | null>(null);
+  const [gitPreviewCommitHash, setGitPreviewCommitHash] = useState<string | null>(null);
 
   const toggleRightPanel = useCallback(() => setShowRightPanel(prev => !prev), []);
   const toggleAISidebar = useCallback(() => setShowAISidebar(prev => !prev), []);
@@ -78,5 +79,7 @@ export function useSQLLabUI() {
     setQueryLimit,
     gitPreviewPath,
     setGitPreviewPath,
+    gitPreviewCommitHash,
+    setGitPreviewCommitHash,
   };
 }

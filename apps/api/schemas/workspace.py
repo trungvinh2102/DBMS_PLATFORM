@@ -74,6 +74,24 @@ class WorkspaceGitActionResponse(BaseModel):
     message: str
 
 
+class WorkspaceGitBranch(BaseModel):
+    name: str
+    isCurrent: bool = False
+    isRemote: bool = False
+    upstream: Optional[str] = None
+
+
+class WorkspaceGitBranchList(BaseModel):
+    branches: List[WorkspaceGitBranch] = Field(default_factory=list)
+    currentBranch: Optional[str] = None
+
+
+class WorkspaceGitBranchCheckout(BaseModel):
+    branch: str = Field(min_length=1)
+    create: bool = False
+    startPoint: Optional[str] = None
+
+
 class WorkspaceGitWorktreeRemove(BaseModel):
     path: str = Field(min_length=1)
     force: bool = False
@@ -96,6 +114,18 @@ class WorkspaceGitCommit(BaseModel):
 class WorkspaceGitHistory(BaseModel):
     commits: List[WorkspaceGitCommit] = Field(default_factory=list)
     graph: str = ""
+
+
+class WorkspaceGitCommitFile(BaseModel):
+    path: str
+    oldPath: Optional[str] = None
+    status: str
+    additions: int = 0
+    deletions: int = 0
+
+
+class WorkspaceGitCommitDetail(WorkspaceGitCommit):
+    files: List[WorkspaceGitCommitFile] = Field(default_factory=list)
 
 
 class WorkspaceGitWorktree(BaseModel):
