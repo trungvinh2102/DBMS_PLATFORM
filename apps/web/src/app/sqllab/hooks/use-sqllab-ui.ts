@@ -4,9 +4,10 @@
  */
 
 import { useState, useCallback } from "react";
-import type { RightPanelMode, ResultTab, CursorPosition } from "../types";
+import type { LeftActivityView, RightPanelMode, ResultTab, CursorPosition } from "../types";
 
 export function useSQLLabUI() {
+  const [activeLeftView, setActiveLeftView] = useState<LeftActivityView>("database");
   const [activeRightTab, setActiveRightTab] = useState<string>("info");
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>("results");
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>("object");
@@ -25,6 +26,7 @@ export function useSQLLabUI() {
   const [isImportWizardOpen, setIsImportWizardOpen] = useState<boolean>(false);
   const [fixSQLError, setFixSQLError] = useState<string | null>(null);
   const [queryLimit, setQueryLimit] = useState<number>(1000);
+  const [gitPreviewPath, setGitPreviewPath] = useState<string | null>(null);
 
   const toggleRightPanel = useCallback(() => setShowRightPanel(prev => !prev), []);
   const toggleAISidebar = useCallback(() => setShowAISidebar(prev => !prev), []);
@@ -34,6 +36,8 @@ export function useSQLLabUI() {
 
   return {
     // Panel States
+    activeLeftView,
+    setActiveLeftView,
     activeRightTab,
     setActiveRightTab,
     activeResultTab,
@@ -72,5 +76,7 @@ export function useSQLLabUI() {
     setFixSQLError,
     queryLimit,
     setQueryLimit,
+    gitPreviewPath,
+    setGitPreviewPath,
   };
 }

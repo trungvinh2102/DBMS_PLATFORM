@@ -4,11 +4,9 @@
  */
 
 import {
-  Database,
-  FolderTree,
+  FolderGit2,
   Play,
   Square,
-  List,
   FileCode,
   Save,
   Undo2,
@@ -77,6 +75,11 @@ export function SQLLabToolbar() {
         icon={<FileCode className="h-4 w-4 text-orange-500" />}
         label="Open"
         onClick={lab.handleOpen}
+      />
+      <ToolbarButton
+        icon={<FolderGit2 className="h-4 w-4 text-emerald-600" />}
+        label="Workspace"
+        onClick={lab.handleWorkspace}
       />
 
       <div className="w-px h-6 bg-border/60 mx-1" />

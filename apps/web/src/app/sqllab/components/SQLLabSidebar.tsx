@@ -3,8 +3,10 @@
  * @description Sidebar component for SQL Lab, providing schema navigation, database selection, and search.
  */
 
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
+  Database,
   Table2,
   CalendarClock,
   FunctionSquare,
@@ -14,6 +16,8 @@ import {
   BadgeCheck,
   BriefcaseBusiness,
   GitBranch,
+  GitGraph,
+  GitPullRequest,
   HardDrive,
   KeyRound,
   Layers3,
@@ -26,6 +30,17 @@ import { SidebarFolder } from "./sidebar/SidebarFolder";
 import { getDBIcon } from "./sidebar/sidebar-utils";
 import { useSQLLabContext } from "../context/SQLLabContext";
 import { RedisKeyBrowser } from "./RedisKeyBrowser";
+import type { LeftActivityView } from "../types";
+import { cn } from "@/lib/utils";
+import { workspaceApi } from "@/lib/api-client";
+
+const WorkspaceSidebarPanel = lazy(() =>
+  import("./workspace/WorkspaceSidebarPanel").then((module) => ({ default: module.WorkspaceSidebarPanel })),
+);
+
+const preloadWorkspaceSidebarPanel = () => {
+  void import("./workspace/WorkspaceSidebarPanel");
+};
 
 /**
  * The main sidebar for the SQL Lab. Handles schema browsing and database selection.
@@ -34,6 +49,15 @@ export function SQLLabSidebar() {
   const lab = useSQLLabContext();
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
+  const gitStatusQuery = useQuery({
+    queryKey: ["workspaceGitStatus"],
+    queryFn: () => workspaceApi.getGitStatus(),
+    enabled: lab.activeLeftView !== "database",
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
+  });
 
   const filterList = (list?: string[]) =>
     list?.filter((item) =>
@@ -55,6 +79,7 @@ export function SQLLabSidebar() {
   const filteredExtensions = filterList(lab.extensions);
   const filteredSynonyms = filterList(lab.synonyms);
   const filteredJobs = filterList(lab.jobs);
+  const changeCount = gitStatusQuery.data?.changedCount ?? 0;
 
   const toggleFolder = (folder: string) => {
     setExpandedFolders((prev) =>
@@ -65,14 +90,32 @@ export function SQLLabSidebar() {
   };
 
   return (
-    <aside className="w-72 flex flex-col border-r bg-background shrink-0 shadow-sm z-10 font-sans">
-      <SQLLabSidebarHeader
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        getDBIcon={getDBIcon}
-      />
+    <aside className="flex shrink-0 border-r bg-background shadow-sm z-10 font-sans">
+      <nav className="flex w-12 shrink-0 flex-col items-center border-r bg-muted/50 py-2 text-muted-foreground dark:bg-muted/20">
+        <ActivityButton view="database" label="Databases" active={lab.activeLeftView === "database"} onClick={lab.setActiveLeftView} badge={0}>
+          <Database className="h-5 w-5" />
+        </ActivityButton>
+        <ActivityButton view="repo" label="Repository" active={lab.activeLeftView === "repo"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={0}>
+          <GitBranch className="h-5 w-5" />
+        </ActivityButton>
+        <ActivityButton view="changes" label="Source Control" active={lab.activeLeftView === "changes"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={changeCount}>
+          <GitPullRequest className="h-5 w-5" />
+        </ActivityButton>
+        <ActivityButton view="graph" label="Git Graph" active={lab.activeLeftView === "graph"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={0}>
+          <GitGraph className="h-5 w-5" />
+        </ActivityButton>
+      </nav>
 
-      <div className="flex-1 overflow-auto scrollbar-thin py-2">
+      <div className="flex w-72 min-w-0 flex-col">
+        {lab.activeLeftView === "database" ? (
+          <>
+            <SQLLabSidebarHeader
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              getDBIcon={getDBIcon}
+            />
+
+            <div className="flex-1 overflow-auto scrollbar-thin py-2">
         {lab.selectedDSType === "redis" && (
           <RedisKeyBrowser
             keys={filteredTables || []}
@@ -118,7 +161,7 @@ export function SQLLabSidebar() {
           onSelectItem={lab.setSelectedTable}
         />
 
-        {/* Triggers: Supported by SQLite, PostgreSQL, MySQL, MSSQL — NOT by DuckDB, ClickHouse */}
+        {/* Triggers: Supported by SQLite, PostgreSQL, MySQL, MSSQL - NOT by DuckDB, ClickHouse */}
         {lab.isRelational && !["clickhouse", "duckdb"].includes(lab.selectedDSType) && (
             <SidebarFolder
               id="triggers"
@@ -135,7 +178,7 @@ export function SQLLabSidebar() {
             />
         )}
 
-        {/* Events/Functions/Procedures: Only for full RDBMS (PostgreSQL, MySQL, MSSQL) — NOT for SQLite, DuckDB, ClickHouse */}
+        {/* Events/Functions/Procedures: Only for full RDBMS (PostgreSQL, MySQL, MSSQL) - NOT for SQLite, DuckDB, ClickHouse */}
         {lab.isRelational && !["clickhouse", "sqlite", "duckdb"].includes(lab.selectedDSType) && (
           <>
             <SidebarFolder
@@ -301,7 +344,73 @@ export function SQLLabSidebar() {
             />
           </>
         )}
+            </div>
+          </>
+        ) : (
+          <Suspense fallback={<WorkspacePanelSkeleton view={lab.activeLeftView} />}>
+            <WorkspaceSidebarPanel view={lab.activeLeftView} />
+          </Suspense>
+        )}
       </div>
     </aside>
+  );
+}
+
+function ActivityButton({
+  view,
+  label,
+  active,
+  badge,
+  children,
+  onClick,
+  onPreload,
+}: {
+  view: LeftActivityView;
+  label: string;
+  active: boolean;
+  badge: number;
+  children: React.ReactNode;
+  onClick: (view: LeftActivityView) => void;
+  onPreload?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(view)}
+      onFocus={onPreload}
+      onMouseEnter={onPreload}
+      className={cn(
+        "relative mb-1 grid h-10 w-10 place-items-center border-l-2 border-transparent transition-colors",
+        "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active && "border-l-primary bg-accent text-accent-foreground",
+      )}
+      aria-label={label}
+      title={label}
+    >
+      {children}
+      {badge > 0 ? (
+        <span className="absolute right-0 top-0 min-w-4 rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-primary-foreground shadow-sm">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function WorkspacePanelSkeleton({ view }: { view: LeftActivityView }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col" aria-label={`Loading ${view} panel`}>
+      <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
+        <div className="h-3 w-28 animate-pulse rounded bg-muted" />
+        <div className="h-7 w-7 animate-pulse rounded-md bg-muted" />
+      </div>
+      <div className="grid gap-3 p-3">
+        <div className="h-16 animate-pulse rounded-md border border-border/60 bg-muted/40" />
+        <div className="h-9 animate-pulse rounded-md bg-muted/50" />
+        <div className="h-9 animate-pulse rounded-md bg-muted/50" />
+        <div className="h-20 animate-pulse rounded-md border border-border/60 bg-muted/30" />
+        <div className="h-20 animate-pulse rounded-md border border-border/60 bg-muted/30" />
+      </div>
+    </div>
   );
 }

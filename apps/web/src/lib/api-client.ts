@@ -239,6 +239,40 @@ export const userApi = {
   changePassword: (data: any) => req(api.post("user/change-password", data)),
 };
 
+export const workspaceApi = {
+  get: () => req(api.get("workspace")),
+  update: (data: {
+    name?: string;
+    rootPath?: string;
+    scriptsFolder?: string;
+    initializeGit?: boolean;
+  }) => req(api.post("workspace", data)),
+  listScripts: () => req(api.get("workspace/scripts")),
+  pickFolder: (data: { initialPath?: string }) =>
+    req(api.post("workspace/pick-folder", data)),
+  listFiles: () => req(api.get("workspace/files")),
+  getGitStatus: () => req(api.get("workspace/git/status")),
+  getGitDiff: (path: string) =>
+    req(api.get("workspace/git/diff", { params: { path } })),
+  getGitHistory: (limit: number = 50) =>
+    req(api.get("workspace/git/history", { params: { limit } })),
+  getGitWorktrees: () => req(api.get("workspace/git/worktrees")),
+  activateGitWorktree: (path: string) =>
+    req(api.post("workspace/git/worktrees/activate", { path })),
+  removeGitWorktree: (data: { path: string; force?: boolean }) =>
+    req(api.post("workspace/git/worktrees/remove", data)),
+  stageGitPaths: (paths: string[]) => req(api.post("workspace/git/stage", { paths })),
+  unstageGitPaths: (paths: string[]) => req(api.post("workspace/git/unstage", { paths })),
+  commitGitPaths: (data: { message: string; paths?: string[] }) =>
+    req(api.post("workspace/git/commit", data)),
+  pushGit: () => req(api.post("workspace/git/push")),
+  pullGit: () => req(api.post("workspace/git/pull")),
+  readScript: (path: string) =>
+    req(api.get("workspace/scripts/read", { params: { path } })),
+  saveScript: (data: { path: string; content: string }) =>
+    req(api.post("workspace/scripts", data)),
+};
+
 export const aiApi = {
   getAIStatus: () => req(api.get("ai/status")),
   getModels: () => req(api.get("ai/models")),

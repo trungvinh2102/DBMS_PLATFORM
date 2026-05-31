@@ -14,6 +14,9 @@ export interface QueryTab {
   results: Record<string, unknown>[];
   columns: any[];
   error: string | null;
+  savedQueryId?: string;
+  scriptPath?: string;
+  workspaceBaseSql?: string;
 }
 
 export function useSQLLabTabs() {

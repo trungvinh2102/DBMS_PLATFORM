@@ -5,7 +5,7 @@
 
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { databaseApi } from "@/lib/api-client";
+import { databaseApi, workspaceApi } from "@/lib/api-client";
 import { toast } from "sonner";
 import { format } from "sql-formatter";
 
@@ -51,6 +51,28 @@ export function useSQLLabQuery({
     queryKey: ["savedQueries", selectedDS],
     queryFn: () => databaseApi.listSavedQueries(selectedDS),
     enabled: !!selectedDS,
+  });
+
+  const {
+    data: workspaceScripts,
+    refetch: refetchWorkspaceScripts,
+  } = useQuery({
+    queryKey: ["workspaceScripts"],
+    queryFn: () => workspaceApi.listScripts(),
+  });
+
+  const loadWorkspaceScriptMutation = useMutation({
+    mutationFn: (path: string) => workspaceApi.readScript(path),
+  });
+
+  const saveWorkspaceScriptMutation = useMutation({
+    mutationFn: (vars: { path: string; content: string }) =>
+      workspaceApi.saveScript(vars),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workspaceScripts"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaceGitStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaceGitDiff"] });
+    },
   });
 
   const handleRun = useCallback(
@@ -154,7 +176,11 @@ export function useSQLLabQuery({
     runSQLMutation,
     explainSQLMutation,
     saveQueryMutation,
+    saveWorkspaceScriptMutation,
+    loadWorkspaceScriptMutation,
     savedQueries: (savedQueries as any[]) || [],
     refetchSavedQueries,
+    workspaceScripts,
+    refetchWorkspaceScripts,
   };
 }

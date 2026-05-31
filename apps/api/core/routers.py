@@ -17,6 +17,7 @@ from routes.metadata_routes import metadata_bp
 from routes.rag import router as rag_router
 from routes.schema_diff_routes import schema_diff_bp
 from routes.user import user_bp
+from routes.workspace_routes import workspace_bp
 
 
 def register_routers(app: FastAPI) -> None:
@@ -27,6 +28,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(schema_diff_bp, prefix="/api/database")
     app.include_router(auth_bp, prefix="/api/auth")
     app.include_router(user_bp, prefix="/api/user")
+    app.include_router(workspace_bp, prefix="/api/workspace")
     app.include_router(ai_bp, prefix="/api/ai")
     app.include_router(ai_config_bp, prefix="/api/ai-config")
     app.include_router(rag_router, prefix="/api/rag")

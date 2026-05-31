@@ -12,6 +12,9 @@ export interface SQLLabTab {
   results: any[];
   columns: any[];
   error: any | null;
+  savedQueryId?: string;
+  scriptPath?: string;
+  workspaceBaseSql?: string;
 }
 
 export interface SyntaxError {
@@ -20,6 +23,8 @@ export interface SyntaxError {
   message: string;
   severity: "error" | "warning";
 }
+
+export type LeftActivityView = "database" | "repo" | "changes" | "graph";
 
 export type RightPanelMode = "object" | "history" | "schema";
 
