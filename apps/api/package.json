@@ -2,6 +2,6 @@
   "name": "api",
   "private": true,
   "scripts": {
-    "dev": "venv/Scripts/python app.py"
+    "dev": "sh -c 'if [ -x venv/bin/python ]; then venv/bin/python app.py; else venv/Scripts/python app.py; fi'"
   }
 }

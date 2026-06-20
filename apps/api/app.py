@@ -56,4 +56,7 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "127.0.0.1")
-    uvicorn.run("app:app", host=host, port=port, reload=False)
+    # Pass the app object directly (not the "app:app" import string): the
+    # PyInstaller-frozen sidecar has no importable `app` module, so an import
+    # string raises "Could not import module 'app'" and uvicorn never binds.
+    uvicorn.run(app, host=host, port=port, reload=False)

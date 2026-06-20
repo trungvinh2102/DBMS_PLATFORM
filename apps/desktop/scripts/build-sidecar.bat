@@ -20,9 +20,9 @@ pip install pyinstaller --quiet
 
 :: Build with PyInstaller
 echo [2/4] Running PyInstaller...
-if exist "api-%TARGET_TRIPLE%.spec" (
+if exist "specs\api-%TARGET_TRIPLE%.spec" (
     echo Using existing spec file...
-    pyinstaller "api-%TARGET_TRIPLE%.spec" --noconfirm
+    pyinstaller "specs\api-%TARGET_TRIPLE%.spec" --noconfirm
 ) else (
     echo Using default options...
     pyinstaller --onefile --name api-%TARGET_TRIPLE% app.py --noconfirm
