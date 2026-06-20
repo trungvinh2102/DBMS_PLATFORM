@@ -288,16 +288,14 @@ export function SQLLabDataTable({
                           isEditing && "p-0",
                         )}
                         title={isEditing ? "" : displayValue(val)}
-                        onDoubleClick={() => {
+                        onClick={() => {
                           if (isObject) {
                             setSelectedJson({ key: col, value: val });
                           }
                         }}
-                        onClick={() => {
-                          if (isColumnEditable(col)) {
-                            if (!isObject) {
-                              setEditingCell({ rowIndex: row._originalIndex, colName: col });
-                            }
+                        onDoubleClick={() => {
+                          if (isColumnEditable(col) && !isObject) {
+                            setEditingCell({ rowIndex: row._originalIndex, colName: col });
                           }
                         }}
                       >
