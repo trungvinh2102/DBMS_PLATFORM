@@ -7,7 +7,7 @@
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:3001",
     "beforeDevCommand": "cd ../web && bun dev",
-    "beforeBuildCommand": "cd ../web && set NODE_OPTIONS=--max-old-space-size=8192 && bun run build"
+    "beforeBuildCommand": "cd ../web && bunx cross-env NODE_OPTIONS=--max-old-space-size=8192 bun run build"
   },
   "app": {
     "windows": [
