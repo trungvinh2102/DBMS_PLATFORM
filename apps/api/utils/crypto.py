@@ -13,12 +13,18 @@ from cryptography.hazmat.primitives import padding
 
 from typing import Optional
 
-# Configuration from environment or defaults matching Node.js implementation
+# Default must match the frontend crypto default (apps/web/src/lib/crypto.ts)
+# and apps/api/.env so secrets encrypted in one context decrypt in another —
+# notably the packaged desktop sidecar, which runs frozen without .env loaded
+# and so falls back to this default instead of JWT_SECRET.
+DEFAULT_SECRET = "supersecret123"
+
+
 def get_secret(secret: Optional[str] = None) -> str:
     """Gets the secret key, falling back to environment variable if not provided."""
     if secret is not None:
         return secret
-    return os.getenv("JWT_SECRET", "fallback-secret-key-must-be-secure")
+    return os.getenv("JWT_SECRET", DEFAULT_SECRET)
 
 def get_key(secret: str) -> bytes:
     """Derives a 32-byte key from a secret string using scrypt."""
