@@ -49,9 +49,13 @@ async fn wait_for_backend_ready() -> bool {
 fn spawn_backend_sidecar(app: &tauri::AppHandle) -> Result<CommandChild, String> {
     let shell = app.shell();
 
+    // Desktop is a single-user local app: disable backend auth so the API
+    // serves the mock admin user (see apps/api/utils/auth_middleware.py
+    // DISABLE_AUTH) instead of requiring login.
     let (mut rx, child) = shell
         .sidecar("api")
         .map_err(|e| format!("Failed to create sidecar command: {}", e))?
+        .env("DISABLE_AUTH", "true")
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 

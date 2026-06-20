@@ -23,7 +23,18 @@ else
   exit 1
 fi
 
-PYTHON="${PYTHON:-python3}"
+# Prefer the api venv interpreter (it has deps + pyinstaller and avoids the
+# system "externally-managed-environment" pip error). Override with PYTHON=...
+if [ -n "${PYTHON:-}" ]; then
+  : # caller-provided, respect it
+elif [ -x "$API_DIR/venv/bin/python" ]; then
+  PYTHON="$API_DIR/venv/bin/python"      # Linux/macOS venv
+elif [ -x "$API_DIR/venv/Scripts/python.exe" ]; then
+  PYTHON="$API_DIR/venv/Scripts/python.exe"  # Windows venv (Git Bash)
+else
+  PYTHON="python3"
+fi
+echo "  python        : $PYTHON"
 
 echo "==========================================="
 echo "Building Python backend sidecar"

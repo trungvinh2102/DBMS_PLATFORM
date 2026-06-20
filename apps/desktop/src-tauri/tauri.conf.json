@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../../web/dist",
     "devUrl": "http://localhost:3001",
-    "beforeDevCommand": "cd ../web && bun dev",
-    "beforeBuildCommand": "cd ../web && bunx cross-env NODE_OPTIONS=--max-old-space-size=8192 bun run build"
+    "beforeDevCommand": "cd ../web && bunx cross-env VITE_DISABLE_AUTH=true bun dev",
+    "beforeBuildCommand": "cd ../web && bunx cross-env NODE_OPTIONS=--max-old-space-size=8192 VITE_DISABLE_AUTH=true bun run build"
   },
   "app": {
     "windows": [
