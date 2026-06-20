@@ -6,7 +6,7 @@ Pydantic request and response schemas for database connection endpoints.
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConnectionBaseRequest(BaseModel):
@@ -31,6 +31,10 @@ class UpdateDatabaseRequest(ConnectionBaseRequest):
 
 
 class TestConnectionRequest(BaseModel):
+    # Frontend may send connection fields flat (host/port/user/...) instead of
+    # nested under `config`; keep extras so the service fallback can read them.
+    model_config = ConfigDict(extra="allow")
+
     id: Optional[str] = None
     type: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
