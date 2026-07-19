@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-QurioDB — desktop-first DB management + analytics platform. Bun/Turbo monorepo, three apps. **Desktop (Tauri) is the priority target**, not web. Every backend/frontend change must be evaluated for desktop-packaged impact (sidecar packaging, health checks, API URL resolution, shutdown). See `AGENTS.md` and `Project-Context.md` for full product/architecture context — read them before non-trivial product, backend, or desktop work.
+QurioDB — desktop-first DB management + analytics platform. Bun/Turbo monorepo, three apps. **Desktop (Tauri) is the priority target**, not web. Every backend/frontend change must be evaluated for desktop-packaged impact (sidecar packaging, health checks, API URL resolution, shutdown). See `AGENTS.md` for full product/architecture context — read it before non-trivial product, backend, or desktop work.
 
 ## Apps
 

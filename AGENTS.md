@@ -10,7 +10,6 @@ The most important product target is the desktop application. The desktop app is
 
 Before making product, architecture, UI, backend, or desktop changes, read:
 
-- `Project-Context.md`
 - `README.md`
 - Relevant `.codex/rules/*`
 
