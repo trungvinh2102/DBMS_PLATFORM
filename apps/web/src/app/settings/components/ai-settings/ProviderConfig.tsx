@@ -15,23 +15,37 @@ interface ProviderConfigProps {
   setApiKey: (val: string) => void;
   provider: string;
   setProvider: (val: string) => void;
+  baseUrl: string;
+  setBaseUrl: (val: string) => void;
   onSave: () => void;
   onReveal: () => void;
   isSaving: boolean;
   isRevealing?: boolean;
 }
 
-export function ProviderConfig({ 
-  apiKey, 
-  setApiKey, 
-  provider, 
-  setProvider, 
+// Providers that route through an OpenAI-compatible gateway and accept a custom base URL.
+const BASE_URL_PROVIDERS: Record<string, string> = {
+  "9router": "http://127.0.0.1:20128/v1",
+  qwen: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+  deepseek: "https://api.deepseek.com",
+};
+
+export function ProviderConfig({
+  apiKey,
+  setApiKey,
+  provider,
+  setProvider,
+  baseUrl,
+  setBaseUrl,
   onSave,
   onReveal,
   isSaving,
   isRevealing = false
 }: ProviderConfigProps) {
   const [showKey, setShowKey] = useState(false);
+  const normalizedProvider = provider.trim().toLowerCase();
+  const supportsBaseUrl = normalizedProvider in BASE_URL_PROVIDERS;
+  const defaultBaseUrl = BASE_URL_PROVIDERS[normalizedProvider] ?? "";
 
   const handleToggleReveal = () => {
     if (!showKey && apiKey === "********") {
@@ -70,6 +84,7 @@ export function ProviderConfig({
                 <SelectItem value="Anthropic" className="py-2.5">Anthropic Claude</SelectItem>
                 <SelectItem value="Qwen" className="py-2.5">Qwen</SelectItem>
                 <SelectItem value="DeepSeek" className="py-2.5">DeepSeek</SelectItem>
+                <SelectItem value="9router" className="py-2.5">9router (OpenAI-compatible)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -102,6 +117,25 @@ export function ProviderConfig({
             </div>
           </div>
         </div>
+
+        {supportsBaseUrl && (
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-foreground ml-1">Base URL (optional)</label>
+            <div className="relative">
+              <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
+              <Input
+                type="text"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder={defaultBaseUrl}
+                className="rounded-xl border-border/40 bg-muted/20 h-12 pl-11 font-mono text-sm focus-visible:ring-primary/20 transition-all hover:bg-muted/30"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground/70 ml-1">
+              Leave blank to use the default endpoint <span className="font-mono">{defaultBaseUrl}</span>.
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/10 border border-dashed border-border/60">
           <div className="flex items-center gap-3">

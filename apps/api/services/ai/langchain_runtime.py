@@ -8,6 +8,7 @@ and message conversion so route/service code can stay focused on product logic.
 
 import logging
 import os
+import re
 from typing import Any, Dict, Iterable, List, Optional
 
 try:
@@ -60,6 +61,9 @@ DEFAULT_LANGSMITH_PROJECT = "QurioDB AI Assistant"
 OPENAI_COMPATIBLE_BASE_URLS = {
     "deepseek": "https://api.deepseek.com",
     "qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    # 9router is a local OpenAI-compatible gateway (https://github.com/decolua/9router)
+    # exposing one /v1 endpoint that fans out to 40+ upstream providers.
+    "9router": "http://127.0.0.1:20128/v1",
 }
 DEFAULT_PROVIDER_MODELS = {
     "openai": "gpt-4o-mini",
@@ -67,6 +71,7 @@ DEFAULT_PROVIDER_MODELS = {
     "anthropic": "claude-3-5-haiku-latest",
     "qwen": "qwen-plus",
     "deepseek": "deepseek-chat",
+    "9router": "cc/claude-sonnet-4.5",
 }
 SUPPORTED_PROVIDERS = tuple(DEFAULT_PROVIDER_MODELS.keys())
 
@@ -107,13 +112,14 @@ def _read_provider_ai_config(provider: str, user_id: Optional[str] = None) -> Di
             return {
                 "api_key": decrypt_key(config.apiKey) if config.apiKey else None,
                 "provider": config.provider,
+                "base_url": (getattr(config, "baseUrl", None) or "").strip() or None,
             }
     except Exception as exc:
         logger.warning("Failed to load %s AI key from DB: %s", normalized_provider, exc)
     finally:
         session.close()
 
-    return {"api_key": None, "provider": None}
+    return {"api_key": None, "provider": None, "base_url": None}
 
 
 def get_ai_api_key(user_id: Optional[str] = None, provider: Optional[str] = None) -> Optional[str]:
@@ -129,6 +135,18 @@ def get_ai_api_key(user_id: Optional[str] = None, provider: Optional[str] = None
     return None
 
 
+def resolve_base_url(provider: str, user_id: Optional[str] = None) -> Optional[str]:
+    """Resolves the OpenAI-compatible base URL: DB override, then env, then default."""
+    normalized_provider = normalize_provider(provider)
+    db_base_url = _read_provider_ai_config(normalized_provider, user_id).get("base_url")
+    if db_base_url:
+        return db_base_url
+
+    # Sanitize provider into a valid env-var name ("9router" -> "_9ROUTER_BASE_URL").
+    env_key = re.sub(r"\W|^(?=\d)", "_", normalized_provider.upper()) + "_BASE_URL"
+    return os.getenv(env_key) or OPENAI_COMPATIBLE_BASE_URLS.get(normalized_provider)
+
+
 def normalize_provider(provider: Optional[str]) -> str:
     """Normalizes provider labels from UI, DB, and model names."""
     value = (provider or "Google").strip().lower()
@@ -139,6 +157,8 @@ def normalize_provider(provider: Optional[str]) -> str:
         "claude": "anthropic",
         "anthripic": "anthropic",
         "alibaba qwen": "qwen",
+        "9 router": "9router",
+        "ninerouter": "9router",
     }
     return aliases.get(value, value)
 
@@ -325,8 +345,8 @@ class LangChainRuntime:
                 raise RuntimeError("Anthropic integration is not installed")
             return ChatAnthropic(api_key=api_key, **kwargs)
 
-        if target_provider in {"qwen", "deepseek"}:
-            base_url = os.getenv(f"{target_provider.upper()}_BASE_URL") or OPENAI_COMPATIBLE_BASE_URLS[target_provider]
+        if target_provider in OPENAI_COMPATIBLE_BASE_URLS:
+            base_url = resolve_base_url(target_provider, user_id)
             return ChatOpenAI(api_key=api_key, base_url=base_url, **kwargs)
 
         return ChatOpenAI(api_key=api_key, **kwargs)

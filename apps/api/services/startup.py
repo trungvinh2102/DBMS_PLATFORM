@@ -32,6 +32,7 @@ def setup_database():
         session = SessionLocal()
         seed_roles(session, Role)
         seed_default_admin(session, Role, User)
+        reclaim_desktop_admin_owned_rows(session, User)
         seed_ai_router_terms(session)
         session.commit()
         print("Backend: Database setup complete.")
@@ -77,6 +78,51 @@ def seed_default_admin(session, role_model, user_model):
     print("Backend: Default admin user created (admin / password123)")
 
 
+LEGACY_DESKTOP_ADMIN_ID = "desktop-admin-id"
+
+
+def reclaim_desktop_admin_owned_rows(session, user_model):
+    """Re-point rows saved under the legacy fictional desktop-admin id.
+
+    Early DISABLE_AUTH builds attributed user-owned rows (AI provider keys) to a
+    constant 'desktop-admin-id' that never existed in the users table, so those
+    rows became invisible once auth resolved the real admin. Move them onto the
+    actual admin/first user so a single re-point heals existing desktop installs.
+    """
+    from models import UserAIConfig
+
+    admin = (
+        session.query(user_model).filter(user_model.username == "admin").first()
+        or session.query(user_model).order_by(user_model.created_on.asc()).first()
+    )
+    if not admin or admin.id == LEGACY_DESKTOP_ADMIN_ID:
+        return
+
+    orphans = (
+        session.query(UserAIConfig)
+        .filter(UserAIConfig.userId == LEGACY_DESKTOP_ADMIN_ID)
+        .all()
+    )
+    for config in orphans:
+        existing = (
+            session.query(UserAIConfig)
+            .filter(
+                UserAIConfig.userId == admin.id,
+                UserAIConfig.provider == config.provider,
+            )
+            .first()
+        )
+        # Avoid violating the (userId, provider) unique index: drop the legacy
+        # duplicate when the real admin already configured the same provider.
+        if existing:
+            session.delete(config)
+        else:
+            config.userId = admin.id
+
+    if orphans:
+        print(f"Backend: Reclaimed {len(orphans)} desktop AI config row(s) for admin.")
+
+
 def seed_ai_router_terms(session):
     """Create configurable AI router keyword defaults for first-run routing."""
     from services.ai.router_terms import router_term_service
@@ -93,6 +139,8 @@ def migrate_user_ai_configs_for_provider_keys(engine):
         if not _sqlite_table_exists(connection, "user_ai_configs"):
             return
 
+        _ensure_user_ai_configs_base_url_column(connection)
+
         index_columns = _sqlite_unique_index_columns(connection, "user_ai_configs")
         has_user_only_unique = ["userId"] in index_columns
         has_user_provider_unique = ["userId", "provider"] in index_columns
@@ -108,6 +156,16 @@ def migrate_user_ai_configs_for_provider_keys(engine):
                 ON user_ai_configs ("userId", provider)
                 """
             )
+
+
+def _ensure_user_ai_configs_base_url_column(connection):
+    """Add the optional baseUrl column to legacy SQLite metadata DBs."""
+    columns = [
+        row[1]
+        for row in connection.exec_driver_sql("PRAGMA table_info('user_ai_configs')").fetchall()
+    ]
+    if "baseUrl" not in columns:
+        connection.exec_driver_sql('ALTER TABLE user_ai_configs ADD COLUMN "baseUrl" VARCHAR')
 
 
 def _sqlite_table_exists(connection, table_name: str) -> bool:
@@ -143,6 +201,7 @@ def _rebuild_user_ai_configs_without_user_unique(connection):
             "userId" VARCHAR NOT NULL,
             "apiKey" VARCHAR NOT NULL,
             provider VARCHAR,
+            "baseUrl" VARCHAR,
             created_on DATETIME,
             changed_on DATETIME,
             PRIMARY KEY (id),
@@ -152,8 +211,8 @@ def _rebuild_user_ai_configs_without_user_unique(connection):
     )
     connection.exec_driver_sql(
         """
-        INSERT INTO user_ai_configs (id, "userId", "apiKey", provider, created_on, changed_on)
-        SELECT id, "userId", "apiKey", COALESCE(provider, 'Google'), created_on, changed_on
+        INSERT INTO user_ai_configs (id, "userId", "apiKey", provider, "baseUrl", created_on, changed_on)
+        SELECT id, "userId", "apiKey", COALESCE(provider, 'Google'), "baseUrl", created_on, changed_on
         FROM user_ai_configs_legacy
         """
     )

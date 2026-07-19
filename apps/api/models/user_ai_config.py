@@ -21,5 +21,8 @@ class UserAIConfig(Base):
     userId = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     apiKey = Column(String, nullable=False)
     provider = Column(String, default="Google")
+    # Optional override for OpenAI-compatible gateways (e.g. 9router). Blank/None
+    # falls back to the provider env var, then the built-in default base URL.
+    baseUrl = Column(String, nullable=True)
     created_on = Column(DateTime, default=datetime.datetime.utcnow)
     changed_on = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

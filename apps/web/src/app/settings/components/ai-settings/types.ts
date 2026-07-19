@@ -24,6 +24,7 @@ export interface NewAIModel {
 export interface AIConfig {
   apiKey: string;
   provider: string;
+  baseUrl?: string;
 }
 
 export interface AITaskCatalogItem {

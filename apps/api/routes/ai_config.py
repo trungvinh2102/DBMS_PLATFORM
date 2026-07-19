@@ -20,6 +20,7 @@ cipher = Fernet(MASTER_KEY.encode())
 class SaveConfigRequest(BaseModel):
     apiKey: str
     provider: str = "Google"
+    baseUrl: Optional[str] = None
 
 
 def _provider_matches(config_provider: str, requested_provider: str) -> bool:
@@ -29,6 +30,8 @@ def _provider_matches(config_provider: str, requested_provider: str) -> bool:
         "claude": "anthropic",
         "anthropic": "anthropic",
         "alibaba qwen": "qwen",
+        "9 router": "9router",
+        "ninerouter": "9router",
     }
     config_value = (config_provider or "Google").strip().lower()
     requested_value = (requested_provider or "Google").strip().lower()
@@ -54,7 +57,7 @@ def get_config(
             session.query(UserAIConfig).filter(UserAIConfig.userId == user_id).first()
         )
         if not config:
-            return {'apiKey': None, 'provider': requested_provider}
+            return {'apiKey': None, 'provider': requested_provider, 'baseUrl': ''}
         
         api_key = '********'
         if reveal and config.apiKey:
@@ -65,7 +68,8 @@ def get_config(
                 
         return {
             'apiKey': api_key,
-            'provider': config.provider
+            'provider': config.provider,
+            'baseUrl': getattr(config, 'baseUrl', None) or ''
         }
     finally:
         session.close()
@@ -75,31 +79,35 @@ def save_config(data: SaveConfigRequest, current_user: dict = Depends(get_curren
     user_id = current_user.get('userId')
     api_key = data.apiKey
     provider = (data.provider or "Google").strip()
-    
+    base_url = (data.baseUrl or "").strip() or None
+
     if not api_key:
         raise HTTPException(status_code=400, detail='API Key is required')
-        
+
     session = SessionLocal()
     try:
         if api_key == '********':
             config = _find_config(session, user_id, provider)
             if config:
+                config.baseUrl = base_url
                 session.commit()
                 return {'message': 'Config updated successfully'}
             raise HTTPException(status_code=400, detail='No existing config to update')
 
         encrypted_key = cipher.encrypt(api_key.encode()).decode()
-        
+
         config = _find_config(session, user_id, provider)
         if config:
             config.apiKey = encrypted_key
             config.provider = provider
+            config.baseUrl = base_url
         else:
             config = UserAIConfig(
                 id=str(uuid.uuid4()),
                 userId=user_id,
                 apiKey=encrypted_key,
-                provider=provider
+                provider=provider,
+                baseUrl=base_url
             )
             session.add(config)
         session.commit()

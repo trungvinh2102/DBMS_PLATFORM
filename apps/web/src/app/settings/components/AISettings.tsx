@@ -37,6 +37,7 @@ export function AISettings() {
   // State for Provider Config
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState("Google");
+  const [baseUrl, setBaseUrl] = useState("");
 
   // State for Add Model Form
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -77,12 +78,13 @@ export function AISettings() {
     if (configQuery.data) {
       setApiKey(configQuery.data.apiKey || "");
       setProvider(configQuery.data.provider || "Google");
+      setBaseUrl(configQuery.data.baseUrl || "");
     }
   }, [configQuery.data]);
 
   // Mutation: Save Provider Config
   const saveConfigMutation = useMutation({
-    mutationFn: (data: { apiKey: string; provider: string }) => aiApi.saveAIConfig(data),
+    mutationFn: (data: { apiKey: string; provider: string; baseUrl?: string }) => aiApi.saveAIConfig(data),
     onSuccess: () => {
       toast.success("AI Configuration saved to ecosystem.");
       queryClient.invalidateQueries({ queryKey: ["ai-config", provider] });
@@ -93,14 +95,15 @@ export function AISettings() {
 
   const handleSaveConfig = useCallback(async () => {
     if (!apiKey) return; // Don't save if empty (or show error if triggered manually)
-    await saveConfigMutation.mutateAsync({ apiKey, provider });
-  }, [apiKey, provider, saveConfigMutation]);
+    await saveConfigMutation.mutateAsync({ apiKey, provider, baseUrl });
+  }, [apiKey, provider, baseUrl, saveConfigMutation]);
 
   const handleReset = useCallback(() => {
     // Reset local state to what's currently in the backend
     if (configQuery.data) {
       setApiKey(configQuery.data.apiKey || "");
       setProvider(configQuery.data.provider || "Google");
+      setBaseUrl(configQuery.data.baseUrl || "");
     }
     toast.info("AI settings restored to last sync");
   }, [configQuery.data]);
@@ -205,6 +208,8 @@ export function AISettings() {
             setApiKey={setApiKey}
             provider={provider}
             setProvider={setProvider}
+            baseUrl={baseUrl}
+            setBaseUrl={setBaseUrl}
             onSave={handleSaveConfig}
             onReveal={() => revealKeyMutation.mutate()}
             isSaving={saveConfigMutation.isPending}

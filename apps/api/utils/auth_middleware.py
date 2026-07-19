@@ -17,13 +17,36 @@ ALGORITHM = "HS256"
 # Flag to bypass all auth/permission checks for Desktop/local mode
 DISABLE_AUTH = str(os.getenv("DISABLE_AUTH", "false")).lower() == "true"
 
-# Mock Admin user for DISABLE_AUTH mode
+# Fallback identity for DISABLE_AUTH mode when the metadata DB has no users yet.
 MOCK_ADMIN = {
     'userId': 'desktop-admin-id',
     'email': 'admin@quriodb.local',
     'role': 'Admin',
     'username': 'admin'
 }
+
+
+def resolve_desktop_admin(db: Session) -> dict:
+    """Return the real seeded admin identity for single-user desktop mode.
+
+    DISABLE_AUTH must bind to the same userId that owns persisted rows (AI keys,
+    connections). Using a fictional id desyncs data written under DISABLE_AUTH
+    from data written via real JWT auth, so prefer the actual admin/first user
+    in the DB and only fall back to MOCK_ADMIN before the seed runs.
+    """
+    user = (
+        db.query(User).filter(User.username == "admin").first()
+        or db.query(User).order_by(User.created_on.asc()).first()
+    )
+    if not user:
+        return MOCK_ADMIN
+    return {
+        'userId': user.id,
+        'email': user.email,
+        'role': MOCK_ADMIN['role'],
+        'username': user.username,
+    }
+
 
 security = HTTPBearer(auto_error=False)
 
@@ -33,8 +56,8 @@ def get_current_user(
     auth: HTTPAuthorizationCredentials = Security(security),
 ):
     if DISABLE_AUTH:
-        return MOCK_ADMIN
-        
+        return resolve_desktop_admin(db)
+
     token = None
     if auth:
         token = auth.credentials
