@@ -287,7 +287,7 @@ export function SQLEditor({
             acceptSuggestionOnCommitCharacter: false,
             suggestOnTriggerCharacters: true,
             quickSuggestions: {
-              other: false,
+              other: true,
               comments: false,
               strings: false,
             },

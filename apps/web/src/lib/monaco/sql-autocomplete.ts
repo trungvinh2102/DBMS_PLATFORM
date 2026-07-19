@@ -207,6 +207,11 @@ const toInlineCompletionItems = (
   ],
 });
 
+const MAX_COLUMN_SUGGESTIONS = 80;
+
+let aliasCacheVersionId = -1;
+let cachedAliases: Record<string, string> = {};
+
 export const registerSqlAutocomplete = (
   monaco: Monaco,
   tablesRef: React.MutableRefObject<string[]>,
@@ -232,6 +237,8 @@ export const registerSqlAutocomplete = (
           endColumn: word.endColumn,
         };
 
+        const versionId = model.getVersionId();
+
         const textUntilPosition = model.getValueInRange({
           startLineNumber: position.lineNumber,
           startColumn: 1,
@@ -252,10 +259,13 @@ export const registerSqlAutocomplete = (
           const prefix = match[1];
           let targetTable = prefix;
 
-          // Check if prefix is an alias
-          const aliases = extractTableAliases(fullText);
-          if (aliases[prefix]) {
-            targetTable = aliases[prefix];
+          // Check if prefix is an alias — cache by model version
+          if (versionId !== aliasCacheVersionId) {
+            cachedAliases = extractTableAliases(fullText);
+            aliasCacheVersionId = versionId;
+          }
+          if (cachedAliases[prefix]) {
+            targetTable = cachedAliases[prefix];
           }
 
           const filteredColumns = normalizedColumns.filter(
@@ -280,6 +290,13 @@ export const registerSqlAutocomplete = (
         }
 
         const dialectCompletions = getSqlDialectCompletions(dialect);
+        const tableCount = tablesRef.current.length;
+
+        // Limit column suggestions based on schema size to keep UI responsive
+        const columnSuggestions = normalizedColumns.slice(
+          0,
+          tableCount > 20 ? Math.min(MAX_COLUMN_SUGGESTIONS, normalizedColumns.length) : normalizedColumns.length,
+        );
 
         const suggestions: any[] = [
           ...dialectCompletions.snippets.map((snip) => ({
@@ -306,7 +323,7 @@ export const registerSqlAutocomplete = (
             range: range,
             sortText: "2",
           })),
-          ...normalizedColumns.map((col) => {
+          ...columnSuggestions.map((col) => {
             const quotedName = shouldQuote(col.columnName)
               ? `"${col.columnName}"`
               : col.columnName;
