@@ -41,6 +41,7 @@ class WorkspaceService:
             "rootPath": str(root),
             "scriptsPath": str(scripts_path),
             "gitEnabled": git_enabled,
+            "gitDirectoryEnabled": self._is_git_directory_enabled(user_id),
         }
 
     def update_config(self, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -94,6 +95,8 @@ class WorkspaceService:
 
     def get_git_status(self, user_id: str) -> Dict[str, Any]:
         """Return structured Git status for the configured workspace root."""
+        if not self._is_git_directory_enabled(user_id):
+            return {"isRepository": False, "branch": None, "upstream": None, "isClean": True, "changedCount": 0, "stagedCount": 0, "unstagedCount": 0, "untrackedCount": 0, "aheadCount": 0, "behindCount": 0, "changes": [], "lastCommit": None}
         config = self.get_config(user_id)
         root = Path(config["rootPath"])
         if not self._is_git_repository(root):
@@ -131,6 +134,8 @@ class WorkspaceService:
 
     def get_git_diff(self, user_id: str, relative_path: str) -> Dict[str, Any]:
         """Return a unified diff for a file inside the workspace root."""
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         config = self.get_config(user_id)
         root = Path(config["rootPath"]).resolve()
         if not self._is_git_repository(root):
@@ -157,6 +162,9 @@ class WorkspaceService:
 
     def list_files(self, user_id: str) -> Dict[str, Any]:
         """Return a bounded full workspace file tree for the selected root."""
+        if not self._is_git_directory_enabled(user_id):
+            config = self.get_config(user_id)
+            return {"workspace": config, "files": []}
         config = self.get_config(user_id)
         root = Path(config["rootPath"]).resolve()
         status_by_path = self._git_status_by_path(root)
@@ -184,6 +192,8 @@ class WorkspaceService:
 
     def list_git_worktrees(self, user_id: str) -> Dict[str, Any]:
         """Return Git worktrees attached to the selected repository."""
+        if not self._is_git_directory_enabled(user_id):
+            return {"worktrees": [], "syncedAt": None}
         config = self.get_config(user_id)
         root = Path(config["rootPath"]).resolve()
         if not self._is_git_repository(root):
@@ -198,6 +208,8 @@ class WorkspaceService:
 
     def remove_git_worktree(self, user_id: str, path: str, force: bool = False) -> Dict[str, Any]:
         """Remove a Git worktree and clear its cached metadata."""
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         config = self.get_config(user_id)
         root = Path(config["rootPath"]).resolve()
         if not self._is_git_repository(root):
@@ -221,6 +233,8 @@ class WorkspaceService:
 
     def list_git_branches(self, user_id: str) -> Dict[str, Any]:
         """Return local and remote branches available to the selected workspace."""
+        if not self._is_git_directory_enabled(user_id):
+            return {"branches": [], "currentBranch": None}
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         if not self._is_git_repository(root):
             return {"branches": [], "currentBranch": None}
@@ -245,6 +259,8 @@ class WorkspaceService:
         start_point: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Checkout an existing branch or create a branch from an optional start point."""
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         if not self._is_git_repository(root):
             raise ValueError("Workspace root is not a Git repository")
@@ -270,6 +286,8 @@ class WorkspaceService:
 
     def activate_git_worktree(self, user_id: str, path: str) -> Dict[str, Any]:
         """Make an existing worktree the active SQL project root."""
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         target_path = Path(path).expanduser().resolve()
         if not target_path.exists() or not self._is_git_repository(target_path):
             raise ValueError("Selected path is not a Git worktree")
@@ -280,6 +298,8 @@ class WorkspaceService:
 
     def get_git_history(self, user_id: str, limit: int = 0) -> Dict[str, Any]:
         """Return recent commits plus a compact text graph."""
+        if not self._is_git_directory_enabled(user_id):
+            return {"commits": [], "graph": ""}
         config = self.get_config(user_id)
         root = Path(config["rootPath"]).resolve()
         if not self._is_git_repository(root):
@@ -329,6 +349,8 @@ class WorkspaceService:
 
     def get_git_commit_detail(self, user_id: str, commit_hash: str) -> Dict[str, Any]:
         """Return commit metadata and changed files for one commit."""
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         commit = self._git_commit_metadata(root, commit_hash)
         files = self._git_commit_files(root, commit_hash)
@@ -336,6 +358,8 @@ class WorkspaceService:
 
     def get_git_commit_file_diff(self, user_id: str, commit_hash: str, relative_path: str) -> Dict[str, Any]:
         """Return a unified diff for one file inside one commit."""
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         self._validate_commit_hash(root, commit_hash)
         safe_path = self._resolve_workspace_path(root, relative_path)
@@ -346,6 +370,8 @@ class WorkspaceService:
         return {"path": git_path, "diff": output, "isBinary": "Binary files" in output}
 
     def stage_git_paths(self, user_id: str, paths: List[str]) -> Dict[str, Any]:
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root, git_paths = self._validated_git_paths(user_id, paths)
         if not git_paths:
             raise ValueError("Choose at least one file to stage")
@@ -353,6 +379,8 @@ class WorkspaceService:
         return {"ok": True, "message": f"Staged {len(git_paths)} file(s)"}
 
     def unstage_git_paths(self, user_id: str, paths: List[str]) -> Dict[str, Any]:
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root, git_paths = self._validated_git_paths(user_id, paths)
         if not git_paths:
             raise ValueError("Choose at least one file to unstage")
@@ -360,6 +388,8 @@ class WorkspaceService:
         return {"ok": True, "message": f"Unstaged {len(git_paths)} file(s)"}
 
     def commit_git_paths(self, user_id: str, message: str, paths: List[str]) -> Dict[str, Any]:
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         if not self._is_git_repository(root):
             raise ValueError("Workspace root is not a Git repository")
@@ -374,6 +404,8 @@ class WorkspaceService:
         return {"ok": True, "message": output or "Committed changes"}
 
     def push_git(self, user_id: str) -> Dict[str, Any]:
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         if not self._is_git_repository(root):
             raise ValueError("Workspace root is not a Git repository")
@@ -387,6 +419,8 @@ class WorkspaceService:
         return {"ok": True, "message": output or "Pushed current branch"}
 
     def pull_git(self, user_id: str) -> Dict[str, Any]:
+        if not self._is_git_directory_enabled(user_id):
+            raise ValueError("Git directory feature is disabled")
         root = Path(self.get_config(user_id)["rootPath"]).resolve()
         if not self._is_git_repository(root):
             raise ValueError("Workspace root is not a Git repository")
@@ -456,6 +490,10 @@ class WorkspaceService:
         finally:
             if session:
                 session.close()
+
+    def _is_git_directory_enabled(self, user_id: str) -> bool:
+        settings = self._get_settings(user_id)
+        return bool(settings.get("sqllabGitDirectoryEnabled", False))
 
     def _set_workspace_root(self, user_id: str, root: Path) -> None:
         settings = self._get_settings(user_id)

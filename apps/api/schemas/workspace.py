@@ -14,6 +14,7 @@ class WorkspaceConfig(BaseModel):
     rootPath: str
     scriptsPath: str
     gitEnabled: bool = False
+    gitDirectoryEnabled: bool = False
 
 
 class WorkspaceConfigUpdate(BaseModel):

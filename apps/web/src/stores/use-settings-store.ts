@@ -21,6 +21,9 @@ export interface SettingsState {
   editorLigatures: boolean;
   editorInlineSuggestions: boolean;
 
+  // SQLLab
+  sqllabGitDirectoryEnabled: boolean;
+
   // Data
   defaultQueryLimit: number;
   queryTimeout: boolean;
@@ -56,6 +59,9 @@ const defaultSettings = {
   editorFormatOnSave: false,
   editorLigatures: true,
   editorInlineSuggestions: true,
+
+  // SQLLab
+  sqllabGitDirectoryEnabled: false,
 
   // Data
   defaultQueryLimit: 1000,

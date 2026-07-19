@@ -33,6 +33,7 @@ import { RedisKeyBrowser } from "./RedisKeyBrowser";
 import type { LeftActivityView } from "../types";
 import { cn } from "@/lib/utils";
 import { workspaceApi } from "@/lib/api-client";
+import { useSettingsStore } from "@/stores/use-settings-store";
 
 const WorkspaceSidebarPanel = lazy(() =>
   import("./workspace/WorkspaceSidebarPanel").then((module) => ({ default: module.WorkspaceSidebarPanel })),
@@ -47,6 +48,7 @@ const preloadWorkspaceSidebarPanel = () => {
  */
 export function SQLLabSidebar() {
   const lab = useSQLLabContext();
+  const { sqllabGitDirectoryEnabled } = useSettingsStore();
   const [expandedFolders, setExpandedFolders] = useState<string[]>(["tables"]);
   const [searchQuery, setSearchQuery] = useState("");
   const gitStatusQuery = useQuery({
@@ -98,15 +100,19 @@ export function SQLLabSidebar() {
         <ActivityButton view="database" label="Databases" active={lab.activeLeftView === "database"} onClick={lab.setActiveLeftView} badge={0}>
           <Database className="h-5 w-5" />
         </ActivityButton>
-        <ActivityButton view="repo" label="Repository" active={lab.activeLeftView === "repo"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={0}>
-          <GitBranch className="h-5 w-5" />
-        </ActivityButton>
-        <ActivityButton view="changes" label="Source Control" active={lab.activeLeftView === "changes"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={changeCount}>
-          <GitPullRequest className="h-5 w-5" />
-        </ActivityButton>
-        <ActivityButton view="graph" label="Git Graph" active={lab.activeLeftView === "graph"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={0}>
-          <GitGraph className="h-5 w-5" />
-        </ActivityButton>
+        {sqllabGitDirectoryEnabled && (
+          <>
+            <ActivityButton view="repo" label="Repository" active={lab.activeLeftView === "repo"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={0}>
+              <GitBranch className="h-5 w-5" />
+            </ActivityButton>
+            <ActivityButton view="changes" label="Source Control" active={lab.activeLeftView === "changes"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={changeCount}>
+              <GitPullRequest className="h-5 w-5" />
+            </ActivityButton>
+            <ActivityButton view="graph" label="Git Graph" active={lab.activeLeftView === "graph"} onClick={lab.setActiveLeftView} onPreload={preloadWorkspaceSidebarPanel} badge={0}>
+              <GitGraph className="h-5 w-5" />
+            </ActivityButton>
+          </>
+        )}
       </nav>
 
       <div className="flex w-72 min-w-0 flex-col">
