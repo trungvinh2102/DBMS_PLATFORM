@@ -8,8 +8,8 @@ import { Terminal, XCircle, Sparkles } from "lucide-react";
 import { SQLLabDataTable } from "../SQLLabDataTable";
 import { NoSQLResults } from "../NoSQLResults";
 import { ProblemsList } from "../ProblemsList";
-import { ExplainPlanViewer } from "./ExplainPlanViewer";
 
+const ExplainPlanViewer = lazy(() => import("./ExplainPlanViewer").then((m) => ({ default: m.ExplainPlanViewer })));
 const LineageViewer = lazy(() => import("../LineageViewer").then((m) => ({ default: m.LineageViewer })));
 
 interface PanelContentProps {
@@ -42,13 +42,15 @@ export function PanelContent({
   if (tab === "results") {
     if (results && (results as any).isExplain) {
       return (
-        <ExplainPlanViewer
-          planData={(results as any).plan}
-          dialect={(results as any).dialect}
-          graph={(results as any).graph}
-          summary={(results as any).summary}
-          sql={sql}
-        />
+        <Suspense fallback={<div className="p-8 flex items-center justify-center text-muted-foreground animate-pulse text-[10px] font-black uppercase tracking-widest">Loading explain plan...</div>}>
+          <ExplainPlanViewer
+            planData={(results as any).plan}
+            dialect={(results as any).dialect}
+            graph={(results as any).graph}
+            summary={(results as any).summary}
+            sql={sql}
+          />
+        </Suspense>
       );
     }
     if (results.length > 0) {

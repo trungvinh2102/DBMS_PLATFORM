@@ -25,8 +25,9 @@ export interface SyntaxError {
 
 import { useSQLLabContext } from "../context/SQLLabContext";
 import { formatDBName } from "./sidebar/sidebar-utils";
-import { MongoAggregationBuilder } from "./MongoAggregationBuilder";
-import { GitDiffPreview } from "./workspace/GitDiffPreview";
+
+const MongoAggregationBuilder = lazy(() => import("./MongoAggregationBuilder").then(m => ({ default: m.MongoAggregationBuilder })));
+const GitDiffPreview = lazy(() => import("./workspace/GitDiffPreview").then(m => ({ default: m.GitDiffPreview })));
 
 export function SQLLabEditorContainer({
   enableValidation = true,
@@ -214,21 +215,27 @@ export function SQLLabEditorContainer({
       </div>
 
       <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
-        {!lab.showAISidebar && lab.gitPreviewPath && <GitDiffPreview />}
+        {!lab.showAISidebar && lab.gitPreviewPath && (
+          <Suspense fallback={<EditorLoadingSkeleton />}>
+            <GitDiffPreview />
+          </Suspense>
+        )}
         {!lab.showAISidebar && !lab.gitPreviewPath && (
           <Suspense fallback={<EditorLoadingSkeleton />}>
             <>
               {lab.selectedDSType === "mongodb" && (
-                <MongoAggregationBuilder
-                  collectionName={lab.selectedTable}
-                  databaseName={lab.selectedSchema}
-                  fields={lab.allColumns}
-                  onApply={lab.setSql}
-                  onRun={(query) => {
-                    lab.setSql(query);
-                    lab.handleRun(query);
-                  }}
-                />
+                <Suspense fallback={<EditorLoadingSkeleton />}>
+                  <MongoAggregationBuilder
+                    collectionName={lab.selectedTable}
+                    databaseName={lab.selectedSchema}
+                    fields={lab.allColumns}
+                    onApply={lab.setSql}
+                    onRun={(query) => {
+                      lab.setSql(query);
+                      lab.handleRun(query);
+                    }}
+                  />
+                </Suspense>
               )}
               <div className="min-h-0 flex-1">
                 <SQLEditor

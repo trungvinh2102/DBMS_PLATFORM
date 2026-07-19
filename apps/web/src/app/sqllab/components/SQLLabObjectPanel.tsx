@@ -199,8 +199,8 @@ export function SQLLabObjectPanel() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() =>
-                      exportData(
+                    onClick={async () =>
+                      await exportData(
                         lab.currentTData,
                         lab.currentTColumns,
                         "csv",
@@ -213,8 +213,8 @@ export function SQLLabObjectPanel() {
                     <span>Export as CSV</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() =>
-                      exportData(
+                    onClick={async () =>
+                      await exportData(
                         lab.currentTData,
                         lab.currentTColumns,
                         "xlsx",

@@ -34,14 +34,14 @@ export function ExportDropdown({ results, columns, encoding }: ExportDropdownPro
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => exportData(results, columns, "csv", "query_results", encoding)}
+          onClick={async () => { await exportData(results, columns, "csv", "query_results", encoding); }}
           className="cursor-pointer"
         >
           <FileText className="mr-2 h-4 w-4" />
           <span>Export as CSV</span>
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => exportData(results, columns, "xlsx", "query_results", encoding)}
+          onClick={async () => { await exportData(results, columns, "xlsx", "query_results", encoding); }}
           className="cursor-pointer"
         >
           <FileSpreadsheet className="mr-2 h-4 w-4" />

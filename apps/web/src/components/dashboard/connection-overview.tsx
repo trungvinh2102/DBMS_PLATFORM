@@ -16,7 +16,30 @@ import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
-import { AreaChart, Area, ResponsiveContainer } from "recharts";
+
+function Sparkline({ data, className }: { data: number[]; className?: string }) {
+  if (!data.length) return null;
+  const w = 200;
+  const h = 60;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const stepX = w / (data.length - 1);
+  const points = data.map((v, i) => `${i * stepX},${h - ((v - min) / range) * (h - 4) - 2}`).join(" ");
+  const areaPoints = `0,${h} ${points} ${w},${h}`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={className}>
+      <defs>
+        <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.6} />
+          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPoints} fill="url(#sparkGrad)" />
+      <polyline points={points} fill="none" stroke="hsl(var(--primary))" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function AnimatedCounter({ value }: { value: number }) {
   const [count, setCount] = useState(0);
@@ -67,28 +90,8 @@ export function ConnectionOverview() {
       {/* Visual background element */}
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover/conn:bg-primary/10 transition-colors duration-500" />
 
-      {/* Background Sparkline - Enhanced area chart */}
-      <div className="absolute bottom-0 left-0 w-full h-[40%] -z-10 opacity-20 pointer-events-none group-hover/conn:opacity-30 transition-opacity duration-1000">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={trendData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="colorTrend" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area
-              type="monotone"
-              dataKey="value"
-              stroke="hsl(var(--primary))"
-              strokeWidth={3}
-              fill="url(#colorTrend)"
-              dot={false}
-              animationDuration={3000}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Background Sparkline - pure SVG (no recharts) */}
+      <Sparkline data={trendData.map(d => d.value)} className="absolute bottom-0 left-0 w-full h-[40%] -z-10 opacity-20 pointer-events-none group-hover/conn:opacity-30 transition-opacity duration-1000" />
 
       <div className="flex items-center justify-between mb-8 relative z-10">
         <div className="flex items-center gap-3">

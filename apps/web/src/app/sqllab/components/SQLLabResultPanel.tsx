@@ -10,8 +10,9 @@ import { useSQLLabContext } from "../context/SQLLabContext";
 
 // Internal Components
 import { PanelContent } from "./results/PanelContent";
-import { ExportDropdown } from "./results/ExportDropdown";
 import { ResultFooter } from "./results/ResultFooter";
+
+const ExportDropdown = lazy(() => import("./results/ExportDropdown").then(m => ({ default: m.ExportDropdown })));
 
 const EMPTY_SYNTAX_ERRORS: any[] = [];
 
@@ -73,11 +74,13 @@ export function SQLLabResultPanel({
         </div>
 
         {lab.results.length > 0 && effectiveTab === "results" && (
-          <ExportDropdown
-            results={lab.results}
-            columns={lab.columns}
-            encoding={lab.resultEncoding}
-          />
+          <Suspense fallback={null}>
+            <ExportDropdown
+              results={lab.results}
+              columns={lab.columns}
+              encoding={lab.resultEncoding}
+            />
+          </Suspense>
         )}
       </div>
 

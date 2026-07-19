@@ -2,13 +2,16 @@
 
 import * as React from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { queryClient } from "@/lib/query-client";
 
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 import { DesktopReadyGuard } from "./desktop-ready-guard";
+
+const ReactQueryDevtools = React.lazy(() =>
+  import("@tanstack/react-query-devtools").then((m) => ({ default: m.ReactQueryDevtools })),
+);
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -22,7 +25,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <DesktopReadyGuard>
           {children}
         </DesktopReadyGuard>
-        <ReactQueryDevtools />
+        {import.meta.env.DEV && (
+          <React.Suspense fallback={null}>
+            <ReactQueryDevtools />
+          </React.Suspense>
+        )}
       </QueryClientProvider>
       <Toaster richColors />
     </ThemeProvider>

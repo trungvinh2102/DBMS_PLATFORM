@@ -29,7 +29,6 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3001,
       proxy: {
-        // Proxy API requests to your Python backend
         '/api': {
           target: env.VITE_API_URL ? new URL(env.VITE_API_URL).origin : 'http://localhost:5000',
           changeOrigin: true,
@@ -39,7 +38,19 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: true,
+      sourcemap: mode === 'development',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-recharts': ['recharts'],
+            'vendor-xyflow': ['@xyflow/react'],
+            'vendor-ai': ['ai', '@ai-sdk/react', '@ai-sdk/google'],
+            'vendor-monaco': ['monaco-editor', '@monaco-editor/react'],
+            'vendor-tanstack': ['@tanstack/react-query', '@tanstack/react-table', '@tanstack/react-virtual', '@tanstack/react-form'],
+          },
+        },
+      },
     },
   };
 });
