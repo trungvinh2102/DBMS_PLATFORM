@@ -287,10 +287,11 @@ export function SQLEditor({
             acceptSuggestionOnCommitCharacter: false,
             suggestOnTriggerCharacters: true,
             quickSuggestions: {
-              other: true,
+              other: false,
               comments: false,
               strings: false,
             },
+            quickSuggestionsDelay: 100,
           }}
         />
       </div>

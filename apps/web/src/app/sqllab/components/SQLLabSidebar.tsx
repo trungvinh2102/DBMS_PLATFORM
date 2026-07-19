@@ -3,7 +3,7 @@
  * @description Sidebar component for SQL Lab, providing schema navigation, database selection, and search.
  */
 
-import React, { lazy, Suspense, useState } from "react";
+import React, { lazy, Suspense, useState, useDeferredValue } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Database,
@@ -59,9 +59,12 @@ export function SQLLabSidebar() {
     placeholderData: (previousData) => previousData,
   });
 
+  const deferredSearch = useDeferredValue(searchQuery);
+  const isSearchStale = searchQuery !== deferredSearch;
+
   const filterList = (list?: string[]) =>
     list?.filter((item) =>
-      item.toLowerCase().includes(searchQuery.toLowerCase()),
+      item.toLowerCase().includes(deferredSearch.toLowerCase()),
     );
 
   const filteredTables = filterList(lab.tables);

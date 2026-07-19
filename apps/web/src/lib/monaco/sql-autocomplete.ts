@@ -241,6 +241,11 @@ export const registerSqlAutocomplete = (
 
         const fullText = model.getValue();
 
+        // Compute normalized columns once — avoid double iteration
+        const normalizedColumns = columnsRef.current
+          .map(getSqlColumnCompletionParts)
+          .filter((col): col is SqlColumnCompletionParts => Boolean(col));
+
         // Table.column or Alias.column completion
         const match = textUntilPosition.match(/([a-zA-Z0-9_]+)\.$/);
         if (match) {
@@ -253,9 +258,6 @@ export const registerSqlAutocomplete = (
             targetTable = aliases[prefix];
           }
 
-          const normalizedColumns = columnsRef.current
-            .map(getSqlColumnCompletionParts)
-            .filter((col): col is SqlColumnCompletionParts => Boolean(col));
           const filteredColumns = normalizedColumns.filter(
             (col) =>
               col.tableName &&
@@ -304,28 +306,25 @@ export const registerSqlAutocomplete = (
             range: range,
             sortText: "2",
           })),
-          ...columnsRef.current
-            .map(getSqlColumnCompletionParts)
-            .filter((col): col is SqlColumnCompletionParts => Boolean(col))
-            .map((col) => {
-              const quotedName = shouldQuote(col.columnName)
-                ? `"${col.columnName}"`
-                : col.columnName;
-              return {
-                label: col.label,
-                kind: monaco.languages.CompletionItemKind.Field,
-                detail: col.tableName
-                  ? `${col.tableName} (${col.columnType})`
-                  : col.columnType,
-                documentation: col.tableName
-                  ? `Column: ${col.columnName} in ${col.tableName}`
-                  : `Column: ${col.columnName}`,
-                insertText: quotedName,
-                range: range,
-                sortText: "3",
-                filterText: col.filterText,
-              };
-            }),
+          ...normalizedColumns.map((col) => {
+            const quotedName = shouldQuote(col.columnName)
+              ? `"${col.columnName}"`
+              : col.columnName;
+            return {
+              label: col.label,
+              kind: monaco.languages.CompletionItemKind.Field,
+              detail: col.tableName
+                ? `${col.tableName} (${col.columnType})`
+                : col.columnType,
+              documentation: col.tableName
+                ? `Column: ${col.columnName} in ${col.tableName}`
+                : `Column: ${col.columnName}`,
+              insertText: quotedName,
+              range: range,
+              sortText: "3",
+              filterText: col.filterText,
+            };
+          }),
         ];
 
         return { suggestions };
