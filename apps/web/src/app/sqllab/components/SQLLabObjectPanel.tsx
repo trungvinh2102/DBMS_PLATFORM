@@ -114,7 +114,6 @@ export function SQLLabObjectPanel() {
   const hasScriptSupport = lab.isRelational && lab.selectedDSType !== "duckdb";
 
   let availableTabs = [
-    "Info",
     "Data",
     "Structure",
     ...(isDiagnosticsSupported ? ["Diagnostics"] : []),
@@ -122,17 +121,18 @@ export function SQLLabObjectPanel() {
     ...(hasRelationSupport ? ["Relation"] : []),
     ...(hasTriggerSupport ? ["Trigger"] : []),
     ...(hasScriptSupport ? ["Script"] : []),
+    "Info",
   ];
   if (lab.selectedObjectType === "view") {
-    availableTabs = ["Info", "Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), ...(hasScriptSupport ? ["Script"] : [])];
+    availableTabs = ["Data", "Structure", ...(isDiagnosticsSupported ? ["Diagnostics"] : []), ...(hasScriptSupport ? ["Script"] : []), "Info"];
   } else if (lab.selectedObjectType === "materialized_view") {
-    availableTabs = ["Info", "Data", "Structure", ...(hasScriptSupport ? ["Script"] : [])];
+    availableTabs = ["Data", "Structure", ...(hasScriptSupport ? ["Script"] : []), "Info"];
   } else if (
     ["event", "function", "procedure", "trigger"].includes(
       lab.selectedObjectType || "",
     )
   ) {
-    availableTabs = ["Info", ...(hasScriptSupport ? ["Script"] : [])];
+    availableTabs = [...(hasScriptSupport ? ["Script"] : []), "Info"];
   } else if (
     ["sequence", "partition", "role", "grant", "tablespace", "extension", "synonym", "job"].includes(
       lab.selectedObjectType || "",
@@ -157,8 +157,8 @@ export function SQLLabObjectPanel() {
             className={cn(
               "px-5 h-full text-[10px] font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap",
               effectiveTab === t.toLowerCase()
-                ? "border-primary text-primary bg-background"
-                : "border-transparent text-muted-foreground/60 hover:text-foreground hover:bg-muted/30",
+                ? "border-primary text-primary bg-primary/[0.04]"
+                : "border-transparent text-muted-foreground/50 hover:text-foreground hover:bg-muted/20",
             )}
           >
             {t}

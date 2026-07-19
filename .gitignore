@@ -84,6 +84,9 @@ skills/
 .agent/
 .codex/
 
+# Superpowers visual companion
+.superpowers/
+
 docs/
 .docs/
 

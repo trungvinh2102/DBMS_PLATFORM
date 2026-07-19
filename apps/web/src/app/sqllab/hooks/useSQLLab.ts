@@ -210,7 +210,6 @@ export function useSQLLab() {
     if (
       ui.selectedTable && 
       activeTab.selectedDS && 
-      ui.activeRightTab === "data" && 
       (type === "table" || type === "view")
     ) {
       const limit = settings.defaultQueryLimit || 100;
@@ -240,6 +239,14 @@ export function useSQLLab() {
   useEffect(() => {
     ui.setDataOffset(0);
   }, [ui.selectedTable, ui.setDataOffset]);
+
+  // Auto-show right panel when a table is selected
+  useEffect(() => {
+    if (ui.selectedTable && !ui.showRightPanel) {
+      ui.setShowRightPanel(true);
+      ui.setRightPanelMode("object");
+    }
+  }, [ui.selectedTable, ui]);
 
   const [selectedText, setSelectedText] = [ui.cursorPos, ui.setCursorPos]; // Mocked locally for now, to be integrated better.
 

@@ -8,7 +8,7 @@ import type { LeftActivityView, RightPanelMode, ResultTab, CursorPosition } from
 
 export function useSQLLabUI() {
   const [activeLeftView, setActiveLeftView] = useState<LeftActivityView>("database");
-  const [activeRightTab, setActiveRightTab] = useState<string>("info");
+  const [activeRightTab, setActiveRightTab] = useState<string>("data");
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>("results");
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>("object");
   const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
