@@ -11,6 +11,8 @@ import { event } from "@tauri-apps/api";
 import { motion, AnimatePresence } from "motion/react";
 import { Database, Loader2, Server, Zap } from "lucide-react";
 
+const TRANSITION_DURATION = 0.35;
+
 interface DesktopReadyGuardProps {
   children: React.ReactNode;
 }
@@ -37,17 +39,21 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
     }
 
     let cancelled = false;
-    let readyTimers: ReturnType<typeof setTimeout>[] = [];
+    const readyTimers: ReturnType<typeof setTimeout>[] = [];
+
+    const markReady = () => {
+      (window as any).__BACKEND_READY__ = true;
+      setStatus("Server ready. Launching dashboard...");
+      readyTimers.push(setTimeout(() => {
+        if (!cancelled) setIsReady(true);
+      }, 200));
+    };
 
     // Set up listener for the backend-ready event emitted from Rust lib.rs
     const unlistenPromise = event.listen<boolean>("backend-ready", (eventData) => {
       if (cancelled) return;
       if (eventData.payload) {
-        setStatus("Server ready. Launching dashboard...");
-        readyTimers.push(setTimeout(() => {
-          setIsReady(true);
-          (window as any).__BACKEND_READY__ = true;
-        }, 800));
+        markReady();
       } else {
         setStatus("Critical: Server failed to initialize.");
       }
@@ -55,7 +61,7 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
 
     let healthInterval: ReturnType<typeof setInterval> | null = null;
 
-    // Fallback: start polling health endpoint after 5s if event hasn't arrived
+    // Fallback: start polling health endpoint after 3s if event hasn't arrived
     // (handles page reload where Rust already emitted backend-ready on first boot)
     readyTimers.push(setTimeout(() => {
       if (cancelled) return;
@@ -68,11 +74,7 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
           if (cancelled) return;
           if (res.ok) {
             if (healthInterval) clearInterval(healthInterval);
-            setStatus("Server ready. Launching dashboard...");
-            readyTimers.push(setTimeout(() => {
-              setIsReady(true);
-              (window as any).__BACKEND_READY__ = true;
-            }, 400));
+            markReady();
           }
         } catch {
           // Backend not ready yet, keep polling
@@ -80,7 +82,7 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
       };
       checkHealth();
       healthInterval = setInterval(checkHealth, 2000);
-    }, 5000));
+    }, 3000));
 
     return () => {
       cancelled = true;
@@ -90,17 +92,16 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
     };
   }, []);
 
-  if (!isTauri || isReady) {
-    return <>{children}</>;
-  }
-
+  // Use AnimatePresence for smooth crossfade between loading and app
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-background"
-        initial={{ opacity: 1 }}
-        exit={{ opacity: 0, transition: { duration: 0.5, ease: "easeInOut" } }}
-      >
+    <>
+      <AnimatePresence>
+        {!isReady && (
+          <motion.div
+            key="splash"
+            className="fixed inset-0 z-9999 flex flex-col items-center justify-center bg-background"
+            exit={{ opacity: 0, transition: { duration: TRANSITION_DURATION, ease: "easeInOut" } }}
+          >
         {/* Abstract Background Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 blur-[120px] rounded-full animate-pulse" />
@@ -186,6 +187,18 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
           </motion.p>
         </div>
       </motion.div>
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+      {isReady && (
+        <motion.div
+          key="app"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: TRANSITION_DURATION, ease: "easeInOut" }}
+        >
+          {children}
+        </motion.div>
+      )}
+    </>
   );
 }
