@@ -18,6 +18,7 @@ export function HealthMonitor() {
   const { data: connections } = useQuery({
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
+    staleTime: 5 * 60 * 1000,
   });
 
   const activeDbId = connections?.[0]?.id || null;
@@ -56,10 +57,10 @@ export function HealthMonitor() {
                 tick={false}
               />
               <RadialBar
+                isAnimationActive={false}
                 background
                 dataKey="value"
                 cornerRadius={30}
-                animationDuration={1500}
               />
               <text
                 x="50%"

@@ -51,6 +51,7 @@ export function DataAnalytics() {
   const { data: connections } = useQuery({
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
+    staleTime: 5 * 60 * 1000,
   });
 
   const activeDbId = connections?.[0]?.id || null;
@@ -143,6 +144,7 @@ export function DataAnalytics() {
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
+                isAnimationActive={false}
                 type="monotone"
                 dataKey="executions"
                 stroke="var(--color-primary)"
@@ -152,6 +154,7 @@ export function DataAnalytics() {
                 name="TPS"
               />
               <Area
+                isAnimationActive={false}
                 type="monotone"
                 dataKey="latency"
                 stroke="var(--color-accent)"
@@ -188,7 +191,7 @@ export function DataAnalytics() {
               />
               <YAxis hide />
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-primary)', opacity: 0.05 }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+              <Bar isAnimationActive={false} dataKey="count" radius={[6, 6, 0, 0]}>
                 {latencyDistribution.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.fill} />
                 ))}
@@ -213,6 +216,7 @@ export function DataAnalytics() {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
+                isAnimationActive={false}
                 data={operationDistribution}
                 cx="50%"
                 cy="50%"

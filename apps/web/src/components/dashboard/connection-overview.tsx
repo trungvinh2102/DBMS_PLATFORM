@@ -9,7 +9,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Database, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
-import { useState, useEffect } from "react";
 
 import { databaseApi } from "@/lib/api-client";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,29 +40,6 @@ function Sparkline({ data, className }: { data: number[]; className?: string }) 
   );
 }
 
-function AnimatedCounter({ value }: { value: number }) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const end = value;
-    if (start === end) return;
-
-    let totalDuration = 800;
-    let incrementTime = Math.max((totalDuration / end), 10);
-
-    const timer = setInterval(() => {
-      start += 1;
-      setCount(start);
-      if (start === end) clearInterval(timer);
-    }, incrementTime);
-
-    return () => clearInterval(timer);
-  }, [value]);
-
-  return <span>{value === 0 ? 0 : count}</span>;
-}
-
 export function ConnectionOverview() {
   const { user } = useAuth();
 
@@ -71,6 +47,7 @@ export function ConnectionOverview() {
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
   });
 
   const activeDbId = connections?.[0]?.id || null;
@@ -135,7 +112,7 @@ export function ConnectionOverview() {
         <div className="mt-auto relative z-10">
           <div className="flex items-baseline gap-4 mb-4">
             <div className="text-8xl font-black tracking-tighter text-foreground drop-shadow-xl select-none">
-              <AnimatedCounter value={count} />
+              {count}
             </div>
             <div className="flex flex-col gap-0.5">
               <span className="text-xs font-bold text-muted-foreground uppercase leading-none opacity-60">Connections</span>
@@ -146,7 +123,7 @@ export function ConnectionOverview() {
             <div className="flex items-center justify-between">
               <p className="text-xs font-bold flex items-center gap-2.5 text-foreground/80">
                 <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-30"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
                 </span>
                 {connections.length} Active Connections

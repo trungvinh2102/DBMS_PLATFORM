@@ -55,7 +55,8 @@ export function useDashboardStats(dbId: string | null) {
       return response as unknown as DashboardStats;
     },
     enabled: !!dbId,
-    refetchInterval: 30000, // Refresh every 30s
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
     retry: 2,
     staleTime: 10000,
   });

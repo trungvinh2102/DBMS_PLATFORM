@@ -31,9 +31,6 @@ export default function HomePage() {
   return (
     <div className="flex-1 h-full w-full overflow-y-auto overflow-x-hidden bg-background">
       <div className="p-4 md:p-6 lg:p-8 relative min-h-full">
-        {/* Subtle background ambient glow */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 blur-[120px] rounded-full opacity-30 pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/20 blur-[120px] rounded-full opacity-30 pointer-events-none" />
 
         <div className="mx-auto max-w-7xl max-xl:max-w-full">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 auto-rows-min">

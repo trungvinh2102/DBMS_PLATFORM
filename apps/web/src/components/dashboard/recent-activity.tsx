@@ -24,6 +24,7 @@ export function RecentActivity() {
     queryKey: ["databases"],
     queryFn: () => databaseApi.list(),
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
   });
   const connections = connectionsData as any[] | undefined;
 

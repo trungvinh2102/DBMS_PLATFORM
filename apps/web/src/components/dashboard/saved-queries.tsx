@@ -35,7 +35,7 @@ export function SavedQueries() {
     >
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 flex items-center gap-2">
-          <Star className="h-3.5 w-3.5 fill-primary/20 text-primary animate-pulse" /> Bookmarked
+          <Star className="h-3.5 w-3.5 fill-primary/20 text-primary" /> Bookmarked
         </h2>
         <div className="flex gap-0.5">
            {[1, 2].map(i => <div key={i} className="w-1 h-3 rounded-full bg-primary/20" />)}
