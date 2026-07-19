@@ -36,30 +36,57 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
       return;
     }
 
+    let cancelled = false;
+    let readyTimers: ReturnType<typeof setTimeout>[] = [];
+
     // Set up listener for the backend-ready event emitted from Rust lib.rs
     const unlistenPromise = event.listen<boolean>("backend-ready", (eventData) => {
+      if (cancelled) return;
       if (eventData.payload) {
         setStatus("Server ready. Launching dashboard...");
-        // Small delay for smooth transition
-        setTimeout(() => {
+        readyTimers.push(setTimeout(() => {
           setIsReady(true);
           (window as any).__BACKEND_READY__ = true;
-        }, 800);
+        }, 800));
       } else {
         setStatus("Critical: Server failed to initialize.");
       }
     });
 
-    // Fallback: If we don't get the event within a certain timeout, we might check health manually
-    // or just let it through to show the error state.
-    const timeout = setTimeout(() => {
-      setStatus("Still waiting for server... trying to connect manually.");
-      // In a real scenario, we might hit GET /health here
-    }, 5000);
+    let healthInterval: ReturnType<typeof setInterval> | null = null;
+
+    // Fallback: start polling health endpoint after 5s if event hasn't arrived
+    // (handles page reload where Rust already emitted backend-ready on first boot)
+    readyTimers.push(setTimeout(() => {
+      if (cancelled) return;
+      setStatus("Connecting to server...");
+
+      const checkHealth = async () => {
+        if (cancelled) return;
+        try {
+          const res = await fetch("http://127.0.0.1:5000/health", { signal: AbortSignal.timeout(3000) });
+          if (cancelled) return;
+          if (res.ok) {
+            if (healthInterval) clearInterval(healthInterval);
+            setStatus("Server ready. Launching dashboard...");
+            readyTimers.push(setTimeout(() => {
+              setIsReady(true);
+              (window as any).__BACKEND_READY__ = true;
+            }, 400));
+          }
+        } catch {
+          // Backend not ready yet, keep polling
+        }
+      };
+      checkHealth();
+      healthInterval = setInterval(checkHealth, 2000);
+    }, 5000));
 
     return () => {
+      cancelled = true;
       unlistenPromise.then((unlisten) => unlisten());
-      clearTimeout(timeout);
+      readyTimers.forEach(clearTimeout);
+      if (healthInterval) clearInterval(healthInterval);
     };
   }, []);
 
