@@ -49,21 +49,21 @@ class AIService(SqlAIService, AgentAIService):
 
     def autocomplete_sql(self, db_id: str, schema: str, prefix: str, suffix: str, user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Provides fast inline SQL autocomplete using Gemini."""
-        context = self._format_schema_context(db_id, schema, intent=f"{prefix} ... {suffix}")
-        
-        system_instruction = (
-            "You are a fast, precise SQL coding assistant for inline autocomplete.\n"
-            f"Here is the database schema context:\n{context}\n\n"
-            "INSTRUCTIONS:\n"
-            "1. Predict ONLY the missing text connecting prefix and suffix.\n"
-            "2. DO NOT repeat prefix/suffix. DO NOT output markdown.\n"
-            "3. If no confident completion, return empty."
-        )
-        
-        prompt = f"PREFIX:\n{prefix}\n\nSUFFIX:\n{suffix}\n\nCOMPLETION:"
-        model_id = task_model_router.resolve_model_id("sql.autocomplete", user_id, model_id, db_id)
-        provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
         try:
+            context = self._format_schema_context(db_id, schema, intent=f"{prefix} ... {suffix}")
+
+            system_instruction = (
+                "You are a fast, precise SQL coding assistant for inline autocomplete.\n"
+                f"Here is the database schema context:\n{context}\n\n"
+                "INSTRUCTIONS:\n"
+                "1. Predict ONLY the missing text connecting prefix and suffix.\n"
+                "2. DO NOT repeat prefix/suffix. DO NOT output markdown.\n"
+                "3. If no confident completion, return empty."
+            )
+
+            prompt = f"PREFIX:\n{prefix}\n\nSUFFIX:\n{suffix}\n\nCOMPLETION:"
+            model_id = task_model_router.resolve_model_id("sql.autocomplete", user_id, model_id, db_id)
+            provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             completion = langchain_runtime.invoke_text(
                 system_prompt=system_instruction,
                 prompt=prompt,
@@ -75,9 +75,9 @@ class AIService(SqlAIService, AgentAIService):
                 max_tokens=128,
             )
             return {"completion": self._clean_sql_code(completion)}
-        except Exception as langchain_error:
-            logger.warning("LangChain autocomplete failed for provider %s: %s", provider, langchain_error)
-            return {"completion": "", "error": f"LangChain autocomplete failed for provider {provider}"}
+        except Exception as error:
+            logger.warning("AI autocomplete failed: %s", error)
+            return {"completion": ""}
 
     def _clean_sql_code(self, completion: str) -> str:
         """Helper to clean autocomplete text."""
