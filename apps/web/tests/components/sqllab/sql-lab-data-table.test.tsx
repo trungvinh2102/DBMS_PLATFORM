@@ -3,8 +3,8 @@
  * @description Regression tests for the SQL Lab query result table layout.
  */
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SQLLabDataTable } from "@/app/sqllab/components/SQLLabDataTable";
 
@@ -13,6 +13,10 @@ function getColWidth(col: HTMLTableColElement) {
 }
 
 describe("SQLLabDataTable", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("uses precomputed fixed column widths instead of auto max-content layout", () => {
     const { container } = render(
       <SQLLabDataTable
@@ -39,5 +43,31 @@ describe("SQLLabDataTable", () => {
     expect(table).toHaveStyle({
       width: `${getColWidth(cols[0]) + idWidth + descriptionWidth}px`,
     });
+  });
+
+  it("keeps typing responsive by deferring expensive result filtering", () => {
+    vi.useFakeTimers();
+
+    const { container } = render(
+      <SQLLabDataTable
+        columns={["name"]}
+        data={[
+          { name: "Alpha" },
+          { name: "Beta" },
+        ]}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText("Search in results...");
+    fireEvent.change(input, { target: { value: "Beta" } });
+
+    expect(input).toHaveValue("Beta");
+    expect(container).toHaveTextContent("2 of 2 rows");
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(container).toHaveTextContent("1 of 2 rows");
   });
 });

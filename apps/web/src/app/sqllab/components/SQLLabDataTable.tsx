@@ -83,6 +83,7 @@ export function SQLLabDataTable({
 }: SQLLabDataTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deferredSearchTerm, setDeferredSearchTerm] = useState("");
   const { showNullAs } = useSettingsStore();
   const [selectedJson, setSelectedJson] = useState<{
     key: string;
@@ -97,22 +98,37 @@ export function SQLLabDataTable({
   const [pendingChanges, setPendingChanges] = useState<Record<number, any>>({});
   const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
 
+  React.useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDeferredSearchTerm(searchTerm);
+    }, 150);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const dataWithIndices = useMemo(
+    () => data.map((row, index) => ({ ...row, _originalIndex: index })),
+    [data],
+  );
+
+  const searchableColumns = useMemo(() => new Set(columns), [columns]);
+
   const filteredData = useMemo(() => {
-    const dataWithIndices = data.map((row, index) => ({ ...row, _originalIndex: index }));
-    if (!searchTerm) return dataWithIndices;
-    const term = searchTerm.toLowerCase();
+    const term = deferredSearchTerm.trim().toLowerCase();
+    if (!term) return dataWithIndices;
+
     return dataWithIndices.filter((row) =>
       Object.entries(row).some(([key, val]) => {
-        if (key === '_originalIndex') return false;
-        if (!columns.includes(key)) return false;
+        if (key === "_originalIndex") return false;
+        if (!searchableColumns.has(key)) return false;
         if (val === null || val === undefined) return false;
-        if (typeof val === 'object') {
+        if (typeof val === "object") {
           return JSON.stringify(val).toLowerCase().includes(term);
         }
         return String(val).toLowerCase().includes(term);
       }),
     );
-  }, [data, searchTerm, columns]);
+  }, [dataWithIndices, deferredSearchTerm, searchableColumns]);
 
   const rowVirtualizer = useVirtualizer({
     count: filteredData.length,
@@ -196,7 +212,10 @@ export function SQLLabDataTable({
           />
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm("")}
+              onClick={() => {
+                setSearchTerm("");
+                setDeferredSearchTerm("");
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-foreground"
             >
               <X className="h-3 w-3" />
