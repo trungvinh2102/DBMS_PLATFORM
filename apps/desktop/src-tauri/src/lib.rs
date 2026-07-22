@@ -19,6 +19,23 @@ const HEALTH_CHECK_INTERVAL_MS: u64 = 500;
 /// Port on which the backend API listens.
 const BACKEND_PORT: u16 = 5000;
 
+#[cfg(target_os = "linux")]
+fn linux_webkit_ime_workaround_env() -> Option<(&'static str, &'static str)> {
+    // Work around WebKitGTK/Tauri v2 Linux IME preedit windows appearing away
+    // from the focused input/editor. This must be set before WebKit starts.
+    Some(("WEBKIT_DISABLE_COMPOSITING_MODE", "1"))
+}
+
+#[cfg(target_os = "linux")]
+fn configure_linux_webkit_ime_workaround() {
+    if let Some((key, value)) = linux_webkit_ime_workaround_env() {
+        std::env::set_var(key, value);
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn configure_linux_webkit_ime_workaround() {}
+
 /// Shared state to hold the backend sidecar child process handle.
 struct SidecarState(Mutex<Option<CommandChild>>);
 
@@ -113,6 +130,8 @@ fn shutdown_sidecar(state: &SidecarState) {
 /// backend sidecar, and registers lifecycle handlers.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    configure_linux_webkit_ime_workaround();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -168,4 +187,17 @@ pub fn run() {
                 _ => {}
             }
         });
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linux_webkit_ime_workaround_disables_compositing_before_webview_start() {
+        assert_eq!(
+            linux_webkit_ime_workaround_env(),
+            Some(("WEBKIT_DISABLE_COMPOSITING_MODE", "1"))
+        );
+    }
 }
