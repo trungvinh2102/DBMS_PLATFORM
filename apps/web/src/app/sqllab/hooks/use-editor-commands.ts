@@ -33,11 +33,6 @@ export function registerEditorCommands({
     onSave?.();
   });
 
-  // Ctrl+F to format
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {
-    onFormat?.();
-  });
-
   // Ctrl+Shift+X to stop
   editor.addCommand(
     monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyX,
