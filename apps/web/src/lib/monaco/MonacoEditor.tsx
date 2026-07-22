@@ -17,7 +17,10 @@ import { ErrorPanel } from "@/lib/monaco/ErrorPanel";
 import type { ValidationOptions } from "@/lib/monaco/types";
 import { useSettingsStore } from "@/stores/use-settings-store";
 import { defineThemes } from "@/lib/monaco/themes";
-import { registerSqlAutocomplete } from "@/lib/monaco/sql-autocomplete";
+import {
+  registerSqlAutocomplete,
+  registerSqlSuggestOnTyping,
+} from "@/lib/monaco/sql-autocomplete";
 import { registerMongoAutocomplete } from "@/lib/monaco/mongodb-autocomplete";
 import { registerRedisAutocomplete } from "@/lib/monaco/redis-autocomplete";
 import { registerEditorCommands } from "../../app/sqllab/hooks/use-editor-commands";
@@ -224,20 +227,28 @@ export function SQLEditor({
   );
 
   useEffect(() => {
-    if (!mounted || !monacoRef.current) return;
+    if (!mounted || !monacoRef.current || !editorRef.current) return;
 
     autocompleteDisposablesRef.current.forEach((disposable) =>
       disposable.dispose(),
     );
+    const sqlDisposables =
+      language === "sql"
+        ? [
+            registerSqlSuggestOnTyping(editorRef.current),
+            registerSqlAutocomplete(
+              monacoRef.current,
+              tablesRef,
+              columnsRef,
+              databaseId,
+              schemaId,
+              sqlDialect,
+            ),
+          ]
+        : [];
+
     autocompleteDisposablesRef.current = [
-      registerSqlAutocomplete(
-        monacoRef.current,
-        tablesRef,
-        columnsRef,
-        databaseId,
-        schemaId,
-        sqlDialect,
-      ),
+      ...sqlDisposables,
       registerMongoAutocomplete(monacoRef.current, tablesRef, columnsRef),
       registerRedisAutocomplete(monacoRef.current, tablesRef),
     ];
@@ -248,7 +259,7 @@ export function SQLEditor({
       );
       autocompleteDisposablesRef.current = [];
     };
-  }, [mounted, databaseId, schemaId, sqlDialect]);
+  }, [mounted, databaseId, schemaId, sqlDialect, language]);
 
   return (
     <div className="sql-editor-container h-full flex flex-col overflow-hidden">
@@ -292,6 +303,10 @@ export function SQLEditor({
               strings: false,
             },
             quickSuggestionsDelay: 100,
+            wordBasedSuggestions: "off",
+            suggest: {
+              showWords: false,
+            },
           }}
         />
       </div>

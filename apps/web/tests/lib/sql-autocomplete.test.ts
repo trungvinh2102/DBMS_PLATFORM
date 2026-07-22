@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   getSqlColumnCompletionParts,
+  registerSqlAutocomplete,
+  registerSqlSuggestOnTyping,
 } from "@/lib/monaco/sql-autocomplete";
 import {
   sanitizeInlineSqlCompletion,
@@ -119,5 +121,359 @@ describe("SQL column completion metadata", () => {
       columnType: "TIMESTAMP",
       label: "orders.created_at",
     });
+  });
+});
+
+describe("SQL completion provider triggers", () => {
+  it("opens SQL suggestions immediately when typing an identifier character", () => {
+    let listener: ((event: any) => void) | undefined;
+    const editor = {
+      onDidChangeModelContent: vi.fn((callback) => {
+        listener = callback;
+        return { dispose: vi.fn() };
+      }),
+      trigger: vi.fn(),
+    };
+
+    registerSqlSuggestOnTyping(editor as any);
+    listener?.({ changes: [{ text: "s" }] });
+
+    expect(editor.trigger).toHaveBeenCalledWith(
+      "quriodb.sql-autocomplete",
+      "editor.action.triggerSuggest",
+      {},
+    );
+  });
+
+  it("does not open SQL suggestions for whitespace or paste changes", () => {
+    let listener: ((event: any) => void) | undefined;
+    const editor = {
+      onDidChangeModelContent: vi.fn((callback) => {
+        listener = callback;
+        return { dispose: vi.fn() };
+      }),
+      trigger: vi.fn(),
+    };
+
+    registerSqlSuggestOnTyping(editor as any);
+    listener?.({ changes: [{ text: " " }] });
+    listener?.({ changes: [{ text: "SELECT" }] });
+
+    expect(editor.trigger).not.toHaveBeenCalled();
+  });
+
+  it("does not retrigger SQL suggestions while continuing the same word", () => {
+    let listener: ((event: any) => void) | undefined;
+    let lineContent = "s";
+    const editor = {
+      getModel: vi.fn(() => ({
+        getLineContent: vi.fn(() => lineContent),
+      })),
+      onDidChangeModelContent: vi.fn((callback) => {
+        listener = callback;
+        return { dispose: vi.fn() };
+      }),
+      trigger: vi.fn(),
+    };
+
+    registerSqlSuggestOnTyping(editor as any);
+    listener?.({
+      changes: [{ text: "s", range: { startLineNumber: 1, startColumn: 1 } }],
+    });
+    lineContent = "se";
+    listener?.({
+      changes: [{ text: "e", range: { startLineNumber: 1, startColumn: 2 } }],
+    });
+
+    expect(editor.trigger).toHaveBeenCalledTimes(1);
+  });
+
+  it("registers inline completions with Monaco's disposal callback", () => {
+    const inlineProviders: any[] = [];
+    const monaco = {
+      Range: class Range {
+        constructor(
+          public startLineNumber: number,
+          public startColumn: number,
+          public endLineNumber: number,
+          public endColumn: number,
+        ) {}
+      },
+      languages: {
+        CompletionItemKind: {
+          Class: 1,
+          Field: 2,
+          Keyword: 3,
+          Snippet: 4,
+        },
+        InlineCompletionTriggerKind: {
+          Explicit: 1,
+        },
+        registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
+        registerInlineCompletionsProvider: vi.fn((language, provider) => {
+          inlineProviders.push({ language, provider });
+          return { dispose: vi.fn() };
+        }),
+      },
+    };
+
+    const disposable = registerSqlAutocomplete(
+      monaco as any,
+      { current: [] },
+      { current: [] },
+      "db-1",
+      "public",
+      "postgresql",
+      true,
+    );
+
+    expect(inlineProviders[0]?.language).toBe("sql");
+    expect(inlineProviders[0]?.provider.disposeInlineCompletions).toEqual(
+      expect.any(Function),
+    );
+
+    disposable.dispose();
+  });
+
+  it("does not register AI inline completions by default", () => {
+    const monaco = {
+      Range: class Range {
+        constructor(
+          public startLineNumber: number,
+          public startColumn: number,
+          public endLineNumber: number,
+          public endColumn: number,
+        ) {}
+      },
+      languages: {
+        CompletionItemKind: {
+          Class: 1,
+          Field: 2,
+          Keyword: 3,
+          Snippet: 4,
+        },
+        InlineCompletionTriggerKind: {
+          Explicit: 1,
+        },
+        registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
+        registerInlineCompletionsProvider: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+    };
+
+    const disposable = registerSqlAutocomplete(
+      monaco as any,
+      { current: [] },
+      { current: [] },
+      "db-1",
+      "public",
+      "postgresql",
+    );
+
+    expect(monaco.languages.registerCompletionItemProvider).toHaveBeenCalled();
+    expect(
+      monaco.languages.registerInlineCompletionsProvider,
+    ).not.toHaveBeenCalled();
+
+    disposable.dispose();
+  });
+
+  it("treats `s` as a keyword trigger so SELECT syntax appears while typing", () => {
+    const completionProviders: any[] = [];
+    const monaco = {
+      Range: class Range {
+        constructor(
+          public startLineNumber: number,
+          public startColumn: number,
+          public endLineNumber: number,
+          public endColumn: number,
+        ) {}
+      },
+      languages: {
+        CompletionItemKind: {
+          Class: 1,
+          Field: 2,
+          Keyword: 3,
+          Snippet: 4,
+        },
+        InlineCompletionTriggerKind: {
+          Explicit: 1,
+        },
+        registerCompletionItemProvider: vi.fn((language, provider) => {
+          completionProviders.push({ language, provider });
+          return { dispose: vi.fn() };
+        }),
+        registerInlineCompletionsProvider: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+    };
+
+    const disposable = registerSqlAutocomplete(
+      monaco as any,
+      { current: [] },
+      { current: [] },
+      "db-1",
+      "public",
+      "postgresql",
+    );
+
+    const sqlProvider = completionProviders.find(
+      (entry) => entry.language === "sql",
+    )?.provider;
+    expect(sqlProvider?.triggerCharacters).toContain("s");
+
+    const suggestions = sqlProvider.provideCompletionItems(
+      {
+        getWordUntilPosition: () => ({ startColumn: 1, endColumn: 2 }),
+        getVersionId: () => 1,
+        getValueInRange: () => "s",
+        getValue: () => "s",
+      },
+      { lineNumber: 1, column: 2 },
+    ).suggestions;
+
+    expect(suggestions.map((item: any) => item.label)).toContain("SELECT");
+
+    disposable.dispose();
+  });
+
+  it("ranks all SQL keywords above snippets, tables, and columns", () => {
+    const completionProviders: any[] = [];
+    const monaco = {
+      Range: class Range {
+        constructor(
+          public startLineNumber: number,
+          public startColumn: number,
+          public endLineNumber: number,
+          public endColumn: number,
+        ) {}
+      },
+      languages: {
+        CompletionItemKind: {
+          Class: 1,
+          Field: 2,
+          Keyword: 3,
+          Snippet: 4,
+        },
+        InlineCompletionTriggerKind: {
+          Explicit: 1,
+        },
+        registerCompletionItemProvider: vi.fn((language, provider) => {
+          completionProviders.push({ language, provider });
+          return { dispose: vi.fn() };
+        }),
+        registerInlineCompletionsProvider: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+    };
+
+    const disposable = registerSqlAutocomplete(
+      monaco as any,
+      { current: ["users"] },
+      { current: [{ table: "users", name: "id", type: "INTEGER" }] },
+      "db-1",
+      "public",
+      "postgresql",
+    );
+
+    const sqlProvider = completionProviders.find(
+      (entry) => entry.language === "sql",
+    )?.provider;
+    const suggestions = sqlProvider.provideCompletionItems(
+      {
+        getWordUntilPosition: () => ({ startColumn: 1, endColumn: 2 }),
+        getVersionId: () => 1,
+        getValueInRange: () => "s",
+        getValue: () => "s",
+      },
+      { lineNumber: 1, column: 2 },
+    ).suggestions;
+
+    const keywordSuggestions = suggestions.filter(
+      (item: any) => item.kind === monaco.languages.CompletionItemKind.Keyword,
+    );
+    const usersTable = suggestions.find(
+      (item: any) =>
+        item.label === "users" &&
+        item.kind === monaco.languages.CompletionItemKind.Class,
+    );
+
+    expect(keywordSuggestions.length).toBeGreaterThan(0);
+    expect(
+      keywordSuggestions.every((item: any) =>
+        item.sortText.startsWith("00_keyword_"),
+      ),
+    ).toBe(true);
+    expect(
+      keywordSuggestions.every(
+        (item: any) => item.sortText < usersTable.sortText,
+      ),
+    ).toBe(true);
+    expect(
+      suggestions.every(
+        (item: any) =>
+          item.kind === monaco.languages.CompletionItemKind.Keyword ||
+          keywordSuggestions[0].sortText < item.sortText,
+      ),
+    ).toBe(true);
+
+    disposable.dispose();
+  });
+
+  it("returns keyword suggestions before matching table names", () => {
+    const completionProviders: any[] = [];
+    const monaco = {
+      Range: class Range {
+        constructor(
+          public startLineNumber: number,
+          public startColumn: number,
+          public endLineNumber: number,
+          public endColumn: number,
+        ) {}
+      },
+      languages: {
+        CompletionItemKind: {
+          Class: 1,
+          Field: 2,
+          Keyword: 3,
+          Snippet: 4,
+        },
+        InlineCompletionTriggerKind: {
+          Explicit: 1,
+        },
+        registerCompletionItemProvider: vi.fn((language, provider) => {
+          completionProviders.push({ language, provider });
+          return { dispose: vi.fn() };
+        }),
+        registerInlineCompletionsProvider: vi.fn(() => ({ dispose: vi.fn() })),
+      },
+    };
+
+    const disposable = registerSqlAutocomplete(
+      monaco as any,
+      { current: ["sq_log_table"] },
+      { current: [] },
+      "db-1",
+      "public",
+      "postgresql",
+    );
+
+    const sqlProvider = completionProviders.find(
+      (entry) => entry.language === "sql",
+    )?.provider;
+    const suggestions = sqlProvider.provideCompletionItems(
+      {
+        getWordUntilPosition: () => ({ startColumn: 1, endColumn: 2 }),
+        getVersionId: () => 1,
+        getValueInRange: () => "s",
+        getValue: () => "s",
+      },
+      { lineNumber: 1, column: 2 },
+    ).suggestions;
+
+    expect(suggestions[0]).toMatchObject({
+      label: "SELECT",
+      kind: monaco.languages.CompletionItemKind.Keyword,
+      sortText: "00_keyword_SELECT",
+    });
+
+    disposable.dispose();
   });
 });

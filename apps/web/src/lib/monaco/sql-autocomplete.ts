@@ -212,6 +212,57 @@ const MAX_COLUMN_SUGGESTIONS = 80;
 let aliasCacheVersionId = -1;
 let cachedAliases: Record<string, string> = {};
 
+const buildSqlTriggerCharacters = (
+  completions: ReturnType<typeof getSqlDialectCompletions>,
+): string[] => {
+  const syntaxInitials = [
+    ...completions.keywords,
+    ...completions.snippets.map((snippet) => snippet.label),
+  ].flatMap((label) => {
+    const firstCharacter = label.trim().charAt(0);
+    if (!/^[a-z]$/i.test(firstCharacter)) return [];
+    return [firstCharacter.toLowerCase(), firstCharacter.toUpperCase()];
+  });
+
+  return Array.from(new Set([".", '"', ...syntaxInitials]));
+};
+
+const isSqlIdentifierCharacter = (text: string): boolean =>
+  /[a-zA-Z0-9_]/.test(text);
+
+const shouldTriggerSqlSuggestForInput = (
+  text: string,
+  previousCharacter?: string,
+): boolean => {
+  if (text.length !== 1) return false;
+  if (text === "." || text === '"' || text === "`") return true;
+  if (!isSqlIdentifierCharacter(text)) return false;
+  return !previousCharacter || !isSqlIdentifierCharacter(previousCharacter);
+};
+
+export const registerSqlSuggestOnTyping = (
+  editor: monacoEditor.editor.IStandaloneCodeEditor,
+): monacoEditor.IDisposable =>
+  editor.onDidChangeModelContent((event) => {
+    if (event.changes.length !== 1) return;
+    const change = event.changes[0];
+    const lineContent = editor
+      .getModel?.()
+      ?.getLineContent(change.range?.startLineNumber ?? 1);
+    const previousCharacter = lineContent?.charAt(
+      (change.range?.startColumn ?? 1) - 2,
+    );
+
+    if (!shouldTriggerSqlSuggestForInput(change.text, previousCharacter))
+      return;
+
+    editor.trigger(
+      "quriodb.sql-autocomplete",
+      "editor.action.triggerSuggest",
+      {},
+    );
+  });
+
 export const registerSqlAutocomplete = (
   monaco: Monaco,
   tablesRef: React.MutableRefObject<string[]>,
@@ -219,12 +270,14 @@ export const registerSqlAutocomplete = (
   databaseId?: string,
   schemaId?: string,
   dialect?: string,
+  enableInlineAi = false,
 ) => {
   const disposables: monacoEditor.IDisposable[] = [];
+  const dialectCompletions = getSqlDialectCompletions(dialect);
 
   disposables.push(
     monaco.languages.registerCompletionItemProvider("sql", {
-      triggerCharacters: [".", '"'],
+      triggerCharacters: buildSqlTriggerCharacters(dialectCompletions),
       provideCompletionItems: (
         model: monacoEditor.editor.ITextModel,
         position: monacoEditor.Position,
@@ -289,16 +342,25 @@ export const registerSqlAutocomplete = (
           }
         }
 
-        const dialectCompletions = getSqlDialectCompletions(dialect);
         const tableCount = tablesRef.current.length;
 
         // Limit column suggestions based on schema size to keep UI responsive
         const columnSuggestions = normalizedColumns.slice(
           0,
-          tableCount > 20 ? Math.min(MAX_COLUMN_SUGGESTIONS, normalizedColumns.length) : normalizedColumns.length,
+          tableCount > 20
+            ? Math.min(MAX_COLUMN_SUGGESTIONS, normalizedColumns.length)
+            : normalizedColumns.length,
         );
 
         const suggestions: any[] = [
+          ...dialectCompletions.keywords.map((keyword) => ({
+            label: keyword,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: keyword,
+            range: range,
+            sortText: `00_keyword_${keyword}`,
+            preselect: keyword === "SELECT",
+          })),
           ...dialectCompletions.snippets.map((snip) => ({
             label: snip.label,
             kind: monaco.languages.CompletionItemKind.Snippet,
@@ -306,14 +368,7 @@ export const registerSqlAutocomplete = (
             insertText: snip.insertText,
             documentation: snip.documentation,
             range: range,
-            sortText: "0",
-          })),
-          ...dialectCompletions.keywords.map((keyword) => ({
-            label: keyword,
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: keyword,
-            range: range,
-            sortText: "1",
+            sortText: `10_snippet_${snip.label}`,
           })),
           ...tablesRef.current.map((table) => ({
             label: table,
@@ -321,7 +376,7 @@ export const registerSqlAutocomplete = (
             documentation: `Table: ${table}`,
             insertText: shouldQuote(table) ? `"${table}"` : table,
             range: range,
-            sortText: "2",
+            sortText: `20_table_${table}`,
           })),
           ...columnSuggestions.map((col) => {
             const quotedName = shouldQuote(col.columnName)
@@ -338,7 +393,7 @@ export const registerSqlAutocomplete = (
                 : `Column: ${col.columnName}`,
               insertText: quotedName,
               range: range,
-              sortText: "3",
+              sortText: `30_column_${col.label}`,
               filterText: col.filterText,
             };
           }),
@@ -349,143 +404,144 @@ export const registerSqlAutocomplete = (
     }),
   );
 
-  // Inline AI Autocomplete Provider
   let timeout: any = null;
   let currentRequestObj: AbortController | null = null;
   const completionCache = new Map<string, InlineCompletionCacheEntry>();
 
-  disposables.push(
-    monaco.languages.registerInlineCompletionsProvider("sql", {
-      provideInlineCompletions: async (
-        model: monacoEditor.editor.ITextModel,
-        position: monacoEditor.Position,
-        context: monacoEditor.languages.InlineCompletionContext,
-        token: monacoEditor.CancellationToken,
-      ) => {
-        if (!databaseId) return { items: [] };
+  if (enableInlineAi) {
+    disposables.push(
+      monaco.languages.registerInlineCompletionsProvider("sql", {
+        provideInlineCompletions: async (
+          model: monacoEditor.editor.ITextModel,
+          position: monacoEditor.Position,
+          context: monacoEditor.languages.InlineCompletionContext,
+          token: monacoEditor.CancellationToken,
+        ) => {
+          if (!databaseId) return { items: [] };
 
-        const textUntilPosition = model.getValueInRange({
-          startLineNumber: 1,
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
-          endColumn: position.column,
-        });
-
-        const textAfterPosition = model.getValueInRange({
-          startLineNumber: position.lineNumber,
-          startColumn: position.column,
-          endLineNumber: model.getLineCount(),
-          endColumn: model.getLineMaxColumn(model.getLineCount()),
-        });
-
-        const currentLinePrefix = model.getValueInRange({
-          startLineNumber: position.lineNumber,
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
-          endColumn: position.column,
-        });
-
-        const nextCharacter = model.getValueInRange({
-          startLineNumber: position.lineNumber,
-          startColumn: position.column,
-          endLineNumber: position.lineNumber,
-          endColumn: Math.min(
-            position.column + 1,
-            model.getLineMaxColumn(position.lineNumber),
-          ),
-        });
-
-        const isExplicit =
-          context.triggerKind ===
-          monaco.languages.InlineCompletionTriggerKind.Explicit;
-        if (
-          !shouldRequestInlineSqlCompletion({
-            prefix: textUntilPosition,
-            currentLinePrefix,
-            nextCharacter,
-            isExplicit,
-          })
-        ) {
-          return { items: [] };
-        }
-
-        const trimmedContext = trimInlineCompletionContext(
-          textUntilPosition,
-          textAfterPosition,
-        );
-        const cacheKey = buildInlineCompletionCacheKey(
-          databaseId,
-          schemaId,
-          trimmedContext.prefix,
-          trimmedContext.suffix,
-        );
-        const cached = completionCache.get(cacheKey);
-        if (cached && cached.expiresAt > Date.now()) {
-          return toInlineCompletionItems(monaco, position, cached.completion);
-        }
-
-        return new Promise((resolve) => {
-          if (timeout) clearTimeout(timeout);
-          if (currentRequestObj) currentRequestObj.abort();
-
-          const modelVersionId = model.getVersionId();
-
-          token.onCancellationRequested(() => {
-            if (currentRequestObj) currentRequestObj.abort();
-            resolve({ items: [] });
+          const textUntilPosition = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
           });
 
-          timeout = setTimeout(async () => {
-            // If model changed before timeout, cancel
-            if (model.getVersionId() !== modelVersionId) {
-              return resolve({ items: [] });
-            }
+          const textAfterPosition = model.getValueInRange({
+            startLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endLineNumber: model.getLineCount(),
+            endColumn: model.getLineMaxColumn(model.getLineCount()),
+          });
 
-            const abortController = new AbortController();
-            currentRequestObj = abortController;
+          const currentLinePrefix = model.getValueInRange({
+            startLineNumber: position.lineNumber,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
 
-            try {
-              const res = await aiApi.completeSql(
-                {
-                  databaseId,
-                  schema_name: schemaId || "public",
-                  prefix: trimmedContext.prefix,
-                  suffix: trimmedContext.suffix,
-                },
-                abortController.signal,
-              );
+          const nextCharacter = model.getValueInRange({
+            startLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endLineNumber: position.lineNumber,
+            endColumn: Math.min(
+              position.column + 1,
+              model.getLineMaxColumn(position.lineNumber),
+            ),
+          });
 
-              if (
-                abortController.signal.aborted ||
-                token.isCancellationRequested
-              ) {
+          const isExplicit =
+            context.triggerKind ===
+            monaco.languages.InlineCompletionTriggerKind.Explicit;
+          if (
+            !shouldRequestInlineSqlCompletion({
+              prefix: textUntilPosition,
+              currentLinePrefix,
+              nextCharacter,
+              isExplicit,
+            })
+          ) {
+            return { items: [] };
+          }
+
+          const trimmedContext = trimInlineCompletionContext(
+            textUntilPosition,
+            textAfterPosition,
+          );
+          const cacheKey = buildInlineCompletionCacheKey(
+            databaseId,
+            schemaId,
+            trimmedContext.prefix,
+            trimmedContext.suffix,
+          );
+          const cached = completionCache.get(cacheKey);
+          if (cached && cached.expiresAt > Date.now()) {
+            return toInlineCompletionItems(monaco, position, cached.completion);
+          }
+
+          return new Promise((resolve) => {
+            if (timeout) clearTimeout(timeout);
+            if (currentRequestObj) currentRequestObj.abort();
+
+            const modelVersionId = model.getVersionId();
+
+            token.onCancellationRequested(() => {
+              if (currentRequestObj) currentRequestObj.abort();
+              resolve({ items: [] });
+            });
+
+            timeout = setTimeout(async () => {
+              // If model changed before timeout, cancel
+              if (model.getVersionId() !== modelVersionId) {
                 return resolve({ items: [] });
               }
 
-              const completionText = sanitizeInlineSqlCompletion(
-                textUntilPosition,
-                (res as any).completion,
-              );
-              if (completionText) {
-                completionCache.set(cacheKey, {
-                  completion: completionText,
-                  expiresAt: Date.now() + AI_COMPLETION_CACHE_TTL_MS,
-                });
-                resolve(
-                  toInlineCompletionItems(monaco, position, completionText),
+              const abortController = new AbortController();
+              currentRequestObj = abortController;
+
+              try {
+                const res = await aiApi.completeSql(
+                  {
+                    databaseId,
+                    schema_name: schemaId || "public",
+                    prefix: trimmedContext.prefix,
+                    suffix: trimmedContext.suffix,
+                  },
+                  abortController.signal,
                 );
-              } else {
+
+                if (
+                  abortController.signal.aborted ||
+                  token.isCancellationRequested
+                ) {
+                  return resolve({ items: [] });
+                }
+
+                const completionText = sanitizeInlineSqlCompletion(
+                  textUntilPosition,
+                  (res as any).completion,
+                );
+                if (completionText) {
+                  completionCache.set(cacheKey, {
+                    completion: completionText,
+                    expiresAt: Date.now() + AI_COMPLETION_CACHE_TTL_MS,
+                  });
+                  resolve(
+                    toInlineCompletionItems(monaco, position, completionText),
+                  );
+                } else {
+                  resolve({ items: [] });
+                }
+              } catch (err) {
                 resolve({ items: [] });
               }
-            } catch (err) {
-              resolve({ items: [] });
-            }
-          }, AI_COMPLETION_DEBOUNCE_MS);
-        });
-      },
-      freeInlineCompletions() {},
-    }),
-  );
+            }, AI_COMPLETION_DEBOUNCE_MS);
+          });
+        },
+        disposeInlineCompletions() {},
+      }),
+    );
+  }
 
   return {
     dispose: () => {
