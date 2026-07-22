@@ -105,7 +105,7 @@ describe("AIMessage", () => {
     expect(await screen.findByText("Alice")).toBeInTheDocument();
   });
 
-  it("shows saved thinking activity even when the assistant message has SQL", () => {
+  it("reveals saved thinking activity even when the assistant message has SQL", async () => {
     render(
       <AIMessage
         message={{
@@ -125,6 +125,8 @@ describe("AIMessage", () => {
         onOptimize={vi.fn()}
       />,
     );
+
+    await userEvent.click(screen.getByRole("button", { name: /xem hoạt động trợ lý/i }));
 
     expect(screen.getByText("Initializing context...")).toBeInTheDocument();
   });
@@ -149,11 +151,12 @@ describe("AIMessage", () => {
       />,
     );
 
+    await userEvent.click(screen.getByRole("button", { name: /xem hoạt động trợ lý/i }));
     expect(screen.getByText("Xác định yêu cầu của người dùng.")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /hide assistant activity/i }));
+    await userEvent.click(screen.getByRole("button", { name: /ẩn hoạt động trợ lý/i }));
 
-    expect(screen.getByRole("button", { name: /view assistant activity/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /xem hoạt động trợ lý/i })).toBeInTheDocument();
     expect(screen.queryByText("Xác định yêu cầu của người dùng.")).not.toBeInTheDocument();
   });
 
