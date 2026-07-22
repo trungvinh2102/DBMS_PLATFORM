@@ -12,7 +12,7 @@ import { databaseApi } from "@/lib/api-client";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
-import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from "recharts";
+import { RadialScore } from "./light-charts";
 
 export function HealthMonitor() {
   const { data: connections } = useQuery({
@@ -25,7 +25,6 @@ export function HealthMonitor() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats(activeDbId);
 
   const score = stats?.health.score || 0;
-  const healthData = [{ value: score, fill: score > 80 ? "var(--color-primary)" : "#f59e0b" }];
 
   return (
     <motion.div
@@ -42,37 +41,7 @@ export function HealthMonitor() {
         {statsLoading ? (
            <Skeleton className="h-full w-full rounded-full bg-black/5" />
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <RadialBarChart 
-              innerRadius="70%" 
-              outerRadius="100%" 
-              data={healthData} 
-              startAngle={90} 
-              endAngle={450}
-            >
-              <PolarAngleAxis
-                type="number"
-                domain={[0, 100]}
-                angleAxisId={0}
-                tick={false}
-              />
-              <RadialBar
-                isAnimationActive={false}
-                background
-                dataKey="value"
-                cornerRadius={30}
-              />
-              <text
-                x="50%"
-                y="50%"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                className="fill-foreground text-2xl font-bold"
-              >
-                {score}%
-              </text>
-            </RadialBarChart>
-          </ResponsiveContainer>
+          <RadialScore score={score} />
         )}
       </div>
       

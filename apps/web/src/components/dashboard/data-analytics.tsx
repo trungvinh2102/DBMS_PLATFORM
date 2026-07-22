@@ -5,46 +5,12 @@
 
 "use client";
 
-import React from "react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  PieChart,
-  Pie,
-} from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Clock, PieChart as PieChartIcon, Loader2 } from "lucide-react";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { useQuery } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
-
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="rounded-xl border border-border bg-card/80 backdrop-blur-md p-3 shadow-xl transition-all">
-        <p className="text-xs font-semibold mb-1 text-foreground">{label}</p>
-        <div className="space-y-1">
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || entry.payload.fill || entry.fill }} />
-              <span className="text-[10px] text-muted-foreground mr-auto">{entry.name}:</span>
-              <span className="text-[11px] font-bold text-foreground">{entry.value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
+import { BarDistributionChart, DonutChart, TrendChart } from "./light-charts";
 
 export function DataAnalytics() {
   // Fetch connections to get a default DB if none selected
@@ -88,10 +54,10 @@ export function DataAnalytics() {
       { time: "22:00", tps: 400, cpu: 20 },
     ];
 
-  const performanceData = rawPerformance.map(p => ({
+  const performanceData = rawPerformance.map((p) => ({
     name: p.time,
-    executions: p.tps,
-    latency: p.cpu
+    executions: p.tps ?? ("total_queries" in p ? p.total_queries : 0),
+    latency: p.cpu ?? ("avg_latency" in p ? p.avg_latency : 0),
   }));
 
   const operationDistribution = [
@@ -121,50 +87,7 @@ export function DataAnalytics() {
           </div>
         </CardHeader>
         <CardContent className="h-[300px] pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={performanceData}>
-              <defs>
-                <linearGradient id="colorExec" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground) / 0.1)" />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-                dy={10}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Area
-                isAnimationActive={false}
-                type="monotone"
-                dataKey="executions"
-                stroke="var(--color-primary)"
-                strokeWidth={3}
-                fillOpacity={1}
-                fill="url(#colorExec)"
-                name="TPS"
-              />
-              <Area
-                isAnimationActive={false}
-                type="monotone"
-                dataKey="latency"
-                stroke="var(--color-accent)"
-                strokeWidth={2}
-                fill="transparent"
-                strokeDasharray="5 5"
-                name="CPU Load"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          <TrendChart data={performanceData} />
         </CardContent>
       </Card>
 
@@ -180,24 +103,7 @@ export function DataAnalytics() {
           </div>
         </CardHeader>
         <CardContent className="h-[300px] pt-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={latencyDistribution}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground) / 0.1)" />
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10 }}
-              />
-              <YAxis hide />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--color-primary)', opacity: 0.05 }} />
-              <Bar isAnimationActive={false} dataKey="count" radius={[6, 6, 0, 0]}>
-                {latencyDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <BarDistributionChart data={latencyDistribution} />
         </CardContent>
       </Card>
 
@@ -213,25 +119,7 @@ export function DataAnalytics() {
           </div>
         </CardHeader>
         <CardContent className="h-[200px] flex items-center justify-center pt-2">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                isAnimationActive={false}
-                data={operationDistribution}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {operationDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
+          <DonutChart data={operationDistribution} />
           <div className="flex flex-col gap-1 ml-4 justify-center">
             {operationDistribution.map((item, i) => (
               <div key={i} className="flex items-center gap-2">
