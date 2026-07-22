@@ -43,9 +43,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-recharts': ['recharts'],
             'vendor-xyflow': ['@xyflow/react'],
-            'vendor-ai': ['ai', '@ai-sdk/react', '@ai-sdk/google'],
             'vendor-monaco': ['monaco-editor', '@monaco-editor/react'],
             'vendor-tanstack': ['@tanstack/react-query', '@tanstack/react-table', '@tanstack/react-virtual', '@tanstack/react-form'],
           },
