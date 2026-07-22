@@ -1,4 +1,4 @@
-import { vi, describe, it, expect } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
 import { exportData } from "@/lib/export";
 
@@ -15,14 +15,31 @@ describe("Utility: exportData", () => {
   const MOCK_DATA = [{ id: 1, name: "Admin" }];
   const MOCK_COLUMNS = ["id", "name"];
 
-  it("calls the appropriate XLSX methods for a CSV export", async () => {
+  beforeEach(() => {
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:mock-url"),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+
+  it("downloads CSV without using XLSX", async () => {
+    const click = vi.fn();
+    const anchor = document.createElement("a");
+    anchor.click = click;
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockReturnValue(anchor);
+
     await exportData(MOCK_DATA, MOCK_COLUMNS, "csv", "test-file");
 
-    expect(XLSX.utils.json_to_sheet).toHaveBeenCalled();
-    expect(XLSX.writeFile).toHaveBeenCalledWith(
-      expect.any(Object),
-      "test-file.csv",
-    );
+    expect(XLSX.utils.json_to_sheet).not.toHaveBeenCalled();
+    expect(XLSX.writeFile).not.toHaveBeenCalled();
+    expect(anchor.download).toBe("test-file.csv");
+    expect(anchor.href).toBe("blob:mock-url");
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+
+    createElementSpy.mockRestore();
   });
 
   it("handles empty data by logging a warning", async () => {
@@ -33,14 +50,33 @@ describe("Utility: exportData", () => {
     warnSpy.mockRestore();
   });
 
-  it("handles object stringification for complex nested data", async () => {
-    const complexData = [{ id: 1, meta: { active: true }, tags: ["a", "b"] }];
-    const complexCols = ["id", "meta", "tags"];
-    await exportData(complexData, complexCols, "csv", "complex-export");
+  it("stringifies nested values in CSV output", async () => {
+    const createObjectURL = vi.fn((blob: Blob) => {
+      expect(blob.type).toBe("text/csv;charset=utf-8");
+      return "blob:complex-url";
+    });
+    vi.stubGlobal("URL", {
+      createObjectURL,
+      revokeObjectURL: vi.fn(),
+    });
 
-    expect(XLSX.utils.json_to_sheet).toHaveBeenCalledWith([
-      { id: 1, meta: '{"active":true}', tags: '["a","b"]' },
-    ]);
+    const anchor = document.createElement("a");
+    anchor.click = vi.fn();
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockReturnValue(anchor);
+
+    await exportData(
+      [{ id: 1, meta: { active: true }, tags: ["a", "b"] }],
+      ["id", "meta", "tags"],
+      "csv",
+      "complex-export",
+    );
+
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(anchor.download).toBe("complex-export.csv");
+
+    createElementSpy.mockRestore();
   });
 
   it("handles auto-width for xlsx export", async () => {
@@ -49,6 +85,9 @@ describe("Utility: exportData", () => {
 
     await exportData(data, cols, "xlsx", "test-file");
 
+    expect(XLSX.utils.json_to_sheet).toHaveBeenCalledWith([
+      { id: 1, name: "Long name that takes space" },
+    ]);
     expect(XLSX.writeFile).toHaveBeenCalledWith(
       expect.any(Object),
       "test-file.xlsx",
