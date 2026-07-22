@@ -175,4 +175,23 @@ describe("AIMessage", () => {
     expect(screen.getByText("The query is ready.")).toBeInTheDocument();
     expect(screen.queryByText(/20% Confidence/i)).not.toBeInTheDocument();
   });
+
+  it("renders assistant SQL in a plain code block without a loading fallback", () => {
+    const { container } = render(
+      <AIMessage
+        message={{
+          id: "assistant-plain-sql",
+          role: "assistant",
+          content: "",
+          sql: "SELECT id, name FROM users;",
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+      />,
+    );
+
+    const code = container.querySelector("pre code");
+    expect(code).toHaveTextContent("SELECT id, name FROM users;");
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+  });
 });

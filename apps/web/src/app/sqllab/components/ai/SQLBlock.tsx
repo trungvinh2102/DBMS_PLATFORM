@@ -8,12 +8,6 @@ import { Copy, Check, Sparkles, FileSearch, Wand2, Table2, Loader2 } from "lucid
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Fixed: Use CJS version to avoid resolution issues
-import vscDarkPlus from 'react-syntax-highlighter/dist/cjs/styles/prism/vsc-dark-plus';
-import oneLight from 'react-syntax-highlighter/dist/cjs/styles/prism/one-light';
-
-const Prism = React.lazy(() => import('react-syntax-highlighter').then(m => ({ default: m.Prism })));
-
 interface SQLBlockProps {
   sql: string;
   isDark: boolean;
@@ -67,25 +61,17 @@ export const SQLBlock = React.memo(({
       </div>
 
       <div className={cn(
-        "p-2.5 overflow-x-auto min-h-10 border-t-0",
+        "overflow-x-auto min-h-10 border-t-0",
         isDark ? "bg-[#0d1117]" : "bg-white"
       )}>
-        <React.Suspense fallback={<div className="h-16 animate-pulse bg-muted/20" />}>
-          <Prism
-            language="sql"
-            style={isDark ? vscDarkPlus : oneLight}
-            customStyle={{
-              background: 'transparent',
-              padding: 0,
-              margin: 0,
-              fontSize: '11px',
-              lineHeight: '1.45',
-              fontFamily: '"JetBrains Mono", "Fira Code", monospace'
-            }}
-          >
-            {sql}
-          </Prism>
-        </React.Suspense>
+        <pre
+          className={cn(
+            "m-0 min-h-10 overflow-x-auto whitespace-pre rounded-none bg-transparent p-2.5 font-mono text-[11px] leading-[1.45]",
+            isDark ? "text-slate-100" : "text-slate-900",
+          )}
+        >
+          <code>{sql}</code>
+        </pre>
       </div>
 
       <div className={cn(
