@@ -6,7 +6,6 @@ import { AuthGuard } from '@/components/auth/auth-guard';
 
 // Lazy load pages for isolation
 const HomePage = lazy(() => import('./app/page'));
-const AiPage = lazy(() => import('./app/ai/page'));
 const LoginPage = lazy(() => import('./app/auth/login/page'));
 const RegisterPage = lazy(() => import('./app/auth/register/page'));
 const ConnectionsPage = lazy(() => import('./app/connections/page'));
@@ -26,7 +25,6 @@ function App() {
             <Suspense fallback={<div className="h-full w-full flex items-center justify-center">Loading page...</div>}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
-                <Route path="/ai" element={<AiPage />} />
                 <Route path="/auth/login" element={<LoginPage />} />
                 <Route path="/auth/register" element={<RegisterPage />} />
                 <Route path="/connections" element={<ConnectionsPage />} />
