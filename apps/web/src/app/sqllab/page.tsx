@@ -105,7 +105,6 @@ function SQLLabContent() {
           onOpenChange={lab.setIsSaveDialogOpen}
           onConfirm={lab.handleSaveConfirmed}
           defaultName={lab.tabs.find((t) => t.id === lab.activeTabId)?.name}
-          defaultScriptPath={lab.tabs.find((t) => t.id === lab.activeTabId)?.scriptPath}
         />
         <OpenQueryDialog
           open={lab.isOpenDialogOpen}

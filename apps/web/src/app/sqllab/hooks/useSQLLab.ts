@@ -3,7 +3,7 @@
  * @description Master composition hook for SQL Lab, integrating state management, query execution, and metadata retrieval.
  */
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -22,7 +22,6 @@ export function useSQLLab() {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useSettingsStore();
-  const lastWorkspaceAutosaveRef = useRef<{ path?: string; content?: string }>({});
 
   // 1. Compose Sub-hooks
   const {
@@ -55,8 +54,7 @@ export function useSQLLab() {
 
   const {
     handleRun, handleExplain, handleFormat, handleStop, executing, runSQLMutation, explainSQLMutation, saveQueryMutation,
-    savedQueries, refetchSavedQueries, workspaceScripts, refetchWorkspaceScripts,
-    loadWorkspaceScriptMutation, saveWorkspaceScriptMutation,
+    savedQueries, refetchSavedQueries,
   } = useSQLLabQuery({
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
@@ -82,50 +80,6 @@ export function useSQLLab() {
       toast.error("Network or execution error. Check details.");
     },
   });
-
-  useEffect(() => {
-    const scriptPath = activeTab.scriptPath;
-    if (!scriptPath) return;
-
-    const content = activeTab.sql;
-    const lastSave = lastWorkspaceAutosaveRef.current;
-    if (lastSave.path === scriptPath && lastSave.content === content) return;
-
-    const timeoutId = window.setTimeout(async () => {
-      lastWorkspaceAutosaveRef.current = { path: scriptPath, content };
-      try {
-        await saveWorkspaceScriptMutation.mutateAsync({
-          path: scriptPath,
-          content,
-        });
-      } catch (error: any) {
-        lastWorkspaceAutosaveRef.current = {};
-        toast.error(error?.message || "Failed to update workspace script");
-      }
-    }, 700);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [activeTab.scriptPath, activeTab.sql, saveWorkspaceScriptMutation]);
-
-  const saveActiveWorkspaceScript = useCallback(async (contentOverride?: string) => {
-    const scriptPath = activeTab.scriptPath;
-    if (!scriptPath) return;
-
-    const content = contentOverride ?? activeTab.sql;
-    const lastSave = lastWorkspaceAutosaveRef.current;
-    if (lastSave.path === scriptPath && lastSave.content === content) return;
-
-    lastWorkspaceAutosaveRef.current = { path: scriptPath, content };
-    try {
-      await saveWorkspaceScriptMutation.mutateAsync({
-        path: scriptPath,
-        content,
-      });
-    } catch (error) {
-      lastWorkspaceAutosaveRef.current = {};
-      throw error;
-    }
-  }, [activeTab.scriptPath, activeTab.sql, saveWorkspaceScriptMutation]);
 
   const saveActiveSavedQuery = useCallback(async (contentOverride?: string) => {
     if (!activeTab.savedQueryId) return;
@@ -280,16 +234,15 @@ export function useSQLLab() {
     loadingTData: tableDataMutation.isPending,
     selectedDSName: selectedDSData?.databaseName || "",
     selectedDSType, isRelational, selectedObjectType: getSelectedObjectType(),
-    savedQueries, refetchSavedQueries, workspaceScripts, refetchWorkspaceScripts,
+    savedQueries, refetchSavedQueries,
 
     // Actions
     handleRun: async (sqlOverride?: string | React.SyntheticEvent) => {
       const actualSql = typeof sqlOverride === "string" ? sqlOverride : undefined;
       try {
-        await saveActiveWorkspaceScript(actualSql);
         await saveActiveSavedQuery(actualSql);
       } catch (error: any) {
-        toast.error(error?.message || "Failed to sync query before run");
+        toast.error(error?.message || "Failed to save query before run");
         return;
       }
       updateActiveTab({ error: null });
@@ -308,7 +261,6 @@ export function useSQLLab() {
     handleSaveConfirmed: async (
       name: string,
       desc?: string,
-      options?: { saveToWorkspace?: boolean; scriptPath?: string },
     ) => {
       let finalSql = activeTab.sql;
       if (settings.editorFormatOnSave) {
@@ -331,41 +283,18 @@ export function useSQLLab() {
         databaseId: activeTab.selectedDS,
       });
       updateActiveTab({ name, savedQueryId: savedQuery.id });
-      if (options?.saveToWorkspace) {
-        const scriptPath = options.scriptPath?.trim() || `${name.replace(/[^\w.-]+/g, "_")}.sql`;
-        const savedScript = await saveWorkspaceScriptMutation.mutateAsync({
-          path: scriptPath,
-          content: finalSql,
-        });
-        lastWorkspaceAutosaveRef.current = { path: savedScript.path, content: finalSql };
-        updateActiveTab({
-          name,
-          savedQueryId: savedQuery.id,
-          scriptPath: savedScript.path,
-          workspaceBaseSql: finalSql,
-        });
-      }
       toast.success(`Query "${name}" saved`);
       ui.setIsSaveDialogOpen(false);
       refetchSavedQueries();
-      refetchWorkspaceScripts();
     },
     handleSelectSavedQuery: (q: any) => {
       updateActiveTab({
         sql: q.sql,
         selectedDS: q.databaseId,
         savedQueryId: q.id,
-        scriptPath: undefined,
-        workspaceBaseSql: undefined,
       });
       renameTab(activeTabId, q.name);
       ui.setIsOpenDialogOpen(false);
-    },
-    handleSelectWorkspaceScript: async (script: { path: string }) => {
-      const loaded = await loadWorkspaceScriptMutation.mutateAsync(script.path);
-      lastWorkspaceAutosaveRef.current = { path: loaded.path, content: loaded.content };
-      updateActiveTab({ sql: loaded.content, scriptPath: loaded.path, workspaceBaseSql: loaded.content });
-      renameTab(activeTabId, loaded.path.split("/").pop()?.replace(/\.sql$/i, "") || "script");
     },
     setSelectedText: (txt: string) => { /* localized in ui trigger if needed */ },
     fixSQLError: ui.fixSQLError,
@@ -378,7 +307,6 @@ export function useSQLLab() {
     },
     handleSave: () => ui.setIsSaveDialogOpen(true),
     handleOpen: () => ui.setIsOpenDialogOpen(true),
-    handleWorkspace: () => ui.setActiveLeftView("repo"),
     handleUndo: ui.triggerUndo,
     handleRedo: ui.triggerRedo,
     addSchemaTab: () => { ui.setRightPanelMode("schema"); ui.setShowRightPanel(true); },

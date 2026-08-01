@@ -16,18 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 
 interface SaveQueryDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (
-    name: string,
-    description?: string,
-    options?: { saveToWorkspace?: boolean; scriptPath?: string },
-  ) => void;
+  onConfirm: (name: string, description?: string) => void;
   defaultName?: string;
-  defaultScriptPath?: string;
 }
 
 export function SaveQueryDialog({
@@ -35,29 +29,20 @@ export function SaveQueryDialog({
   onOpenChange,
   onConfirm,
   defaultName = "",
-  defaultScriptPath = "",
 }: SaveQueryDialogProps) {
   const [name, setName] = useState(defaultName);
   const [description, setDescription] = useState("");
-  const [saveToWorkspace, setSaveToWorkspace] = useState(Boolean(defaultScriptPath));
-  const [scriptPath, setScriptPath] = useState(defaultScriptPath);
 
   useEffect(() => {
     if (!open) return;
     setName(defaultName);
-    setScriptPath(defaultScriptPath);
-    setSaveToWorkspace(Boolean(defaultScriptPath));
-  }, [defaultName, defaultScriptPath, open]);
+  }, [defaultName, open]);
 
   const handleConfirm = () => {
     if (!name.trim()) return;
-    onConfirm(name.trim(), description.trim(), {
-      saveToWorkspace,
-      scriptPath: scriptPath.trim(),
-    });
+    onConfirm(name.trim(), description.trim());
     setName("");
     setDescription("");
-    setScriptPath("");
   };
 
   return (
@@ -88,26 +73,6 @@ export function SaveQueryDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
-          </div>
-          <div className="rounded-md border border-border/60 p-3">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Checkbox
-                checked={saveToWorkspace}
-                onCheckedChange={(checked) => setSaveToWorkspace(Boolean(checked))}
-              />
-              Save a SQL script in the workspace folder
-            </label>
-            {saveToWorkspace && (
-              <div className="mt-3 grid gap-2">
-                <Label htmlFor="scriptPath">Script path</Label>
-                <Input
-                  id="scriptPath"
-                  placeholder="reports/monthly_revenue.sql"
-                  value={scriptPath}
-                  onChange={(e) => setScriptPath(e.target.value)}
-                />
-              </div>
-            )}
           </div>
         </div>
         <DialogFooter>

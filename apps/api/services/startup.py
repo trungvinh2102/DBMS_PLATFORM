@@ -5,6 +5,7 @@ Database startup helpers for schema creation, local migrations, and default
 seed data used by the FastAPI application.
 """
 
+import json
 import uuid
 
 
@@ -28,6 +29,7 @@ def setup_database():
         print("Backend: Checking and initializing database schema...")
         Base.metadata.create_all(engine)
         migrate_user_ai_configs_for_provider_keys(engine)
+        migrate_remove_workspace_git_metadata(engine)
 
         session = SessionLocal()
         seed_roles(session, Role)
@@ -155,6 +157,46 @@ def migrate_user_ai_configs_for_provider_keys(engine):
                 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_ai_configs_user_provider
                 ON user_ai_configs ("userId", provider)
                 """
+            )
+
+
+def migrate_remove_workspace_git_metadata(engine) -> None:
+    """Remove internal SQLLab Git workspace metadata without touching user files."""
+    if not engine or engine.dialect.name != "sqlite":
+        return
+
+    with engine.begin() as connection:
+        connection.exec_driver_sql("DROP TABLE IF EXISTS workspace_git_worktrees")
+        if not _sqlite_table_exists(connection, "user_settings"):
+            return
+
+        rows = connection.exec_driver_sql(
+            "SELECT id, settings FROM user_settings"
+        ).fetchall()
+        for setting_id, raw_settings in rows:
+            if raw_settings is None:
+                continue
+            try:
+                settings = (
+                    json.loads(raw_settings)
+                    if isinstance(raw_settings, str)
+                    else raw_settings
+                )
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(settings, dict):
+                continue
+
+            has_workspace = "workspace" in settings
+            has_flag = "sqllabGitDirectoryEnabled" in settings
+            settings.pop("workspace", None)
+            settings.pop("sqllabGitDirectoryEnabled", None)
+            if not has_workspace and not has_flag:
+                continue
+
+            connection.exec_driver_sql(
+                "UPDATE user_settings SET settings = ? WHERE id = ?",
+                (json.dumps(settings, ensure_ascii=False), setting_id),
             )
 
 

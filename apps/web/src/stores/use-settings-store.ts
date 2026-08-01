@@ -21,9 +21,6 @@ export interface SettingsState {
   editorLigatures: boolean;
   editorInlineSuggestions: boolean;
 
-  // SQLLab
-  sqllabGitDirectoryEnabled: boolean;
-
   // Data
   defaultQueryLimit: number;
   queryTimeout: boolean;
@@ -60,9 +57,6 @@ const defaultSettings = {
   editorLigatures: true,
   editorInlineSuggestions: true,
 
-  // SQLLab
-  sqllabGitDirectoryEnabled: false,
-
   // Data
   defaultQueryLimit: 1000,
   queryTimeout: true,
@@ -73,8 +67,42 @@ const defaultSettings = {
   resultEncoding: "UTF-8",
 };
 
+export function sanitizePersistedSettingsState(
+  persistedState: unknown,
+  currentState?: unknown,
+): Record<string, unknown> {
+  if (
+    persistedState === null ||
+    typeof persistedState !== "object" ||
+    Array.isArray(persistedState)
+  ) {
+    return {};
+  }
+
+  const sanitizedState = { ...(persistedState as Record<string, unknown>) };
+  delete sanitizedState.sqllabGitDirectoryEnabled;
+
+  const currentStateRecord =
+    currentState !== null &&
+    typeof currentState === "object" &&
+    !Array.isArray(currentState)
+      ? (currentState as Record<string, unknown>)
+      : undefined;
+
+  for (const key of Object.keys(sanitizedState)) {
+    if (
+      typeof sanitizedState[key] === "function" ||
+      typeof currentStateRecord?.[key] === "function"
+    ) {
+      delete sanitizedState[key];
+    }
+  }
+
+  return sanitizedState;
+}
+
 export const useSettingsStore = create<SettingsState>()(
-  persist(
+  persist<SettingsState, [], [], Record<string, unknown>>(
     (set) => ({
       ...defaultSettings,
 
@@ -87,7 +115,14 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "app-settings",
+      version: 1,
+      migrate: (persistedState) =>
+        sanitizePersistedSettingsState(persistedState),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...sanitizePersistedSettingsState(persistedState, currentState),
+      }),
+      partialize: (state) => sanitizePersistedSettingsState(state),
     },
   ),
 );
-

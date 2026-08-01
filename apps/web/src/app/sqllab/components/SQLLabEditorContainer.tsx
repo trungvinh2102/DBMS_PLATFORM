@@ -27,7 +27,6 @@ import { useSQLLabContext } from "../context/SQLLabContext";
 import { formatDBName } from "./sidebar/sidebar-utils";
 
 const MongoAggregationBuilder = lazy(() => import("./MongoAggregationBuilder").then(m => ({ default: m.MongoAggregationBuilder })));
-const GitDiffPreview = lazy(() => import("./workspace/GitDiffPreview").then(m => ({ default: m.GitDiffPreview })));
 
 export function SQLLabEditorContainer({
   enableValidation = true,
@@ -55,8 +54,6 @@ export function SQLLabEditorContainer({
             key={tab.id}
             onClick={() => {
               lab.setShowAISidebar(false);
-              lab.setGitPreviewPath(null);
-              lab.setGitPreviewCommitHash(null);
               setAiShowHistory(false);
               lab.setActiveTabId(tab.id);
             }}
@@ -95,8 +92,6 @@ export function SQLLabEditorContainer({
         <button
           onClick={() => {
             lab.setShowAISidebar(false);
-            lab.setGitPreviewPath(null);
-            lab.setGitPreviewCommitHash(null);
             setAiShowHistory(false);
             lab.addTab();
           }}
@@ -110,16 +105,12 @@ export function SQLLabEditorContainer({
           tabIndex={0}
           onClick={() => {
             lab.setShowAISidebar(true);
-            lab.setGitPreviewPath(null);
-            lab.setGitPreviewCommitHash(null);
             lab.setShowRightPanel(false);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               lab.setShowAISidebar(true);
-              lab.setGitPreviewPath(null);
-              lab.setGitPreviewCommitHash(null);
               lab.setShowRightPanel(false);
             }
           }}
@@ -168,7 +159,7 @@ export function SQLLabEditorContainer({
           <span className="font-mono lower opacity-80">{lab.selectedSchema || "main"}</span>
           <ChevronRight className="h-3 w-3 shrink-0 opacity-20" />
           <span className="italic opacity-40">
-            {lab.showAISidebar ? "ai_assistant" : lab.gitPreviewPath ? "git_diff" : "query_editor"}
+            {lab.showAISidebar ? "ai_assistant" : "query_editor"}
           </span>
         </div>
 
@@ -215,12 +206,7 @@ export function SQLLabEditorContainer({
       </div>
 
       <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
-        {!lab.showAISidebar && lab.gitPreviewPath && (
-          <Suspense fallback={<EditorLoadingSkeleton />}>
-            <GitDiffPreview />
-          </Suspense>
-        )}
-        {!lab.showAISidebar && !lab.gitPreviewPath && (
+        {!lab.showAISidebar && (
           <Suspense fallback={<EditorLoadingSkeleton />}>
             <>
               {lab.selectedDSType === "mongodb" && (

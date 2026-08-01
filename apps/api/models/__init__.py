@@ -27,7 +27,6 @@ from .schema_embedding import SchemaEmbedding
 from .user import User
 from .user_ai_config import UserAIConfig
 from .user_setting import UserSetting
-from .workspace_git_worktree import WorkspaceGitWorktree
 
 __all__ = [
     "AIChatMessage",
@@ -55,6 +54,5 @@ __all__ = [
     "User",
     "UserAIConfig",
     "UserSetting",
-    "WorkspaceGitWorktree",
     "engine",
 ]
