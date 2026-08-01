@@ -1,6 +1,6 @@
 # QurioDB - Desktop Build Guide
 
-This directory contains the **Tauri 2** desktop wrapper for the QurioDB. It bundles the Vite/React frontend and the Python Flask backend into a standalone Windows installer (.exe).
+This directory contains the **Tauri 2** desktop wrapper for QurioDB. It bundles the Vite/React frontend and the Python FastAPI backend into standalone desktop installers.
 
 ## 🏛 Architecture
 
@@ -14,7 +14,8 @@ This directory contains the **Tauri 2** desktop wrapper for the QurioDB. It bund
 │  │  React)    │    │  PyInstaller)    │  │
 │  └────────────┘    └──────────────────┘  │
 │                                          │
-│  Lifecycle: spawn → health-check → run   │
+│  Lifecycle: single-instance → spawn →    │
+│             dynamic health-check → run   │
 │  Shutdown:  CloseRequested → kill child  │
 └──────────────────────────────────────────┘
 ```
@@ -101,15 +102,17 @@ After a successful build, you can find the installers here:
 
 When the desktop app starts:
 
-1. **Spawn**: The Tauri Rust core spawns `api.exe` (running completely hidden without a console window) via `tauri-plugin-shell`.
-2. **Health Check**: Polls `http://127.0.0.1:5000/health` every 500ms (up to 30 attempts).
-3. **Ready Event**: Emits `backend-ready` event to the frontend once the backend is live.
-4. **Graceful Shutdown**: On window close, the sidecar process is killed to prevent orphans.
+1. **Single instance**: Tauri focuses the existing window when a second launch is attempted.
+2. **Allocate**: The Rust core selects an available loopback port and generates a per-launch nonce.
+3. **Spawn**: The Rust core starts the sidecar via `tauri-plugin-shell`, passing `QURIODB_DESKTOP_PORT`, `QURIODB_STARTUP_NONCE`, `QURIODB_DESKTOP_PARENT_PID`, and the desktop-only sidecar settings.
+4. **Verify**: Rust checks `GET /api/desktop/health` with the nonce and publishes typed generation/status state containing the dynamic API URL.
+5. **Render**: The React `DesktopReadyGuard` configures the API client before rendering the application. If startup fails, it provides **Retry** and **Quit** actions.
+6. **Graceful shutdown**: On window close, the owned sidecar process is killed to prevent orphans.
 
 ### Security
 
-- Backend binds to `127.0.0.1` (not `0.0.0.0`) to avoid Windows firewall popups.
-- Use `FLASK_HOST=0.0.0.0` environment variable to override for web deployments.
+- Backend binds to `127.0.0.1` (not `0.0.0.0`) to avoid Windows firewall popups. The desktop port is dynamic; browser development still defaults to `127.0.0.1:5000`.
+- Use the FastAPI `HOST` environment variable only for intentional web deployments; do not broaden the packaged desktop binding.
 
 ### ⚠️ Stale Sidecars (Developer Warning)
 

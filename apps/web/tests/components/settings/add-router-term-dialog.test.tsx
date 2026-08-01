@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
+import { fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AddRouterTermDialog } from "@/app/settings/components/ai-settings/AddRouterTermDialog";
@@ -50,7 +51,9 @@ describe("AddRouterTermDialog", () => {
     expect(screen.getByRole("heading", { name: /add router term/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /create term/i })).toBeDisabled();
 
-    await user.type(screen.getByPlaceholderText(/keyword or phrase/i), "analyze revenue");
+    const termInput = screen.getByPlaceholderText(/keyword or phrase/i);
+    fireEvent.change(termInput, { target: { value: "analyze revenue" } });
+    await waitFor(() => expect(termInput).toHaveValue("analyze revenue"));
     await user.click(screen.getByRole("button", { name: /create term/i }));
 
     expect(onCreate).toHaveBeenCalledTimes(1);

@@ -3,13 +3,17 @@
  * @description Unit tests for the SQL Lab AI assistant message presentation and interactions.
  */
 
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AIMessage } from "@/app/sqllab/components/ai/AIMessage";
 
 describe("AIMessage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders streamed SQL markdown immediately without a blank placeholder", () => {
     render(
       <AIMessage
@@ -56,6 +60,38 @@ describe("AIMessage", () => {
       "Use an indexed lookup for this query.\n\nThe indexed path should reduce table scans.",
     );
     expect(screen.getByRole("button", { name: /response copied/i })).toBeInTheDocument();
+  });
+
+  it("clears the response copy reset timer when unmounted", async () => {
+    vi.useFakeTimers();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    const { unmount } = render(
+      <AIMessage
+        message={{
+          id: "assistant-copy-unmount",
+          role: "assistant",
+          content: "Response to copy",
+        }}
+        onExplain={vi.fn()}
+        onOptimize={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /copy assistant response/i }));
+    expect(screen.getByRole("button", { name: /response copied/i })).toBeInTheDocument();
+
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+
+    await act(async () => {
+      vi.advanceTimersByTime(2001);
+    });
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("replaces SQL apply, preview, and diff actions with show data", () => {

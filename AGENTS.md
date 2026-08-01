@@ -69,12 +69,12 @@ Desktop is the priority path. When changing backend or frontend behavior, consid
 
 Startup flow:
 
-1. Tauri starts the main window.
-2. Rust code in `apps/desktop/src-tauri/src/lib.rs` spawns the backend sidecar with `shell.sidecar("api")`.
-3. The sidecar starts the FastAPI app on `127.0.0.1:5000`.
-4. Rust polls `http://127.0.0.1:5000/health`.
-5. Once healthy, Rust emits the `backend-ready` event.
-6. The frontend `DesktopReadyGuard` listens for `backend-ready` before rendering the app in Tauri.
+1. Tauri enforces a single running instance and focuses the existing window when another launch is attempted.
+2. Rust allocates an available loopback port and a per-launch startup nonce.
+3. Rust spawns the backend sidecar with `shell.sidecar("api")`, passing the desktop-only `QURIODB_DESKTOP_PORT`, `QURIODB_STARTUP_NONCE`, `QURIODB_DESKTOP_PARENT_PID`, and sidecar settings.
+4. Rust verifies `GET /api/desktop/health` with the nonce, then publishes typed generation/status state containing the dynamic API URL.
+5. The frontend `DesktopReadyGuard` configures its typed API client before rendering the application in Tauri.
+6. Startup failures show **Retry** and **Quit** actions; browser development bypasses this desktop startup flow and defaults to `http://127.0.0.1:5000/api/`.
 
 Shutdown flow:
 
@@ -95,7 +95,7 @@ Important desktop files:
 - If Python backend code in `apps/api` changes and desktop behavior matters, rebuild the sidecar.
 - Tauri uses prebuilt binaries from `apps/desktop/src-tauri/bin/`.
 - The sidecar name is configured as `bin/api` in `tauri.conf.json`; Tauri resolves target-specific binaries such as `api-x86_64-pc-windows-gnu.exe`.
-- Backend health must remain available at both `/health` and `/api/health`.
+- Backend health must remain available at both `/health` and `/api/health`; desktop readiness is verified separately at `/api/desktop/health`.
 - Keep the backend bound to `127.0.0.1` by default to avoid Windows firewall prompts.
 - Do not assume browser dev mode and desktop mode behave identically. Desktop relies on sidecar readiness and local API resolution.
 
@@ -120,7 +120,7 @@ $env:NODE_OPTIONS="--max-old-space-size=8192"
 ## Backend Notes
 
 - Main entry point: `apps/api/app.py`.
-- The app is FastAPI even if some docs/comments still say Flask.
+- The app is FastAPI; legacy Flask wording in untouched code or historical documentation does not describe the current backend.
 - Default local metadata DB is SQLite at `~/.quriodb/quriodb.db`.
 - `setup_database()` auto-creates tables and seeds default roles/admin when needed.
 - Default admin seed is `admin` / `password123` when no users exist.

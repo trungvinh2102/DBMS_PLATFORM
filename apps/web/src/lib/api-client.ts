@@ -5,70 +5,21 @@
 
 import axios from "axios";
 import { useAuth } from "../hooks/use-auth";
-
-const getBaseURL = () => {
-    // Priority 1: Environment variable set at build time (Vite)
-    const envUrl = import.meta.env.VITE_API_URL;
-    if (envUrl && envUrl !== "undefined") {
-        return envUrl.endsWith("/") ? envUrl : `${envUrl}/`;
-    }
-
-    // Priority 2: Standard standalone/desktop local development
-    if (typeof window !== "undefined") {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        
-        // If we're running in Electron/Tauri via app://, tauri://, tauri.localhost, or localized localhost
-        const isStandalone = 
-            protocol === 'app:' || 
-            protocol === 'tauri:' ||
-            protocol === 'https:' && hostname === 'tauri.localhost' ||
-            hostname === 'tauri.localhost' ||
-            hostname === 'localhost' ||
-            hostname === '127.0.0.1';
-            
-        if (isStandalone) {
-            // Using 127.0.0.1 is often more reliable than 'localhost' in some webview environments
-            return "http://127.0.0.1:5000/api/";
-        }
-        
-        // If we're in the browser on a web domain, use relative path (proxied)
-        return "/api/"; 
-    }
-
-    // Default fallback
-    return "http://127.0.0.1:5000/api/";
-};
+import { getApiBaseUrl, isTauriRuntime } from "./runtime-api";
 
 const api = axios.create({
-  baseURL: getBaseURL(),
   withCredentials: true,
 });
 
 // Request interceptor to add platform header and auth token
 api.interceptors.request.use((config) => {
-    if (typeof window !== "undefined") {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        
-        // Mark as standalone if in Tauri/App environment
-        const isStandalone = 
-            protocol === 'app:' || 
-            protocol === 'tauri:' ||
-            protocol === 'https:' && hostname === 'tauri.localhost' ||
-            hostname === 'tauri.localhost' ||
-            hostname === 'localhost' ||
-            hostname === '127.0.0.1';
-            
-        if (isStandalone) {
-            config.headers["X-App-Platform"] = "tauri";
-        }
-        
-        // Attach token from state if available (fallback for desktop cookies)
-        const token = useAuth.getState().token;
-        if (token) {
-            config.headers["Authorization"] = `Bearer ${token}`;
-        }
+    config.baseURL = getApiBaseUrl();
+    if (isTauriRuntime()) {
+        config.headers["X-App-Platform"] = "tauri";
+    }
+    const token = useAuth.getState().token;
+    if (token) {
+        config.headers["Authorization"] = `Bearer ${token}`;
     }
     return config;
 });
@@ -103,7 +54,11 @@ api.interceptors.response.use(
       "An unknown error occurred";
       
     if (error.message === "Network Error") {
-      console.error("API Network Error: Check if backend is running at", getBaseURL());
+       try {
+         console.error("API Network Error: Check if backend is running at", getApiBaseUrl());
+       } catch {
+         console.error("API Network Error: Desktop backend URL is not configured");
+       }
     }
     
     return Promise.reject(new Error(message));
@@ -338,20 +293,11 @@ export const aiApi = {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    if (typeof window !== "undefined") {
-      const hostname = window.location.hostname;
-      const protocol = window.location.protocol;
-      const isStandalone = 
-        protocol === 'app:' || 
-        protocol === 'tauri:' ||
-        hostname === 'tauri.localhost';
-          
-      if (isStandalone) {
-        headers["X-App-Platform"] = "tauri";
-      }
+    if (isTauriRuntime()) {
+      headers["X-App-Platform"] = "tauri";
     }
 
-    const response = await fetch(`${getBaseURL()}ai/stream`, {
+    const response = await fetch(`${getApiBaseUrl()}ai/stream`, {
       method: "POST",
       headers,
       credentials: "include",
@@ -428,7 +374,7 @@ export const resolveUrl = (path: string | null | undefined) => {
   if (!path) return "";
   if (path.startsWith("http") || path.startsWith("data:")) return path;
   // Remove /api/ from end of baseURL and append path
-  const base = getBaseURL().replace(/\/api\/$/, "");
+  const base = getApiBaseUrl().replace(/\/api\/$/, "");
   return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 

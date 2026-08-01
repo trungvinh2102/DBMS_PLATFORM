@@ -15,6 +15,7 @@ from core.environment import load_backend_environment
 
 load_backend_environment()
 
+from core.desktop_runtime import resolve_server_host, resolve_server_port
 from core.cors import configure_cors
 from core.handlers import register_handlers
 from core.responses import UnicodeJSONResponse
@@ -54,8 +55,8 @@ if __name__ == "__main__":
     monitor_thread = threading.Thread(target=monitor_parent, daemon=True)
     monitor_thread.start()
 
-    port = int(os.environ.get("PORT", 5000))
-    host = os.environ.get("HOST", "127.0.0.1")
+    port = resolve_server_port()
+    host = resolve_server_host()
     # Pass the app object directly (not the "app:app" import string): the
     # PyInstaller-frozen sidecar has no importable `app` module, so an import
     # string raises "Could not import module 'app'" and uvicorn never binds.

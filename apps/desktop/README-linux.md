@@ -83,8 +83,15 @@ unless they were observed interactively; otherwise report them as
 
 ## Notes
 
-- The backend binds `127.0.0.1:5000`; the Rust shell health-polls
-  `/health` and emits `backend-ready` (see `src-tauri/src/lib.rs`).
+- In packaged desktop mode, Rust allocates a loopback port and per-launch nonce,
+  passes `QURIODB_DESKTOP_PORT`, `QURIODB_STARTUP_NONCE`, and
+  `QURIODB_DESKTOP_PARENT_PID` to the sidecar, and
+  verifies `/api/desktop/health` before publishing the typed API URL to React.
+  Tauri enforces a single running instance and focuses the existing window on a
+  second launch. The frontend configures its API client before rendering;
+  startup failures provide Retry and Quit. Browser development still defaults to
+  `127.0.0.1:5000`, and the isolated sidecar smoke test above intentionally uses
+  that standalone default.
 - `apps/api/.env` must exist — it is bundled as a Tauri resource
   (`tauri.conf.json` → `bundle.resources`).
 - `apps/desktop/python/` (pywebview + `DBMS_Platform.spec`) is the legacy

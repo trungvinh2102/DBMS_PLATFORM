@@ -4,7 +4,7 @@
  * Follows SRP by delegating rendering of specialized sections to sub-components.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Check, Clipboard, FileSearch, MessageSquare, User, BrainCircuit } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -58,6 +58,8 @@ const AIMessageComponent = ({
   const [sqlPreview, setSqlPreview] = useState<SqlDataPreview | null>(null);
   const [sqlPreviewError, setSqlPreviewError] = useState("");
   const [isSqlPreviewLoading, setIsSqlPreviewLoading] = useState(false);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const responseCopyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -65,6 +67,13 @@ const AIMessageComponent = ({
   useEffect(() => {
     setIsThoughtVisible(false);
   }, [message.id]);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) clearTimeout(copyResetTimeoutRef.current);
+      if (responseCopyResetTimeoutRef.current) clearTimeout(responseCopyResetTimeoutRef.current);
+    };
+  }, []);
 
   const status = useMemo(() => {
     if (message.content?.startsWith("Error:")) return null;
@@ -129,7 +138,11 @@ const AIMessageComponent = ({
       navigator.clipboard.writeText(message.sql);
       setIsCopied(true);
       toast.success('SQL copied to clipboard');
-      setTimeout(() => setIsCopied(false), 2000);
+      if (copyResetTimeoutRef.current) clearTimeout(copyResetTimeoutRef.current);
+      copyResetTimeoutRef.current = setTimeout(() => {
+        setIsCopied(false);
+        copyResetTimeoutRef.current = null;
+      }, 2000);
     }
   }, [message.sql]);
 
@@ -140,7 +153,11 @@ const AIMessageComponent = ({
     navigator.clipboard.writeText(response);
     setIsResponseCopied(true);
     toast.success("Response copied");
-    setTimeout(() => setIsResponseCopied(false), 2000);
+    if (responseCopyResetTimeoutRef.current) clearTimeout(responseCopyResetTimeoutRef.current);
+    responseCopyResetTimeoutRef.current = setTimeout(() => {
+      setIsResponseCopied(false);
+      responseCopyResetTimeoutRef.current = null;
+    }, 2000);
   }, [cleaned, message.content, message.explanation]);
 
   const handleShowSqlData = useCallback(async (sql: string) => {

@@ -1,10 +1,29 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { api } from "@/lib/api";
+import {
+  clearDesktopApiConfiguration,
+  configureDesktopApi,
+} from "@/lib/runtime-api";
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
+
+afterEach(() => {
+  clearDesktopApiConfiguration();
+  delete window.__TAURI_INTERNALS__;
+});
 
 describe("api client base", () => {
-  it("should have correct baseURL", () => {
-    // defaults to localhost:5000/api in tests
-    expect(api.defaults.baseURL).toContain("/api");
+  it("resolves the configured desktop base URL for each request", async () => {
+    window.__TAURI_INTERNALS__ = {};
+    configureDesktopApi("http://127.0.0.1:43123/api/");
+    const requestHandler = (api.interceptors.request as any).handlers[0].fulfilled;
+    const config = await requestHandler({ headers: {} });
+    expect(config.baseURL).toBe("http://127.0.0.1:43123/api/");
+    expect(config.headers["X-App-Platform"]).toBe("tauri");
   });
 
   it("should return response correctly through interceptors", async () => {
@@ -12,7 +31,7 @@ describe("api client base", () => {
     const responseHandler = (api.interceptors.response as any).handlers[0]
       .fulfilled;
     const res = await responseHandler({ data: "ok" });
-    expect(res).toEqual({ data: "ok" });
+    expect(res).toBe("ok");
   });
 
   it("should reject error gracefully through interceptors", async () => {

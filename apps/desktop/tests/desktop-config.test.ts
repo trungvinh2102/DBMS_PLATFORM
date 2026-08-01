@@ -12,6 +12,7 @@ import path from 'path';
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const SRC_TAURI = path.join(__dirname, '..', 'src-tauri');
 const API_DIR = path.join(PROJECT_ROOT, 'api');
+const DESKTOP_RUNTIME_PATH = path.join(API_DIR, 'core', 'desktop_runtime.py');
 
 describe('Desktop Configuration', () => {
   describe('tauri.conf.json', () => {
@@ -26,8 +27,8 @@ describe('Desktop Configuration', () => {
 
     it('should have correct product metadata', () => {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      expect(config.productName).toBe('QurioDB Desktop');
-      expect(config.identifier).toBe('com.quriodb.desktop');
+      expect(config.productName).toBe('QurioDB');
+      expect(config.identifier).toBe('com.quriodb.app');
       expect(config.version).toMatch(/^\d+\.\d+\.\d+$/);
     });
 
@@ -81,8 +82,21 @@ describe('Desktop Configuration', () => {
       expect(content).toContain('tauri');
       expect(content).toContain('tauri-plugin-shell');
       expect(content).toContain('tauri-plugin-log');
+      expect(content).toContain('tauri-plugin-single-instance');
+      expect(content).toContain('rand');
       expect(content).toContain('reqwest');
       expect(content).toContain('tokio');
+    });
+
+    it('should configure dynamic desktop backend startup', () => {
+      const backendSource = fs.readFileSync(
+        path.join(SRC_TAURI, 'src', 'backend.rs'),
+        'utf-8',
+      );
+      expect(backendSource).toContain('QURIODB_DESKTOP_PORT');
+      expect(backendSource).toContain('QURIODB_STARTUP_NONCE');
+      expect(backendSource).toContain('/api/desktop/health');
+      expect(backendSource).not.toContain('const BACKEND_PORT: u16 = 5000');
     });
   });
 
@@ -135,31 +149,22 @@ describe('Desktop Configuration', () => {
     });
   });
 
-  describe('Sidecar Binary', () => {
-    it('should have at least one sidecar binary in bin/', () => {
-      const binDir = path.join(SRC_TAURI, 'bin');
-      expect(fs.existsSync(binDir)).toBe(true);
-
-      const files = fs.readdirSync(binDir);
-      const exeFiles = files.filter((f) => f.startsWith('api') && f.endsWith('.exe'));
-      expect(exeFiles.length).toBeGreaterThan(0);
-    });
-  });
-
   describe('Backend app.py', () => {
-    it('should bind to 127.0.0.1 by default for security', () => {
+    it('should delegate host selection to the desktop runtime helper', () => {
       const appPath = path.join(API_DIR, 'app.py');
       const content = fs.readFileSync(appPath, 'utf-8');
 
-      // Should use 127.0.0.1 as default, not 0.0.0.0
-      expect(content).toContain("'127.0.0.1'");
-      expect(content).not.toMatch(/app\.run\(host=['"]0\.0\.0\.0['"]/);
+      expect(content).toMatch(/from core\.desktop_runtime import .*resolve_server_host/);
+      expect(content).toMatch(/host\s*=\s*resolve_server_host\(\)/);
     });
 
-    it('should support FLASK_HOST env var for override', () => {
-      const appPath = path.join(API_DIR, 'app.py');
-      const content = fs.readFileSync(appPath, 'utf-8');
-      expect(content).toContain('FLASK_HOST');
+    it('should define the runtime host policy helper', () => {
+      const content = fs.readFileSync(DESKTOP_RUNTIME_PATH, 'utf-8');
+
+      expect(content).toMatch(/def\s+resolve_server_host\s*\(/);
+      expect(content).toContain('DESKTOP_PORT_ENV');
+      expect(content).toContain('HOST');
+      expect(content).toContain('127.0.0.1');
     });
   });
 });

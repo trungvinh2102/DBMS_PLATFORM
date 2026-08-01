@@ -38,7 +38,13 @@ To generate a fresh `.msi` installer:
 
 - **Frontend (`apps/web`)**: React 19, Vite 6, TypeScript, Tailwind CSS 4, shadcn-style primitives, TanStack Query/Table, Monaco Editor, and Zustand.
 - **Backend (`apps/api`)**: FastAPI, SQLAlchemy, SQLite metadata storage, database connectors, import flows, and AI/RAG services.
-- **Desktop (`apps/desktop`)**: Tauri 2 wrapper with automated FastAPI sidecar startup, health polling, and shutdown cleanup.
+- **Desktop (`apps/desktop`)**: Tauri 2 wrapper with single-instance enforcement, dynamic loopback FastAPI sidecar startup, nonce-authenticated readiness, and shutdown cleanup.
+
+### Desktop startup
+
+The desktop shell keeps one running instance and focuses the existing window when a second launch is attempted. On each launch, Rust allocates an available loopback port and a per-launch startup nonce, then passes `QURIODB_DESKTOP_PORT`, `QURIODB_STARTUP_NONCE`, `QURIODB_DESKTOP_PARENT_PID`, and the desktop-only sidecar settings to the bundled API. Rust verifies `GET /api/desktop/health` with that nonce before publishing the typed API URL and generation state to the React frontend. The frontend configures its API client before rendering the desktop application; startup failures remain actionable through **Retry** and **Quit**.
+
+Browser development remains independent of this flow and defaults to `http://127.0.0.1:5000/api/` unless `VITE_API_URL` is set.
 
 ## Setup & Development
 

@@ -86,7 +86,7 @@ describe('Linux IME configuration', () => {
     expect(tauriSetupSource).toMatch(/^\s*configure_linux_webkit_ime\(app\)\?;\s*$/m);
 
     const configureIndex = tauriSetupSource!.indexOf('configure_linux_webkit_ime(app)?;');
-    const sidecarIndex = tauriSetupSource!.indexOf('spawn_backend_sidecar');
+    const sidecarIndex = tauriSetupSource!.indexOf('start_backend');
 
     expect(sidecarIndex, 'sidecar startup must exist in the setup block').toBeGreaterThan(-1);
     expect(configureIndex).toBeGreaterThanOrEqual(0);

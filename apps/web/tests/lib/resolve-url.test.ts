@@ -1,5 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
 import { resolveUrl } from "@/lib/api-client";
+import {
+  clearDesktopApiConfiguration,
+  configureDesktopApi,
+} from "@/lib/runtime-api";
+
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown;
+  }
+}
+
+afterEach(() => {
+  clearDesktopApiConfiguration();
+  delete window.__TAURI_INTERNALS__;
+});
 
 describe("resolveUrl", () => {
   it("returns empty string for null", () => {
@@ -42,5 +57,13 @@ describe("resolveUrl", () => {
     const result = resolveUrl("/uploads/avatar.png");
     expect(result).toContain("/uploads/avatar.png");
     expect(result).not.toContain("//uploads");
+  });
+
+  it("resolves resources against the configured desktop backend", () => {
+    window.__TAURI_INTERNALS__ = {};
+    configureDesktopApi("http://127.0.0.1:43123/api/");
+    expect(resolveUrl("/uploads/avatar.png")).toBe(
+      "http://127.0.0.1:43123/uploads/avatar.png",
+    );
   });
 });
