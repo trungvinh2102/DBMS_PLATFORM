@@ -90,4 +90,9 @@ skills/
 docs/
 .docs/
 
+# Playwight MCP
+playwright-report/*
+.playwright-mcp/*
+
 Project-Context.md
+
