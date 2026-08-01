@@ -52,6 +52,35 @@ curl http://127.0.0.1:5000/health     # expect HTTP 200
 If it fails with `ModuleNotFoundError`, add the missing module as another
 `--hidden-import` / `--collect-all` in `scripts/build-sidecar.sh`.
 
+## Linux IME input
+
+QurioDB enables WebKitGTK input-method preedit on the main Tauri webview.
+This keeps IME composition rendered inline in Monaco and in normal form
+inputs. The configuration is in `src-tauri/src/lib.rs`.
+
+Do not replace this configuration with `WEBKIT_DISABLE_COMPOSITING_MODE`.
+That environment variable changes rendering behavior; it does not configure
+Wry's preedit policy.
+
+When collecting a Linux IME report, run these diagnostics (they print only
+session and input-method names/values, not secret contents):
+
+```bash
+printf 'session=%s\n' "$XDG_SESSION_TYPE"
+printf 'GTK_IM_MODULE=%s\n' "${GTK_IM_MODULE-}"
+printf 'QT_IM_MODULE=%s\n' "${QT_IM_MODULE-}"
+printf 'XMODIFIERS=%s\n' "${XMODIFIERS-}"
+pkg-config --modversion webkit2gtk-4.1
+ibus engine 2>/dev/null || true
+fcitx5-remote -n 2>/dev/null || true
+```
+
+Test both SQL Lab (including Monaco composition) and a normal search input.
+State whether each result came from development mode, a `.deb`, or an
+`.AppImage` package. Do not mark Wayland/X11 or IBus/Fcitx GUI rows as passed
+unless they were observed interactively; otherwise report them as
+`UNTESTED`.
+
 ## Notes
 
 - The backend binds `127.0.0.1:5000`; the Rust shell health-polls

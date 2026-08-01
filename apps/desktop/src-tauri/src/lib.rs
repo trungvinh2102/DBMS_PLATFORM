@@ -5,9 +5,9 @@
 
 use std::sync::Mutex;
 use std::time::Duration;
-use tauri::{Manager, Emitter, RunEvent, WindowEvent};
-use tauri_plugin_shell::ShellExt;
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
+use tauri_plugin_shell::ShellExt;
 
 /// Maximum number of health-check attempts before giving up.
 /// Increased to 180 (90 seconds) to allow time for Docker Desktop to start.
@@ -20,21 +20,30 @@ const HEALTH_CHECK_INTERVAL_MS: u64 = 500;
 const BACKEND_PORT: u16 = 5000;
 
 #[cfg(target_os = "linux")]
-fn linux_webkit_ime_workaround_env() -> Option<(&'static str, &'static str)> {
-    // Work around WebKitGTK/Tauri v2 Linux IME preedit windows appearing away
-    // from the focused input/editor. This must be set before WebKit starts.
-    Some(("WEBKIT_DISABLE_COMPOSITING_MODE", "1"))
-}
+fn configure_linux_webkit_ime(app: &tauri::App) -> tauri::Result<()> {
+    use webkit2gtk::{InputMethodContextExt, WebViewExt};
 
-#[cfg(target_os = "linux")]
-fn configure_linux_webkit_ime_workaround() {
-    if let Some((key, value)) = linux_webkit_ime_workaround_env() {
-        std::env::set_var(key, value);
-    }
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("Main webview window not found; skipping Linux IME configuration.");
+        return Ok(());
+    };
+
+    window.with_webview(|webview| {
+        if let Some(input_method_context) = webview.inner().input_method_context() {
+            input_method_context.set_enable_preedit(true);
+            log::info!("Enabled Linux WebKitGTK IME preedit.");
+        } else {
+            log::warn!("Linux WebKitGTK input method context unavailable.");
+        }
+    })?;
+
+    Ok(())
 }
 
 #[cfg(not(target_os = "linux"))]
-fn configure_linux_webkit_ime_workaround() {}
+fn configure_linux_webkit_ime(_app: &tauri::App) -> tauri::Result<()> {
+    Ok(())
+}
 
 /// Shared state to hold the backend sidecar child process handle.
 struct SidecarState(Mutex<Option<CommandChild>>);
@@ -130,14 +139,13 @@ fn shutdown_sidecar(state: &SidecarState) {
 /// backend sidecar, and registers lifecycle handlers.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    configure_linux_webkit_ime_workaround();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_log::Builder::default().build())
         .manage(SidecarState(Mutex::new(None)))
         .setup(|app| {
+            configure_linux_webkit_ime(app)?;
             let handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {
@@ -187,17 +195,4 @@ pub fn run() {
                 _ => {}
             }
         });
-}
-
-#[cfg(all(test, target_os = "linux"))]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn linux_webkit_ime_workaround_disables_compositing_before_webview_start() {
-        assert_eq!(
-            linux_webkit_ime_workaround_env(),
-            Some(("WEBKIT_DISABLE_COMPOSITING_MODE", "1"))
-        );
-    }
 }
