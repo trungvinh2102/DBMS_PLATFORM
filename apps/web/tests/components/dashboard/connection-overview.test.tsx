@@ -10,10 +10,10 @@ describe("ConnectionOverview", () => {
     useAuth.setState({ user: null });
   });
 
-  it("renders the Connections header", () => {
+  it("renders the Connectivity header", () => {
     useAuth.setState({ user: { id: "1" } as any });
     render(<ConnectionOverview />);
-    expect(screen.getByText("Connections")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connectivity" })).toBeInTheDocument();
   });
 
   it("shows connection count when databases exist", async () => {
@@ -21,11 +21,11 @@ describe("ConnectionOverview", () => {
     render(<ConnectionOverview />);
 
     await waitFor(() => {
-      expect(screen.getByText("Active Workspaces")).toBeInTheDocument();
+      expect(screen.getByText("2 Active Connections")).toBeInTheDocument();
     });
   });
 
-  it("shows 'No connections yet' when no databases", async () => {
+  it("shows the pending architecture empty state when no databases", async () => {
     useAuth.setState({ user: { id: "1" } as any });
 
     server.use(
@@ -35,14 +35,15 @@ describe("ConnectionOverview", () => {
     render(<ConnectionOverview />);
 
     await waitFor(() => {
-      expect(screen.getByText("No connections yet")).toBeInTheDocument();
+      expect(screen.getByText("Architecture Pending")).toBeInTheDocument();
       expect(
-        screen.getByText(/connect your first database/i),
+        screen.getByText(
+          "Initialize your first analytical pipeline by connecting a data source.",
+        ),
       ).toBeInTheDocument();
     });
 
-    // Should have an "Add Connection" link
-    const addLink = screen.getByRole("link", { name: /add connection/i });
+    const addLink = screen.getByRole("link", { name: "Add Asset" });
     expect(addLink).toHaveAttribute("href", "/connections");
   });
 
@@ -56,7 +57,7 @@ describe("ConnectionOverview", () => {
     render(<ConnectionOverview />);
 
     await waitFor(() => {
-      expect(screen.getByText("No connections yet")).toBeInTheDocument();
+      expect(screen.getByText("Architecture Pending")).toBeInTheDocument();
     });
   });
 });

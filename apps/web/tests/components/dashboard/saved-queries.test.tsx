@@ -10,9 +10,9 @@ describe("SavedQueries", () => {
     useAuth.setState({ user: null });
   });
 
-  it("renders the Bookmarks header", () => {
+  it("renders the Bookmarked header", () => {
     render(<SavedQueries />);
-    expect(screen.getByText("Bookmarks")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bookmarked" })).toBeInTheDocument();
   });
 
   it("shows skeletons when loading", () => {
@@ -39,17 +39,17 @@ describe("SavedQueries", () => {
     expect(link).toHaveAttribute("href", "/sqllab?saved=1");
   });
 
-  it("shows View All link when queries exist", async () => {
+  it("shows the System Catalog link when queries exist", async () => {
     useAuth.setState({ user: { id: "1" } as any });
 
     render(<SavedQueries />);
 
     await waitFor(() => {
-      expect(screen.getByText("View All")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "System Catalog" })).toBeInTheDocument();
     });
 
-    const viewAllLink = screen.getByRole("link", { name: /view all/i });
-    expect(viewAllLink).toHaveAttribute("href", "/sqllab");
+    const systemCatalogLink = screen.getByRole("link", { name: "System Catalog" });
+    expect(systemCatalogLink).toHaveAttribute("href", "/sqllab");
   });
 
   it("shows empty state message when no saved queries", async () => {
@@ -64,12 +64,14 @@ describe("SavedQueries", () => {
     render(<SavedQueries />);
 
     await waitFor(() => {
+      expect(screen.getByText("Library Empty")).toBeInTheDocument();
       expect(
-        screen.getByText(/queries you save will appear here/i),
+        screen.getByText(
+          "Archive your favorite architectures for instant retrieval here.",
+        ),
       ).toBeInTheDocument();
     });
 
-    // "View All" should not appear for empty state
-    expect(screen.queryByText("View All")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "System Catalog" })).not.toBeInTheDocument();
   });
 });
