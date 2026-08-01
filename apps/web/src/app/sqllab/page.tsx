@@ -55,46 +55,54 @@ function SQLLabContent() {
           <SQLLabToolbar />
 
           <div className="flex-1 flex overflow-hidden">
-            {lab.showAISidebar ? (
-              <SQLLabEditorContainer />
-            ) : (
-              <ResizablePanelGroup direction="horizontal">
-                <ResizablePanel defaultSize={65} minSize={30}>
-                  <ResizablePanelGroup direction="vertical">
-                    <ResizablePanel defaultSize={60} minSize={20}>
-                      <SQLLabEditorContainer />
-                    </ResizablePanel>
+            <ResizablePanelGroup direction="horizontal">
+              <ResizablePanel
+                defaultSize={65}
+                minSize={30}
+                className={lab.showAISidebar ? "!basis-full" : undefined}
+              >
+                <ResizablePanelGroup direction="vertical">
+                  <ResizablePanel
+                    defaultSize={60}
+                    minSize={20}
+                    className={lab.showAISidebar ? "!basis-full" : undefined}
+                  >
+                    <SQLLabEditorContainer />
+                  </ResizablePanel>
 
-                    <ResizableHandle withHandle className="h-1 hover:bg-primary/20 transition-colors" />
+                  {!lab.showAISidebar && (
+                    <>
+                      <ResizableHandle withHandle className="h-1 hover:bg-primary/20 transition-colors" />
 
-                    <ResizablePanel defaultSize={40} minSize={10}>
-                      <SQLLabResultPanel />
-                    </ResizablePanel>
-                  </ResizablePanelGroup>
-                </ResizablePanel>
+                      <ResizablePanel defaultSize={40} minSize={10}>
+                        <SQLLabResultPanel />
+                      </ResizablePanel>
+                    </>
+                  )}
+                </ResizablePanelGroup>
+              </ResizablePanel>
 
-                {lab.showRightPanel && (
-                  <>
-                    <ResizableHandle withHandle className="w-1 hover:bg-primary/20 transition-colors" />
-                    <ResizablePanel defaultSize={35} minSize={20} className="bg-background">
-                      <Suspense fallback={<PanelSkeleton />}>
-                        {lab.rightPanelMode === "object" ? (
-                          <SQLLabObjectPanel />
-                        ) : lab.rightPanelMode === "history" ? (
-                          <SQLLabHistoryPanel />
-                        ) : (
-                          <SchemaContent
-                            databaseId={lab.selectedDS}
-                            schema={lab.selectedSchema}
-                            dataSources={lab.dataSources}
-                          />
-                        )}
-                      </Suspense>
-                    </ResizablePanel>
-                  </>
-                )}
-              </ResizablePanelGroup>
-            )}
+              {!lab.showAISidebar && lab.showRightPanel && (
+                <>
+                  <ResizableHandle withHandle className="w-1 hover:bg-primary/20 transition-colors" />
+                  <ResizablePanel defaultSize={35} minSize={20} className="bg-background">
+                    <Suspense fallback={<PanelSkeleton />}>
+                      {lab.rightPanelMode === "object" ? (
+                        <SQLLabObjectPanel />
+                      ) : lab.rightPanelMode === "history" ? (
+                        <SQLLabHistoryPanel />
+                      ) : (
+                        <SchemaContent
+                          databaseId={lab.selectedDS}
+                          schema={lab.selectedSchema}
+                          dataSources={lab.dataSources}
+                        />
+                      )}
+                    </Suspense>
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
           </div>
         </div>
       </div>

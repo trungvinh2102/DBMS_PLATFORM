@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { aiApi, databaseApi } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { SQLLabContextType } from "../context/SQLLabContext";
 import { useAIChat } from "../hooks/useAIChat";
 import { parseSlashCommand, filterCommands, type SlashCommand } from "../utils/slash-commands";
 
@@ -22,10 +21,22 @@ import { AIDiagnosticsPanel } from "./ai/AIDiagnosticsPanel";
 import type { AIRuntimeStatus } from "./ai/types";
 
 interface AIAssistantProps {
-  lab: SQLLabContextType;
+  lab: AIAssistantLab;
+  active: boolean;
   showHistory: boolean;
   onShowHistoryChange: (show: boolean) => void;
   newChatSignal: number;
+}
+
+export interface AIAssistantLab {
+  selectedDS: string;
+  selectedSchema: string;
+  selectedDSType: string;
+  sql: string;
+  error: string | null;
+  fixSQLError: string | null;
+  queryLimit: number;
+  setFixSQLError: (value: string | null) => void;
 }
 
 const shouldShowSlashCommands = (value: string) => {
@@ -41,8 +52,9 @@ const buildVietnamesePrompt = (prompt: string) =>
     ? prompt
     : `${VIETNAMESE_RESPONSE_INSTRUCTION}\n\n${prompt}`;
 
-export function AIAssistant({
+function AIAssistantContent({
   lab,
+  active,
   showHistory,
   onShowHistoryChange,
   newChatSignal,
@@ -360,7 +372,7 @@ export function AIAssistant({
     onSuggestionClick: handleSuggestionClick
   }), [handleExplain, handleOptimize, handleShowSqlData, handleSuggestionClick]);
 
-  if (!lab.showAISidebar) return null;
+  if (!active) return null;
 
   return (
     <div
@@ -466,3 +478,33 @@ export function AIAssistant({
     </div>
   );
 }
+
+export const areAIAssistantPropsEqual = (
+  previous: AIAssistantProps,
+  next: AIAssistantProps,
+) => {
+  if (
+    previous.active !== next.active ||
+    previous.showHistory !== next.showHistory ||
+    previous.newChatSignal !== next.newChatSignal
+  ) {
+    return false;
+  }
+
+  if (!previous.active) return true;
+
+  if (previous.onShowHistoryChange !== next.onShowHistoryChange) return false;
+
+  return (
+    previous.lab.selectedDS === next.lab.selectedDS &&
+    previous.lab.selectedSchema === next.lab.selectedSchema &&
+    previous.lab.selectedDSType === next.lab.selectedDSType &&
+    previous.lab.sql === next.lab.sql &&
+    previous.lab.error === next.lab.error &&
+    previous.lab.fixSQLError === next.lab.fixSQLError &&
+    previous.lab.queryLimit === next.lab.queryLimit &&
+    previous.lab.setFixSQLError === next.lab.setFixSQLError
+  );
+};
+
+export const AIAssistant = React.memo(AIAssistantContent, areAIAssistantPropsEqual);

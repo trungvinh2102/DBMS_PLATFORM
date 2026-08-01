@@ -4,7 +4,7 @@
  */
 
 import { FileCode, Database, ChevronRight, Plus, X, Sparkles, History, MessageSquare } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { EditorLoadingSkeleton } from "./Skeletons";
 
@@ -40,8 +40,38 @@ export function SQLLabEditorContainer({
   const lab = useSQLLabContext();
   const [aiShowHistory, setAiShowHistory] = useState(false);
   const [aiNewChatSignal, setAiNewChatSignal] = useState(0);
+  const [hasActivatedAI, setHasActivatedAI] = useState(false);
   const selectedDSData = lab.dataSources?.find((ds: any) => ds.id === lab.selectedDS);
   const formatted = formatDBName(selectedDSData);
+
+  useEffect(() => {
+    if (lab.showAISidebar) setHasActivatedAI(true);
+    if (lab.fixSQLError && !lab.showAISidebar) {
+      setHasActivatedAI(true);
+      lab.setShowAISidebar(true);
+      lab.setShowRightPanel(false);
+    }
+  }, [lab.fixSQLError, lab.setShowAISidebar, lab.setShowRightPanel, lab.showAISidebar]);
+
+  const aiLab = useMemo(() => ({
+    selectedDS: lab.selectedDS,
+    selectedSchema: lab.selectedSchema,
+    selectedDSType: lab.selectedDSType,
+    sql: lab.sql,
+    error: lab.error,
+    fixSQLError: lab.fixSQLError,
+    queryLimit: lab.queryLimit,
+    setFixSQLError: lab.setFixSQLError,
+  }), [
+    lab.selectedDS,
+    lab.selectedSchema,
+    lab.selectedDSType,
+    lab.sql,
+    lab.error,
+    lab.fixSQLError,
+    lab.queryLimit,
+    lab.setFixSQLError,
+  ]);
 
   const language = lab.isRelational ? "sql" : (lab.selectedDSType === "redis" ? "redis" : "javascript");
   const sqlDialect = lab.selectedDSType as any || "postgresql";
@@ -104,12 +134,14 @@ export function SQLLabEditorContainer({
           role="button"
           tabIndex={0}
           onClick={() => {
+            setHasActivatedAI(true);
             lab.setShowAISidebar(true);
             lab.setShowRightPanel(false);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
+              setHasActivatedAI(true);
               lab.setShowAISidebar(true);
               lab.setShowRightPanel(false);
             }
@@ -250,14 +282,17 @@ export function SQLLabEditorContainer({
             </>
           </Suspense>
         )}
-        <Suspense fallback={<EditorLoadingSkeleton />}>
-          <AIAssistant
-            lab={lab}
-            showHistory={aiShowHistory}
-            onShowHistoryChange={setAiShowHistory}
-            newChatSignal={aiNewChatSignal}
-          />
-        </Suspense>
+        {hasActivatedAI && (
+          <Suspense fallback={<EditorLoadingSkeleton />}>
+            <AIAssistant
+              lab={aiLab}
+              active={lab.showAISidebar}
+              showHistory={aiShowHistory}
+              onShowHistoryChange={setAiShowHistory}
+              newChatSignal={aiNewChatSignal}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );
