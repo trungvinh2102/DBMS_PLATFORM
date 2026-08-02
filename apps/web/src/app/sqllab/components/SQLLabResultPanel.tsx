@@ -6,7 +6,7 @@
 import React, { lazy, Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSQLLabContext } from "../context/SQLLabContext";
+import { useSQLLabContext, useSQLLabEditorContext, useSQLLabResultContext } from "../context/SQLLabContext";
 
 // Internal Components
 import { PanelContent } from "./results/PanelContent";
@@ -27,11 +27,13 @@ export function SQLLabResultPanel({
   onErrorClick?: (line: number, column: number) => void;
 }) {
   const lab = useSQLLabContext();
+  const { sql } = useSQLLabEditorContext();
+  const { results, columns, error, executing, activeResultTab, setActiveResultTab } = useSQLLabResultContext();
   const isMongoDB = lab.selectedDSType === "mongodb";
   const errorCount = syntaxErrors.filter((e) => e.severity === 8).length;
   const warningCount = syntaxErrors.filter((e) => e.severity === 4).length;
   const totalProblems = syntaxErrors.length;
-  const effectiveTab = lab.activeResultTab;
+  const effectiveTab = activeResultTab;
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden border-r">
@@ -40,24 +42,24 @@ export function SQLLabResultPanel({
         <div className="flex items-center gap-8 h-full font-black text-[10px] uppercase tracking-[0.2em]">
           <TabButton
             active={effectiveTab === "results"}
-            onClick={() => lab.setActiveResultTab("results")}
-            count={lab.results.length}
+            onClick={() => setActiveResultTab("results")}
+            count={results.length}
           >
             Results
           </TabButton>
           <TabButton
             active={effectiveTab === "messages"}
-            onClick={() => lab.setActiveResultTab("messages")}
-            hasError={!!lab.error}
+            onClick={() => setActiveResultTab("messages")}
+            hasError={!!error}
           >
             Messages
-            {lab.error && (
+            {error && (
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-1" />
             )}
           </TabButton>
           <TabButton
             active={effectiveTab === "problems"}
-            onClick={() => lab.setActiveResultTab("problems")}
+              onClick={() => setActiveResultTab("problems")}
             count={totalProblems}
             errorCount={errorCount}
           >
@@ -66,18 +68,18 @@ export function SQLLabResultPanel({
           {!isMongoDB && !["clickhouse", "duckdb"].includes(lab.selectedDSType) && (
             <TabButton
               active={effectiveTab === "lineage"}
-              onClick={() => lab.setActiveResultTab("lineage")}
+              onClick={() => setActiveResultTab("lineage")}
             >
               Lineage
             </TabButton>
           )}
         </div>
 
-        {lab.results.length > 0 && effectiveTab === "results" && (
+        {results.length > 0 && effectiveTab === "results" && (
           <Suspense fallback={null}>
             <ExportDropdown
-              results={lab.results}
-              columns={lab.columns}
+              results={results}
+              columns={columns}
               encoding={lab.resultEncoding}
             />
           </Suspense>
@@ -86,7 +88,7 @@ export function SQLLabResultPanel({
 
       {/* Main Content Area */}
       <div className="flex-1 bg-background relative overflow-hidden">
-        {lab.executing ? (
+        {executing ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/5">
             <Loader2 className="h-10 w-10 animate-spin mb-4 opacity-20" />
             <span className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30 animate-pulse">
@@ -96,12 +98,12 @@ export function SQLLabResultPanel({
         ) : (
           <PanelContent
             tab={effectiveTab}
-            results={lab.results}
-            columns={lab.columns}
-            error={lab.error}
+            results={results}
+            columns={columns}
+            error={error}
             syntaxErrors={syntaxErrors}
             onErrorClick={onErrorClick}
-            sql={lab.sql}
+            sql={sql}
             dataSources={lab.dataSources}
             selectedDS={lab.selectedDS}
             onFixWithAI={lab.setFixSQLError}
@@ -110,11 +112,10 @@ export function SQLLabResultPanel({
       </div>
 
       <ResultFooter
-        cursorPos={lab.cursorPos}
         tabSize={lab.tabSize}
         errorCount={errorCount}
         warningCount={warningCount}
-        setActiveTab={lab.setActiveResultTab}
+         setActiveTab={setActiveResultTab}
         encoding={lab.resultEncoding}
       />
     </div>

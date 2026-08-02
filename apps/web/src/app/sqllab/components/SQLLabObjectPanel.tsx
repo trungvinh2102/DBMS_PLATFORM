@@ -58,7 +58,7 @@ import {
   DiagnosticsTabView,
 } from "./ObjectPanelTabs";
 
-import { useSQLLabContext } from "../context/SQLLabContext";
+import { useSQLLabContext, useSQLLabResultContext } from "../context/SQLLabContext";
 
 const ObjectIcon = ({
   selectedObjectType,
@@ -103,6 +103,7 @@ const ObjectIcon = ({
 
 export function SQLLabObjectPanel() {
   const lab = useSQLLabContext();
+  const result = useSQLLabResultContext();
   const [structureSearch, setStructureSearch] = useState("");
   const { resolvedTheme } = useTheme();
   const monacoTheme = resolvedTheme === "dark" ? "quriodb-dark" : "quriodb-light";
@@ -184,7 +185,7 @@ export function SQLLabObjectPanel() {
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          {effectiveTab === "data" && lab.currentTData.length > 0 && (
+          {effectiveTab === "data" && result.currentTData.length > 0 && (
             <>
               <div className="w-px h-4 bg-border/60" />
               <DropdownMenu>
@@ -201,8 +202,8 @@ export function SQLLabObjectPanel() {
                   <DropdownMenuItem
                     onClick={async () =>
                       await exportData(
-                        lab.currentTData,
-                        lab.currentTColumns,
+                         result.currentTData,
+                         result.currentTColumns,
                         "csv",
                         lab.selectedTable || "table_data",
                       )
@@ -215,8 +216,8 @@ export function SQLLabObjectPanel() {
                   <DropdownMenuItem
                     onClick={async () =>
                       await exportData(
-                        lab.currentTData,
-                        lab.currentTColumns,
+                         result.currentTData,
+                         result.currentTColumns,
                         "xlsx",
                         lab.selectedTable || "table_data",
                       )
@@ -238,9 +239,9 @@ export function SQLLabObjectPanel() {
           <EmptyObjectSelection />
         ) : effectiveTab === "data" ? (
           <DataTabView
-            loadingTData={lab.loadingTData}
-            currentTData={lab.currentTData}
-            currentTColumns={lab.currentTColumns}
+             loadingTData={result.loadingTData}
+             currentTData={result.currentTData}
+             currentTColumns={result.currentTColumns}
             allColumns={lab.allColumns}
             onSave={lab.handleUpdateData}
           />
@@ -283,7 +284,7 @@ export function SQLLabObjectPanel() {
         )}
       </div>
 
-      {lab.activeRightTab === "data" && lab.currentTData.length > 0 && (
+      {lab.activeRightTab === "data" && result.currentTData.length > 0 && (
         <div className="h-11 border-t flex items-center justify-between px-5 bg-muted/5 shrink-0 text-[10px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">
           <div className="flex items-center gap-4">
             <button
@@ -294,10 +295,10 @@ export function SQLLabObjectPanel() {
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span className="tracking-tighter">
-              {lab.dataOffset + 1}-{lab.dataOffset + lab.currentTData.length} OF {lab.tableInfo?.row_count || lab.currentTData.length + (lab.currentTData.length === lab.defaultQueryLimit ? "+" : "")}
+               {lab.dataOffset + 1}-{lab.dataOffset + result.currentTData.length} OF {lab.tableInfo?.row_count || result.currentTData.length + (result.currentTData.length === lab.defaultQueryLimit ? "+" : "")}
             </span>
             <button
-              disabled={lab.currentTData.length < lab.defaultQueryLimit}
+               disabled={result.currentTData.length < lab.defaultQueryLimit}
               onClick={lab.nextPage}
               className="h-7 w-7 hover:bg-muted rounded-full transition-colors flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
             >
@@ -306,7 +307,7 @@ export function SQLLabObjectPanel() {
           </div>
           <div className="flex items-center gap-2.5">
             <Clock className="h-4 w-4 opacity-40" />
-            <span>{lab.executionTime || 0}MS</span>
+            <span>{result.executionTime || 0}MS</span>
           </div>
         </div>
       )}

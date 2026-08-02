@@ -28,6 +28,21 @@ import { SuggestionList } from "./SuggestionList";
 // Utils
 import { extractConfidence } from "./ai-utils";
 
+/**
+ * Per-message transient UI state that must survive virtualized window shifts.
+ * The parent persists this keyed by message id so scrolling a row out of the
+ * window and back does not lose expanded reasoning, feedback, or SQL previews.
+ */
+export interface MessageUiState {
+  isThoughtVisible: boolean;
+  feedbackRating: 1 | -1 | null;
+  shouldShowCorrection: boolean;
+  correctionText: string;
+  isFeedbackSubmitted: boolean;
+  sqlPreview: SqlDataPreview | null;
+  sqlPreviewError: string;
+}
+
 interface AIMessageProps {
   message: Message;
   onExplain: (sql: string) => void;
@@ -35,6 +50,8 @@ interface AIMessageProps {
   onShowSqlData?: (sql: string) => Promise<SqlDataPreview>;
   onSuggestionClick?: (suggestion: string) => void;
   conversationId?: string | null;
+  messageUiState?: Partial<MessageUiState>;
+  onMessageUiStateChange?: (messageId: string, patch: Partial<MessageUiState>) => void;
 }
 
 const noopSuggestionClick = () => {};
@@ -46,27 +63,28 @@ const AIMessageComponent = ({
   onOptimize,
   onShowSqlData = noopShowSqlData,
   onSuggestionClick,
-  conversationId
+  conversationId,
+  messageUiState,
+  onMessageUiStateChange,
 }: AIMessageProps) => {
-  const [isThoughtVisible, setIsThoughtVisible] = useState(false);
+  // Local UI state is initialized from the parent's persisted per-message map
+  // so rows remounting after scrolling out of the virtualized window keep
+  // their previous expanded/preview/feedback state.
+  const [isThoughtVisible, setIsThoughtVisible] = useState(() => messageUiState?.isThoughtVisible ?? false);
   const [isCopied, setIsCopied] = useState(false);
   const [isResponseCopied, setIsResponseCopied] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(null);
-  const [shouldShowCorrection, setShouldShowCorrection] = useState(false);
-  const [correctionText, setCorrectionText] = useState("");
-  const [isFeedbackSubmitted, setIsFeedbackSubmitted] = useState(false);
-  const [sqlPreview, setSqlPreview] = useState<SqlDataPreview | null>(null);
-  const [sqlPreviewError, setSqlPreviewError] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState<1 | -1 | null>(() => messageUiState?.feedbackRating ?? null);
+  const [shouldShowCorrection, setShouldShowCorrection] = useState(() => messageUiState?.shouldShowCorrection ?? false);
+  const [correctionText, setCorrectionText] = useState(() => messageUiState?.correctionText ?? "");
+  const [isFeedbackSubmitted, setIsFeedbackSubmitted] = useState(() => messageUiState?.isFeedbackSubmitted ?? false);
+  const [sqlPreview, setSqlPreview] = useState<SqlDataPreview | null>(() => messageUiState?.sqlPreview ?? null);
+  const [sqlPreviewError, setSqlPreviewError] = useState(() => messageUiState?.sqlPreviewError ?? "");
   const [isSqlPreviewLoading, setIsSqlPreviewLoading] = useState(false);
   const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const responseCopyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-
-  useEffect(() => {
-    setIsThoughtVisible(false);
-  }, [message.id]);
 
   useEffect(() => {
     return () => {
@@ -95,15 +113,22 @@ const AIMessageComponent = ({
   const canCopyResponse = message.role === "assistant" && !status && (hasTextContent || Boolean(message.explanation));
   const shouldShowConfidence = Boolean(message.isStreaming) && message.confidence !== undefined && !status;
   const handleToggleThought = useCallback(() => {
-    setIsThoughtVisible((current) => !current);
-  }, []);
+    // Persist the parent state-map mutation outside the state updater so
+    // StrictMode's double-invocation of updater functions cannot fire the
+    // side effect twice.
+    const next = !isThoughtVisible;
+    onMessageUiStateChange?.(message.id, { isThoughtVisible: next });
+    setIsThoughtVisible(next);
+  }, [message.id, onMessageUiStateChange, isThoughtVisible]);
 
   const handleFeedback = useCallback(async (rating: 1 | -1) => {
     setFeedbackRating(rating);
     if (rating === -1) {
       setShouldShowCorrection(true);
+      onMessageUiStateChange?.(message.id, { feedbackRating: rating, shouldShowCorrection: true });
       return;
     }
+    onMessageUiStateChange?.(message.id, { feedbackRating: rating });
     try {
       await aiApi.submitFeedback({
         messageId: message.id,
@@ -111,11 +136,12 @@ const AIMessageComponent = ({
         conversationId: conversationId || undefined,
       });
       setIsFeedbackSubmitted(true);
+      onMessageUiStateChange?.(message.id, { isFeedbackSubmitted: true });
       toast.success("Thanks for the feedback!");
     } catch {
       toast.error("Failed to save feedback");
     }
-  }, [message.id, conversationId]);
+  }, [message.id, conversationId, onMessageUiStateChange]);
 
   const handleSubmitCorrection = useCallback(async () => {
     try {
@@ -127,11 +153,17 @@ const AIMessageComponent = ({
       });
       setIsFeedbackSubmitted(true);
       setShouldShowCorrection(false);
+      onMessageUiStateChange?.(message.id, { isFeedbackSubmitted: true, shouldShowCorrection: false });
       toast.success("Feedback saved — we'll improve!");
     } catch {
       toast.error("Failed to save feedback");
     }
-  }, [message.id, conversationId, correctionText]);
+  }, [message.id, conversationId, correctionText, onMessageUiStateChange]);
+
+  const handleCorrectionChange = useCallback((text: string) => {
+    setCorrectionText(text);
+    onMessageUiStateChange?.(message.id, { correctionText: text });
+  }, [message.id, onMessageUiStateChange]);
 
   const handleCopy = useCallback(() => {
     if (message.sql) {
@@ -166,13 +198,18 @@ const AIMessageComponent = ({
     try {
       const preview = await onShowSqlData(sql);
       setSqlPreview(preview);
+      onMessageUiStateChange?.(message.id, { sqlPreview: preview, sqlPreviewError: "" });
     } catch (error: any) {
       setSqlPreview(null);
       setSqlPreviewError(error.message || "Khong the hien thi du lieu.");
+      onMessageUiStateChange?.(message.id, {
+        sqlPreview: null,
+        sqlPreviewError: error.message || "Khong the hien thi du lieu.",
+      });
     } finally {
       setIsSqlPreviewLoading(false);
     }
-  }, [onShowSqlData]);
+  }, [onShowSqlData, onMessageUiStateChange, message.id]);
 
   return (
     <div className={cn(
@@ -336,7 +373,7 @@ const AIMessageComponent = ({
                 showCorrection={shouldShowCorrection}
                 correctionText={correctionText}
                 onRating={handleFeedback}
-                onCorrectionChange={setCorrectionText}
+                onCorrectionChange={handleCorrectionChange}
                 onSubmitCorrection={handleSubmitCorrection}
               />
             )}

@@ -5,9 +5,10 @@
 
 import React from "react";
 import { Database, XCircle, AlertTriangle } from "lucide-react";
+import { useSQLLabCursorContext } from "../../context/SQLLabContext";
 
 interface ResultFooterProps {
-  cursorPos: { lineNumber: number; column: number };
+  cursorPos?: { lineNumber: number; column: number };
   tabSize: number;
   errorCount: number;
   warningCount: number;
@@ -23,6 +24,8 @@ export function ResultFooter({
   setActiveTab,
   encoding = "UTF-8",
 }: ResultFooterProps) {
+  const contextCursor = useSQLLabCursorContext();
+  const currentCursor = cursorPos ?? contextCursor.cursorPos;
   return (
     <footer className="h-10 border-t bg-background flex items-center justify-between px-5 text-[10px] font-black text-muted-foreground/60 overflow-hidden shrink-0 uppercase tracking-widest divide-x divide-border/40">
       <div className="flex items-center gap-8 h-full">
@@ -30,7 +33,7 @@ export function ResultFooter({
           <Database className="h-4 w-4 text-primary/60" /> {encoding}
         </span>
         <span className="hover:bg-muted px-4 cursor-pointer transition-colors h-full flex items-center">
-          LN {cursorPos.lineNumber}, COL {cursorPos.column}
+          LN {currentCursor.lineNumber}, COL {currentCursor.column}
         </span>
         <span className="hover:bg-muted px-4 cursor-pointer transition-colors h-full flex items-center">
           SPACES: {tabSize}

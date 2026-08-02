@@ -302,17 +302,61 @@ const extractLegacyLabeledSections = (value: string) => {
 
 export function useAIChat(databaseId?: string, schema?: string, selectedModel?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [isFetchingConversation, setIsFetchingConversation] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
   const messagesRef = useRef<Message[]>([]);
+  const streamingMessageRef = useRef<Message | null>(null);
+  const streamGenerationRef = useRef(0);
   const restoredConversationRef = useRef<string | null>(null);
+  // AbortController for the in-flight stream so conversation switches can stop
+  // the underlying request instead of waiting for it to settle on its own.
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // Generation that currently "owns" the typing indicator. A stale stream's
+  // finally must not clear `isTyping` for a newer stream (or for an unlocked
+  // conversation switch), so it only clears when the generation still matches.
+  const typingGenerationRef = useRef(-1);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  // Keeps the live streaming message separate from committed history so a
+  // stream chunk never creates a new `messages` array (and therefore never
+  // re-renders the committed message list).
+  const updateStreamingMessage = useCallback(
+    (updater: Message | null | ((prev: Message | null) => Message | null)) => {
+      streamingMessageRef.current =
+        typeof updater === "function" ? updater(streamingMessageRef.current) : updater;
+      setStreamingMessage(streamingMessageRef.current);
+    },
+    [],
+  );
+
+  // Any conversation/history change invalidates the in-flight stream so its
+  // late chunks cannot leak into a different conversation. The old request is
+  // aborted, the streaming UI is cleared, and the input unlocks immediately.
+  const invalidateStream = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    streamGenerationRef.current += 1;
+    typingGenerationRef.current = -1;
+    setIsTyping(false);
+    updateStreamingMessage(null);
+  }, [updateStreamingMessage]);
+
+  // Abort any pending stream when the hook unmounts (e.g. navigating away).
+  // `invalidateStream` is stable (its only dep `updateStreamingMessage` is a
+  // memoized callback), so this effect mounts once and its cleanup runs only
+  // on unmount — it cannot create an infinite cleanup/restart loop.
+  useEffect(() => {
+    return () => {
+      invalidateStream();
+    };
+  }, [invalidateStream]);
 
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
     if (message.role === "user") return { content: String(message.content || "") };
@@ -483,6 +527,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, []);
 
   const loadHistory = async (dbId?: string) => {
+    invalidateStream();
     setIsFetchingConversation(true);
     setMessages([]);
     try {
@@ -517,6 +562,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, []);
 
   const loadConversation = useCallback(async (id: string) => {
+    invalidateStream();
     setIsFetchingConversation(true);
     setMessages([]); // Clear immediately to show skeletons
     try {
@@ -538,7 +584,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     } finally {
       setIsFetchingConversation(false);
     }
-  }, [databaseId, parseMessageContent]);
+  }, [databaseId, parseMessageContent, invalidateStream]);
 
   useEffect(() => {
     const activeConversationId = getStoredActiveConversationId(databaseId);
@@ -554,11 +600,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, [conversationId, databaseId, loadConversation]);
 
   const startNewChat = useCallback(() => {
+    invalidateStream();
     clearStoredActiveConversationId(databaseId);
     restoredConversationRef.current = null;
     setConversationId(null);
     setMessages([]);
-  }, [databaseId]);
+  }, [databaseId, invalidateStream]);
 
   const handleSend = useCallback(async (input: string) => {
     if (!input.trim() || isTyping || !databaseId) {
@@ -583,7 +630,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       steps: [{ type: "thinking", content: INITIAL_ASSISTANT_ACTIVITY, status: "active" }],
     };
 
-    setMessages(prev => [...prev, userMsg, initialAssistantMsg]);
+    setMessages(prev => [...prev, userMsg]);
+    const streamGeneration = streamGenerationRef.current;
+    typingGenerationRef.current = streamGeneration;
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    updateStreamingMessage(initialAssistantMsg);
 
     let responseContent = "";
     let sqlContent = "";
@@ -602,6 +654,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let pendingAssistantEvent: string | undefined;
     let pendingAssistantChunk: unknown;
     let scheduledAssistantFrame: number | null = null;
+    let streamError: unknown = null;
 
     const completeStreamSteps = () => {
       streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
@@ -617,11 +670,16 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       return lastParsedMessage;
     };
 
-    const flushAssistantMessage = () => {
+    const cancelScheduledAssistantFrame = () => {
       if (scheduledAssistantFrame !== null && typeof window !== "undefined") {
         window.cancelAnimationFrame(scheduledAssistantFrame);
         scheduledAssistantFrame = null;
       }
+    };
+
+    const flushAssistantMessage = () => {
+      cancelScheduledAssistantFrame();
+      if (streamGeneration !== streamGenerationRef.current) return;
 
       const event = pendingAssistantEvent;
       const chunk = pendingAssistantChunk;
@@ -629,12 +687,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       pendingAssistantChunk = undefined;
       const parsed = getParsedMessage();
 
-      setMessages(prev => prev.map(m => {
-        if (m.id !== assistantMsgId) return m;
+      updateStreamingMessage(prev => {
+        const base = prev ?? initialAssistantMsg;
 
         if (event === "error") {
           return {
-            ...m,
+            ...base,
             content: `Error: ${chunk}`,
             isActionable: false,
             isStreaming: false,
@@ -642,7 +700,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         }
 
         return {
-          ...m,
+          ...base,
           ...parsed,
           sql: parsed.sql || sqlContent.trim(),
           analysis: parsed.analysis || analysisContent.trim(),
@@ -656,7 +714,34 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           isStreaming: true,
           isActionable: true
         };
-      }));
+      });
+    };
+
+    // Moves the live streaming message into committed history exactly once and
+    // only for the current conversation generation. A duplicate guard prevents
+    // the same id from being appended twice (e.g. a cancelled stream re-commit).
+    const commitStreamingMessage = () => {
+      const streamed = streamingMessageRef.current;
+      if (!streamed) return;
+
+      const finalMessage: Message = {
+        ...streamed,
+        isStreaming: false,
+        isActionable: streamed.isActionable ?? true,
+        steps: streamed.steps?.map((step) => ({ ...step, status: "complete" as const })),
+      };
+
+      setMessages(prev => {
+        if (streamGeneration !== streamGenerationRef.current) return prev;
+        if (prev.some(m => m.id === finalMessage.id)) return prev;
+        return [...prev, finalMessage];
+      });
+
+      // Only the current generation may clear the live streaming message; an
+      // abandoned stream's finally must not wipe a newer stream's UI.
+      if (streamGeneration === streamGenerationRef.current) {
+        updateStreamingMessage(null);
+      }
     };
 
     const scheduleAssistantMessageFlush = (event?: string, chunk?: unknown) => {
@@ -767,33 +852,47 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
             storeActiveConversationId(databaseId, cid);
             loadConversations(databaseId);
           }
-        }
+        },
+        controller.signal,
       );
 
     } catch (error: any) {
-      toast.error(error.message || "Failed to generate SQL");
-      flushAssistantMessage();
-      setMessages(prev => prev.map(m =>
-        m.id === assistantMsgId ? { ...m, content: `Error: ${error.message}`, isStreaming: false } : m
-      ));
+      streamError = error;
+      // An abandoned stream (conversation switched, new chat started) or an
+      // explicit abort must not render error UI or overwrite the newer stream.
+      if (streamGeneration === streamGenerationRef.current && error?.name !== "AbortError") {
+        toast.error(error.message || "Failed to generate SQL");
+        cancelScheduledAssistantFrame();
+        updateStreamingMessage(prev => ({
+          ...(prev ?? initialAssistantMsg),
+          content: `Error: ${error.message}`,
+          isStreaming: false,
+          isActionable: false,
+          steps: (prev?.steps ?? []).map((step) => ({ ...step, status: "complete" as const })),
+        }));
+      }
     } finally {
-      flushAssistantMessage();
-      setIsTyping(false);
-      setMessages(prev => prev.map(m =>
-        m.id === assistantMsgId
-          ? {
-              ...m,
-              isStreaming: false,
-              steps: m.steps?.map((step) => ({ ...step, status: "complete" as const })),
-            }
-          : m
-      ));
+      // On success flush any last pending chunk; on failure keep the error text.
+      if (streamError) {
+        cancelScheduledAssistantFrame();
+      } else {
+        flushAssistantMessage();
+      }
+      // Only the stream that currently owns the typing indicator may clear it;
+      // an abandoned stream must not unlock/lock a newer conversation's input.
+      if (typingGenerationRef.current === streamGeneration) {
+        typingGenerationRef.current = -1;
+        abortControllerRef.current = null;
+        setIsTyping(false);
+      }
+      commitStreamingMessage();
     }
-  }, [databaseId, schema, selectedModel, isTyping, conversationId, parseMessageContent, loadConversations]);
+  }, [databaseId, schema, selectedModel, isTyping, conversationId, parseMessageContent, loadConversations, updateStreamingMessage]);
 
   return {
     messages,
     setMessages,
+    streamingMessage,
     isTyping,
     setIsTyping,
     isFetchingConversation,

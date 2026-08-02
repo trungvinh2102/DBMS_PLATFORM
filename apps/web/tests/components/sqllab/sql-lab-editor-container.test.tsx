@@ -19,6 +19,8 @@ const { getLab, getModelsMock, getAIStatusMock, getRagPipelineStatusMock, getCon
 
 vi.mock("@/app/sqllab/context/SQLLabContext", () => ({
   useSQLLabContext: getLab,
+  useSQLLabEditorContext: getLab,
+  useSQLLabResultContext: getLab,
 }));
 
 vi.mock("@/lib/monaco/MonacoEditor", () => ({

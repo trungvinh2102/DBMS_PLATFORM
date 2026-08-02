@@ -9,6 +9,7 @@ import { render, screen, waitFor } from "../test-utils";
 const mocks = vi.hoisted(() => ({
   configureDesktopApi: vi.fn(),
   getBackendStatus: vi.fn(),
+  markPerformance: vi.fn(),
   quitDesktop: vi.fn(),
   restartBackend: vi.fn(),
   subscribeBackendStatus: vi.fn(),
@@ -27,8 +28,13 @@ vi.mock("@/lib/desktop-backend", () => ({
   subscribeBackendStatus: mocks.subscribeBackendStatus,
 }));
 
+vi.mock("@/lib/performance/performance-marks", () => ({
+  markPerformance: mocks.markPerformance,
+}));
+
 const configureDesktopApiMock = mocks.configureDesktopApi;
 const getBackendStatusMock = mocks.getBackendStatus;
+const markPerformanceMock = mocks.markPerformance;
 const quitDesktopMock = mocks.quitDesktop;
 const restartBackendMock = mocks.restartBackend;
 const subscribeBackendStatusMock = mocks.subscribeBackendStatus;
@@ -73,6 +79,30 @@ describe("DesktopReadyGuard", () => {
     ));
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
     expect(order).toEqual(["configure"]);
+  });
+
+  it("marks frontend_ready only after the API client is configured", async () => {
+    getBackendStatusMock.mockResolvedValue(readyStatus());
+    const order: string[] = [];
+    configureDesktopApiMock.mockImplementation(() => order.push("configure"));
+    markPerformanceMock.mockImplementation((name: string) => order.push(`mark:${name}`));
+
+    render(<DesktopReadyGuard><div>Dashboard</div></DesktopReadyGuard>);
+
+    await waitFor(() => expect(configureDesktopApiMock).toHaveBeenCalledWith(
+      "http://127.0.0.1:43123/api/",
+    ));
+    expect(await screen.findByText("Dashboard")).toBeInTheDocument();
+    expect(order).toEqual(["configure", "mark:frontend_ready"]);
+  });
+
+  it("does not mark frontend_ready before the backend is ready", async () => {
+    getBackendStatusMock.mockResolvedValue({ status: "starting", generation: 1 });
+    render(<DesktopReadyGuard><div>Dashboard</div></DesktopReadyGuard>);
+
+    await waitFor(() => expect(getBackendStatusMock).toHaveBeenCalled());
+    expect(screen.getByText("Initializing system...")).toBeInTheDocument();
+    expect(markPerformanceMock).not.toHaveBeenCalled();
   });
 
   it("subscribes before reading current state", async () => {

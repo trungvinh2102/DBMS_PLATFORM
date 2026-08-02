@@ -3,7 +3,9 @@
  * @description Hook to manage SQL Lab query tabs and their persistence.
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
+const TABS_PERSISTENCE_DEBOUNCE_MS = 300;
 
 export interface QueryTab {
   id: string;
@@ -31,6 +33,25 @@ export function useSQLLabTabs() {
     },
   ]);
   const [activeTabId, setActiveTabId] = useState<string>("1");
+  const pendingTabsRef = useRef<QueryTab[] | null>(null);
+  const persistenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const committedTabsRef = useRef<QueryTab[] | null>(null);
+  const hydrationCompleteRef = useRef(false);
+  const [hydrationComplete, setHydrationComplete] = useState(false);
+
+  const flushPersistence = useCallback(() => {
+    if (!hydrationCompleteRef.current) return;
+
+    if (persistenceTimerRef.current) {
+      clearTimeout(persistenceTimerRef.current);
+      persistenceTimerRef.current = null;
+    }
+
+    if (pendingTabsRef.current) {
+      localStorage.setItem("sqllab_tabs", JSON.stringify(pendingTabsRef.current));
+      pendingTabsRef.current = null;
+    }
+  }, []);
 
   // Persistence
   useEffect(() => {
@@ -47,16 +68,65 @@ export function useSQLLabTabs() {
         console.error("Failed to load tabs", e);
       }
     }
+    setHydrationComplete(true);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("sqllab_tabs", JSON.stringify(tabs));
+    hydrationCompleteRef.current = hydrationComplete;
+  }, [hydrationComplete]);
+
+  useEffect(() => {
+    if (!hydrationComplete) return;
+
+    const previousTabs = committedTabsRef.current;
+    committedTabsRef.current = tabs;
+    pendingTabsRef.current = tabs;
+    if (persistenceTimerRef.current) clearTimeout(persistenceTimerRef.current);
+
+    if (previousTabs && tabs.length < previousTabs.length) {
+      flushPersistence();
+      return;
+    }
+
+    persistenceTimerRef.current = setTimeout(
+      flushPersistence,
+      TABS_PERSISTENCE_DEBOUNCE_MS,
+    );
+  }, [tabs, flushPersistence, hydrationComplete]);
+
+  useEffect(() => {
+    if (!hydrationComplete) return;
     localStorage.setItem("sqllab_active_tab", activeTabId);
-  }, [tabs, activeTabId]);
+  }, [activeTabId, hydrationComplete]);
+
+  useEffect(() => {
+    if (!hydrationComplete) return;
+    flushPersistence();
+  }, [activeTabId, flushPersistence, hydrationComplete]);
+
+  useEffect(() => {
+    const flush = () => flushPersistence();
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      flushPersistence();
+    };
+  }, [flushPersistence]);
 
   const activeTab = useMemo(
     () => tabs.find((t) => t.id === activeTabId) || tabs[0],
     [tabs, activeTabId],
+  );
+
+  const setActiveTabIdAndFlush = useCallback(
+    (nextActiveTabId: string | ((current: string) => string)) => {
+      flushPersistence();
+      setActiveTabId(nextActiveTabId);
+    },
+    [flushPersistence],
   );
 
   const addTab = useCallback((selectedDS: string, selectedSchema: string) => {
@@ -74,10 +144,11 @@ export function useSQLLabTabs() {
       };
       return [...prev, newTab];
     });
-    setActiveTabId(newId);
-  }, []);
+    setActiveTabIdAndFlush(newId);
+  }, [setActiveTabIdAndFlush]);
 
   const closeTab = useCallback((id: string) => {
+    flushPersistence();
     setTabs((prev) => {
       if (prev.length === 1) return prev;
       const newTabs = prev.filter((t) => t.id !== id);
@@ -89,7 +160,7 @@ export function useSQLLabTabs() {
       });
       return newTabs;
     });
-  }, []);
+  }, [flushPersistence]);
 
   const renameTab = useCallback((id: string, newName: string) => {
     setTabs((prev) =>
@@ -110,7 +181,7 @@ export function useSQLLabTabs() {
     tabs,
     setTabs,
     activeTabId,
-    setActiveTabId,
+    setActiveTabId: setActiveTabIdAndFlush,
     activeTab,
     addTab,
     closeTab,

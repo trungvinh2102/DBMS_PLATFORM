@@ -23,7 +23,7 @@ export interface SyntaxError {
   severityLabel: string;
 }
 
-import { useSQLLabContext } from "../context/SQLLabContext";
+import { useSQLLabContext, useSQLLabEditorContext, useSQLLabResultContext } from "../context/SQLLabContext";
 import { formatDBName } from "./sidebar/sidebar-utils";
 
 const MongoAggregationBuilder = lazy(() => import("./MongoAggregationBuilder").then(m => ({ default: m.MongoAggregationBuilder })));
@@ -38,6 +38,8 @@ export function SQLLabEditorContainer({
   onErrorsChange?: (errors: SyntaxError[]) => void;
 }) {
   const lab = useSQLLabContext();
+  const editor = useSQLLabEditorContext();
+  const result = useSQLLabResultContext();
   const [aiShowHistory, setAiShowHistory] = useState(false);
   const [aiNewChatSignal, setAiNewChatSignal] = useState(0);
   const [hasActivatedAI, setHasActivatedAI] = useState(false);
@@ -57,8 +59,8 @@ export function SQLLabEditorContainer({
     selectedDS: lab.selectedDS,
     selectedSchema: lab.selectedSchema,
     selectedDSType: lab.selectedDSType,
-    sql: lab.sql,
-    error: lab.error,
+    sql: editor.sql,
+    error: result.error,
     fixSQLError: lab.fixSQLError,
     queryLimit: lab.queryLimit,
     setFixSQLError: lab.setFixSQLError,
@@ -66,8 +68,8 @@ export function SQLLabEditorContainer({
     lab.selectedDS,
     lab.selectedSchema,
     lab.selectedDSType,
-    lab.sql,
-    lab.error,
+    editor.sql,
+    result.error,
     lab.fixSQLError,
     lab.queryLimit,
     lab.setFixSQLError,
@@ -79,17 +81,17 @@ export function SQLLabEditorContainer({
     <div className="flex h-full w-full min-w-0 flex-1 flex-col bg-background">
       {/* Tabs Header */}
       <div className="flex items-center h-10 border-b bg-muted/5 px-2 overflow-x-auto no-scrollbar shrink-0">
-        {lab.tabs.map((tab: any) => (
+        {editor.tabs.map((tab: any) => (
           <div
             key={tab.id}
             onClick={() => {
               lab.setShowAISidebar(false);
               setAiShowHistory(false);
-              lab.setActiveTabId(tab.id);
+              editor.setActiveTabId(tab.id);
             }}
             className={cn(
               "flex items-center h-10 px-4 border-r cursor-pointer transition-all group shrink-0 select-none",
-              !lab.showAISidebar && lab.activeTabId === tab.id
+              !lab.showAISidebar && editor.activeTabId === tab.id
                 ? "bg-background border-t-2 border-t-primary text-foreground font-bold"
                 : "text-muted-foreground hover:bg-muted/50 border-t-2 border-t-transparent",
             )}
@@ -97,7 +99,7 @@ export function SQLLabEditorContainer({
             <FileCode
               className={cn(
                 "h-3.5 w-3.5 mr-2",
-                !lab.showAISidebar && lab.activeTabId === tab.id
+                !lab.showAISidebar && editor.activeTabId === tab.id
                   ? "text-primary"
                   : "text-muted-foreground/60",
               )}
@@ -112,7 +114,7 @@ export function SQLLabEditorContainer({
               }}
               className={cn(
                 "ml-2 p-0.5 rounded-full hover:bg-muted transition-colors opacity-0 group-hover:opacity-100",
-                lab.tabs.length === 1 && "hidden",
+                editor.tabs.length === 1 && "hidden",
               )}
             >
               <X className="h-3 w-3" />
@@ -257,19 +259,19 @@ export function SQLLabEditorContainer({
               )}
               <div className="min-h-0 flex-1">
                 <SQLEditor
-                  key={lab.activeTabId} // Re-mount when switching tabs to ensure clean state
-                  value={lab.sql}
+                  key={editor.activeTabId} // Re-mount when switching tabs to ensure clean state
+                  value={editor.sql}
                   onChange={(val) => lab.setSql(val || "")}
-                  onPositionChange={lab.setCursorPos}
+                  onPositionChange={editor.setCursorPos}
                   onRun={lab.handleRun}
                   onFormat={lab.handleFormat}
                   onStop={lab.handleStop}
                   onSave={lab.handleSave}
-                  tabSize={lab.tabSize}
+                  tabSize={editor.tabSize}
                   tables={lab.tables}
                   columns={lab.autocompleteColumns as any}
-                  undoTrigger={lab.undoTrigger}
-                  redoTrigger={lab.redoTrigger}
+                  undoTrigger={editor.undoTrigger}
+                  redoTrigger={editor.redoTrigger}
                   enableValidation={enableValidation}
                   showErrorPanel={showErrorPanel}
                   sqlDialect={sqlDialect}

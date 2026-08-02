@@ -263,8 +263,9 @@ describe("useAIChat stream status handling", () => {
       sendPromise = result.current.handleSend("tạo truy vấn kiểm thử");
     });
 
+    // The live stream lives in `streamingMessage`; committed history stays frozen.
     await waitFor(() => {
-      expect(result.current.messages.at(-1)).toEqual(expect.objectContaining({
+      expect(result.current.streamingMessage).toEqual(expect.objectContaining({
         role: "assistant",
         isStreaming: true,
         steps: [expect.objectContaining({
@@ -273,10 +274,425 @@ describe("useAIChat stream status handling", () => {
         })],
       }));
     });
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].role).toBe("user");
 
     await act(async () => {
       resolveStream?.();
       await sendPromise;
     });
+
+    expect(result.current.streamingMessage).toBeNull();
+  });
+});
+
+describe("useAIChat long-conversation streaming", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const makeHistory = (count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `m-${i}`,
+      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+      content: `message content ${i}`,
+    }));
+
+  it("streams chunks into a separate message without touching committed history", async () => {
+    vi.spyOn(aiApi, "getConversationMessages").mockResolvedValue({
+      id: "conv-120",
+      messages: makeHistory(120),
+    });
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+
+    let resolveStream!: () => void;
+    let emitChunk!: (chunk: string, event?: string) => void;
+    vi.spyOn(aiApi, "streamChat").mockImplementation((_data, onChunk) => {
+      emitChunk = onChunk;
+      return new Promise<void>((resolve) => {
+        resolveStream = () => resolve();
+      });
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.loadConversation("conv-120");
+    });
+    expect(result.current.messages).toHaveLength(120);
+
+    let sendPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.handleSend("stream test");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(121);
+      expect(result.current.streamingMessage).toBeDefined();
+    });
+
+    const committedDuringStream = result.current.messages;
+
+    await act(async () => {
+      emitChunk("Hello", "message");
+    });
+    await waitFor(() => {
+      expect(result.current.streamingMessage?.content).toContain("Hello");
+    });
+    // Committed history is untouched: same array reference, same message objects.
+    expect(result.current.messages).toBe(committedDuringStream);
+    expect(result.current.messages[0]).toBe(committedDuringStream[0]);
+
+    await act(async () => {
+      emitChunk(" world", "message");
+    });
+    await waitFor(() => {
+      expect(result.current.streamingMessage?.content).toContain("Hello world");
+    });
+    expect(result.current.messages).toBe(committedDuringStream);
+    expect(result.current.messages).toHaveLength(121);
+
+    await act(async () => {
+      resolveStream();
+      await sendPromise;
+    });
+
+    expect(result.current.streamingMessage).toBeNull();
+    expect(result.current.messages).toHaveLength(122);
+    expect(result.current.messages.at(-1)).toEqual(expect.objectContaining({
+      role: "assistant",
+      content: "Hello world",
+      isStreaming: false,
+    }));
+
+    // No duplicate messages: every id appears exactly once.
+    const ids = result.current.messages.map((m) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("concatenates all streamed chunks in order without loss", async () => {
+    vi.spyOn(aiApi, "getConversationMessages").mockResolvedValue({
+      id: "conv-order",
+      messages: makeHistory(100),
+    });
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk, onHeaders) => {
+      onHeaders?.(new Headers({ "X-Conversation-Id": "conv-order-2" }));
+      for (let i = 0; i < 50; i += 1) {
+        onChunk(`piece-${i} `, "message");
+      }
+      onChunk("SELECT 1;", "sql");
+      onChunk("Phân tích.", "analysis");
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.loadConversation("conv-order");
+    });
+    expect(result.current.messages).toHaveLength(100);
+
+    await act(async () => {
+      await result.current.handleSend("order test");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)).toEqual(expect.objectContaining({
+        role: "assistant",
+        // parseMessageContent trims the accumulated streamed text.
+        content: Array.from({ length: 50 }, (_, i) => `piece-${i} `).join("").trim(),
+        sql: "SELECT 1;",
+        analysis: "Phân tích.",
+        isStreaming: false,
+      }));
+    });
+    expect(result.current.messages).toHaveLength(102);
+  });
+
+  it("commits the assistant message exactly once", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk) => {
+      onChunk("final", "message");
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("once test");
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages.at(-1)).toEqual(
+        expect.objectContaining({ role: "assistant", content: "final" }),
+      );
+    });
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.streamingMessage).toBeNull();
+  });
+
+  it("discards an in-flight stream when the conversation is switched", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "getConversationMessages").mockImplementation(async (id) => {
+      if (id === "conv-a") {
+        return { id: "conv-a", messages: [{ id: "a1", role: "user", content: "hi a" }] };
+      }
+      return { id: "conv-b", messages: [{ id: "b1", role: "user", content: "hi b" }] };
+    });
+
+    let resolveStream!: () => void;
+    let emitChunk!: (chunk: string, event?: string) => void;
+    vi.spyOn(aiApi, "streamChat").mockImplementation((_data, onChunk) => {
+      emitChunk = onChunk;
+      return new Promise<void>((resolve) => {
+        resolveStream = () => resolve();
+      });
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.loadConversation("conv-a");
+    });
+    expect(result.current.messages).toHaveLength(1);
+
+    let sendPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.handleSend("ask");
+    });
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(2);
+      expect(result.current.streamingMessage).toBeDefined();
+    });
+
+    await act(async () => {
+      await result.current.loadConversation("conv-b");
+    });
+    expect(result.current.streamingMessage).toBeNull();
+    expect(result.current.messages).toEqual([expect.objectContaining({ id: "b1" })]);
+
+    // The abandoned stream must not leak into the new conversation.
+    await act(async () => {
+      emitChunk("late chunk", "message");
+      resolveStream();
+      await sendPromise;
+    });
+
+    expect(result.current.streamingMessage).toBeNull();
+    expect(result.current.messages).toEqual([expect.objectContaining({ id: "b1" })]);
+    expect(result.current.messages.filter((m) => m.role === "assistant")).toHaveLength(0);
+  });
+
+  it("aborts an abandoned stream, unlocks the input, and lets the new conversation stream cleanly", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "getConversationMessages").mockImplementation(async (id) => {
+      if (id === "conv-a") {
+        return { id: "conv-a", messages: [{ id: "a1", role: "user", content: "hi a" }] };
+      }
+      return { id: "conv-b", messages: [{ id: "b1", role: "user", content: "hi b" }] };
+    });
+
+    interface CapturedStream {
+      onChunk: (chunk: string, event?: string) => void;
+      signal?: AbortSignal;
+      resolve: () => void;
+    }
+    const streams: CapturedStream[] = [];
+    vi.spyOn(aiApi, "streamChat").mockImplementation((_data, onChunk, _onHeaders, signal) => {
+      return new Promise<void>((resolve) => {
+        streams.push({ onChunk, signal, resolve });
+      });
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.loadConversation("conv-a");
+    });
+    expect(result.current.messages).toHaveLength(1);
+
+    // Start a stream in conversation A; it stays pending forever.
+    let oldSendPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      oldSendPromise = result.current.handleSend("old ask");
+    });
+    await waitFor(() => {
+      expect(result.current.isTyping).toBe(true);
+      expect(streams).toHaveLength(1);
+    });
+
+    // Switch conversations while the old stream is still pending.
+    await act(async () => {
+      await result.current.loadConversation("conv-b");
+    });
+
+    // The abandoned request was aborted and the input unlocked immediately.
+    expect(streams[0].signal?.aborted).toBe(true);
+    expect(result.current.isTyping).toBe(false);
+    expect(result.current.streamingMessage).toBeNull();
+
+    // A new message can be sent in the new conversation right away.
+    let newSendPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      newSendPromise = result.current.handleSend("new ask");
+    });
+    await waitFor(() => {
+      expect(streams).toHaveLength(2);
+    });
+    expect(result.current.isTyping).toBe(true);
+    expect(result.current.streamingMessage).toBeDefined();
+
+    // The new stream makes progress.
+    await act(async () => {
+      streams[1].onChunk("NEW-ANSWER", "message");
+    });
+    await waitFor(() => {
+      expect(result.current.streamingMessage?.content).toContain("NEW-ANSWER");
+    });
+
+    // The old stream settles late: its chunks must not commit or overwrite UI.
+    await act(async () => {
+      streams[0].onChunk("LATE-CHUNK", "message");
+      streams[0].resolve();
+      await oldSendPromise;
+    });
+
+    expect(result.current.streamingMessage?.content).toContain("NEW-ANSWER");
+    expect(result.current.streamingMessage?.content).not.toContain("LATE-CHUNK");
+    expect(result.current.messages.map((m) => m.content)).not.toContain("LATE-CHUNK");
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ id: "b1" }),
+      expect.objectContaining({ role: "user", content: "new ask" }),
+    ]);
+
+    // The new stream finishes cleanly and commits exactly once.
+    await act(async () => {
+      streams[1].resolve();
+      await newSendPromise;
+    });
+
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ id: "b1" }),
+      expect.objectContaining({ role: "user", content: "new ask" }),
+      expect.objectContaining({ role: "assistant", content: "NEW-ANSWER", isStreaming: false }),
+    ]);
+    expect(result.current.isTyping).toBe(false);
+  });
+
+  it("starts a new chat during streaming without leaking the in-flight assistant message", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+
+    let resolveStream!: () => void;
+    let emitChunk!: (chunk: string, event?: string) => void;
+    vi.spyOn(aiApi, "streamChat").mockImplementation((_data, onChunk) => {
+      emitChunk = onChunk;
+      return new Promise<void>((resolve) => {
+        resolveStream = () => resolve();
+      });
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    let sendPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.handleSend("ask");
+    });
+    await waitFor(() => {
+      expect(result.current.streamingMessage).toBeDefined();
+    });
+
+    act(() => {
+      result.current.startNewChat();
+    });
+    expect(result.current.messages).toHaveLength(0);
+    expect(result.current.streamingMessage).toBeNull();
+
+    await act(async () => {
+      emitChunk("late", "message");
+      resolveStream();
+      await sendPromise;
+    });
+
+    expect(result.current.streamingMessage).toBeNull();
+    expect(result.current.messages).toHaveLength(0);
+  });
+
+  it("aborts the in-flight stream when the hook unmounts", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    let capturedSignal: AbortSignal | undefined;
+    vi.spyOn(aiApi, "streamChat").mockImplementation((_data, _onChunk, _onHeaders, signal) => {
+      capturedSignal = signal;
+      return new Promise<void>(() => {});
+    });
+
+    const { result, unmount } = renderHook(() => useAIChat("db-1", "public"));
+
+    act(() => {
+      result.current.handleSend("ask while mounted");
+    });
+    await waitFor(() => {
+      expect(result.current.isTyping).toBe(true);
+    });
+    expect(capturedSignal?.aborted).toBe(false);
+
+    act(() => {
+      unmount();
+    });
+
+    // Navigating away aborts the SSE request and clears the typing/stream UI.
+    expect(capturedSignal?.aborted).toBe(true);
+    // The unmount cleanup must not resubscribe or restart any stream.
+    expect(aiApi.streamChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("settles consistently when the stream is rejected or cancelled", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockRejectedValue(new Error("Request cancelled"));
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("ask");
+    });
+
+    expect(result.current.isTyping).toBe(false);
+    expect(result.current.streamingMessage).toBeNull();
+    expect(result.current.messages.at(-1)).toEqual(expect.objectContaining({
+      role: "assistant",
+      content: "Error: Request cancelled",
+      isStreaming: false,
+    }));
+    const lastId = result.current.messages.at(-1)?.id;
+    expect(result.current.messages.filter((m) => m.id === lastId)).toHaveLength(1);
+  });
+
+  it("preserves stream ordering when chunks from different event types interleave", async () => {
+    vi.spyOn(aiApi, "getConversations").mockResolvedValue([]);
+    vi.spyOn(aiApi, "streamChat").mockImplementation(async (_data, onChunk) => {
+      onChunk("Intent: phân tích.", "thinking");
+      onChunk("Đầu tiên", "message");
+      onChunk("SQL text", "sql");
+      onChunk(" tiếp theo", "message");
+    });
+
+    const { result } = renderHook(() => useAIChat("db-1", "public"));
+
+    await act(async () => {
+      await result.current.handleSend("interleave");
+    });
+
+    await waitFor(() => {
+      const last = result.current.messages.at(-1);
+      expect(last).toEqual(expect.objectContaining({
+        role: "assistant",
+        content: "Đầu tiên tiếp theo",
+        sql: "SQL text",
+        isStreaming: false,
+      }));
+    });
+    expect(result.current.streamingMessage).toBeNull();
   });
 });

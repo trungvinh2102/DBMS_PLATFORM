@@ -5,8 +5,9 @@
 
 "use client";
 
-import { useState, Suspense, lazy } from "react";
+import { memo, useEffect, Suspense, lazy } from "react";
 import { toast } from "sonner";
+import { markPerformance } from "@/lib/performance/performance-marks";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -14,13 +15,22 @@ import {
 } from "@/components/ui/resizable";
 
 // Context
-import { SQLLabProvider, useSQLLabContext } from "./context/SQLLabContext";
+import {
+  SQLLabProvider,
+  useSQLLabContext,
+  useSQLLabTabMetadataContext,
+  useSQLLabResultContext,
+} from "./context/SQLLabContext";
 
 // Static imports
 import { SQLLabSidebar } from "./components/SQLLabSidebar";
 import { SQLLabToolbar } from "./components/SQLLabToolbar";
 import { SQLLabEditorContainer } from "./components/SQLLabEditorContainer";
 import { SQLLabResultPanel } from "./components/SQLLabResultPanel";
+
+const StableSQLLabSidebar = memo(SQLLabSidebar);
+const StableSQLLabToolbar = memo(SQLLabToolbar);
+const LiveSQLLabResultPanel = memo(SQLLabResultPanel);
 
 // Skeletons
 import { PanelSkeleton } from "./components/Skeletons";
@@ -32,6 +42,7 @@ const SaveQueryDialog = lazy(() => import("./components/SaveQueryDialog").then(m
 const OpenQueryDialog = lazy(() => import("./components/OpenQueryDialog").then(m => ({ default: m.OpenQueryDialog })));
 const SchemaContent = lazy(() => import("./components/SchemaContent").then(m => ({ default: m.SchemaContent })));
 const ImportWizardModal = lazy(() => import("./components/import/ImportWizardModal").then(m => ({ default: m.ImportWizardModal })));
+const StableSQLLabDialogs = memo(SQLLabDialogs);
 
 export default function SQLLabPage() {
   return (
@@ -48,11 +59,12 @@ function SQLLabContent() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background text-foreground">
+      <SQLLabPerformanceMarks />
       <div className="flex-1 flex overflow-hidden">
-        <SQLLabSidebar />
+        <StableSQLLabSidebar />
 
         <div className="flex-1 flex flex-col overflow-hidden bg-muted/5">
-          <SQLLabToolbar />
+          <StableSQLLabToolbar />
 
           <div className="flex-1 flex overflow-hidden">
             <ResizablePanelGroup direction="horizontal">
@@ -75,7 +87,7 @@ function SQLLabContent() {
                       <ResizableHandle withHandle className="h-1 hover:bg-primary/20 transition-colors" />
 
                       <ResizablePanel defaultSize={40} minSize={10}>
-                        <SQLLabResultPanel />
+                        <LiveSQLLabResultPanel />
                       </ResizablePanel>
                     </>
                   )}
@@ -107,26 +119,62 @@ function SQLLabContent() {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <SaveQueryDialog
-          open={lab.isSaveDialogOpen}
-          onOpenChange={lab.setIsSaveDialogOpen}
-          onConfirm={lab.handleSaveConfirmed}
-          defaultName={lab.tabs.find((t) => t.id === lab.activeTabId)?.name}
-        />
-        <OpenQueryDialog
-          open={lab.isOpenDialogOpen}
-          onOpenChange={lab.setIsOpenDialogOpen}
-          savedQueries={lab.savedQueries}
-          onSelect={lab.handleSelectSavedQuery}
-        />
-        <ImportWizardModal
-          open={lab.isImportWizardOpen}
-          onOpenChange={lab.setIsImportWizardOpen}
-          databaseId={lab.selectedDS}
-          schemaName={lab.selectedSchema}
-        />
-      </Suspense>
+      <StableSQLLabDialogs />
     </div>
+  );
+}
+
+function SQLLabPerformanceMarks() {
+  const lab = useSQLLabContext();
+  const result = useSQLLabResultContext();
+
+  useEffect(() => {
+    markPerformance("sqllab_mounted");
+  }, []);
+
+  useEffect(() => {
+    if (lab.selectedDS && !lab.isLoadingColumns) {
+      markPerformance("metadata_loaded");
+    }
+  }, [lab.isLoadingColumns, lab.selectedDS]);
+
+  useEffect(() => {
+    if (
+      !result.executing &&
+      !result.error &&
+      (result.results.length > 0 || result.columns.length > 0)
+    ) {
+      markPerformance("result_rendered");
+    }
+  }, [result.columns, result.error, result.executing, result.results]);
+
+  return null;
+}
+
+function SQLLabDialogs() {
+  const lab = useSQLLabContext();
+  const { activeTabName } = useSQLLabTabMetadataContext();
+
+  return (
+    <Suspense fallback={null}>
+      <SaveQueryDialog
+        open={lab.isSaveDialogOpen}
+        onOpenChange={lab.setIsSaveDialogOpen}
+        onConfirm={lab.handleSaveConfirmed}
+        defaultName={activeTabName}
+      />
+      <OpenQueryDialog
+        open={lab.isOpenDialogOpen}
+        onOpenChange={lab.setIsOpenDialogOpen}
+        savedQueries={lab.savedQueries}
+        onSelect={lab.handleSelectSavedQuery}
+      />
+      <ImportWizardModal
+        open={lab.isImportWizardOpen}
+        onOpenChange={lab.setIsImportWizardOpen}
+        databaseId={lab.selectedDS}
+        schemaName={lab.selectedSchema}
+      />
+    </Suspense>
   );
 }

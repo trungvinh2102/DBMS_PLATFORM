@@ -207,7 +207,7 @@ export function useSQLLab() {
   // 4. Expose Clean API
   return {
     ...ui,
-    tabs, activeTabId, setActiveTabId, 
+    tabs, activeTabId, activeTab, setActiveTabId,
     addTab: () => addTab(activeTab.selectedDS, activeTab.selectedSchema),
     closeTab, renameTab,
     sql: activeTab.sql,

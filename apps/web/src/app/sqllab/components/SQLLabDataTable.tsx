@@ -32,6 +32,12 @@ const MIN_DATA_COLUMN_WIDTH_PX = 88;
 const CELL_CHROME_WIDTH_PX = 44;
 const MONOSPACE_CHAR_WIDTH_PX = 8;
 
+/**
+ * Column widths are estimates; scanning a bounded row sample keeps the
+ * main-thread cost of width calculation independent of result-set size.
+ */
+export const COLUMN_WIDTH_SAMPLE_ROWS = 100;
+
 function formatCellValue(val: any, nullText: string) {
   if (val === null) return nullText;
   if (typeof val === "object") return JSON.stringify(val);
@@ -47,12 +53,20 @@ function getEstimatedTextUnits(text: string) {
   return units;
 }
 
-function estimateColumnWidths(columns: string[], data: any[], nullText: string) {
+export function estimateColumnWidths(
+  columns: string[],
+  data: any[],
+  nullText: string,
+) {
   const maxUnitsByColumn = columns.map((column) =>
     getEstimatedTextUnits(column),
   );
 
-  data.forEach((row) => {
+  // Avoid whole-dataset scans (and per-object JSON.stringify) on every
+  // dataset change: width estimation is bounded to a row sample.
+  const scanLimit = Math.min(data.length, COLUMN_WIDTH_SAMPLE_ROWS);
+  for (let rowIndex = 0; rowIndex < scanLimit; rowIndex++) {
+    const row = data[rowIndex];
     columns.forEach((column, index) => {
       const value = formatCellValue(row?.[column], nullText);
       const units = getEstimatedTextUnits(value);
@@ -60,7 +74,7 @@ function estimateColumnWidths(columns: string[], data: any[], nullText: string) 
         maxUnitsByColumn[index] = units;
       }
     });
-  });
+  }
 
   return maxUnitsByColumn.map((units) =>
     Math.max(
@@ -68,6 +82,48 @@ function estimateColumnWidths(columns: string[], data: any[], nullText: string) 
       Math.ceil(units * MONOSPACE_CHAR_WIDTH_PX) + CELL_CHROME_WIDTH_PX,
     ),
   );
+}
+
+export interface ResultFilteredRow {
+  row: any;
+  _originalIndex: number;
+}
+
+/**
+ * Filters a result set without cloning the dataset. Returns `null` when the
+ * term is empty so callers can index the original rows directly (the common
+ * path), and returns only the matching rows paired with their original index
+ * when searching. Iterates `columns` instead of `Object.entries(row)` to avoid
+ * per-row allocation on every filter operation.
+ */
+export function filterResultRows(
+  data: any[],
+  columns: string[],
+  searchTerm: string,
+): ResultFilteredRow[] | null {
+  const term = searchTerm.trim().toLowerCase();
+  if (!term) return null;
+
+  const matches: ResultFilteredRow[] = [];
+  for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+    const row = data[rowIndex];
+    let matched = false;
+    for (const column of columns) {
+      const value = row?.[column];
+      if (value === null || value === undefined) continue;
+      if (typeof value === "object") {
+        if (JSON.stringify(value).toLowerCase().includes(term)) {
+          matched = true;
+          break;
+        }
+      } else if (String(value).toLowerCase().includes(term)) {
+        matched = true;
+        break;
+      }
+    }
+    if (matched) matches.push({ row, _originalIndex: rowIndex });
+  }
+  return matches;
 }
 
 /**
@@ -106,32 +162,21 @@ export function SQLLabDataTable({
     return () => window.clearTimeout(timeoutId);
   }, [searchTerm]);
 
-  const dataWithIndices = useMemo(
-    () => data.map((row, index) => ({ ...row, _originalIndex: index })),
-    [data],
+  // Stable column identity so a new `columns` array reference with the same
+  // content does not re-run whole-dataset work on every render.
+  const columnsKey = useMemo(() => columns.join("\u0000"), [columns]);
+
+  // null means "no active filter": virtual rows index the original `data`
+  // array directly, so no whole-dataset clone is needed for the common path.
+  const filteredRows = useMemo(
+    () => filterResultRows(data, columns, deferredSearchTerm),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, columnsKey, deferredSearchTerm],
   );
-
-  const searchableColumns = useMemo(() => new Set(columns), [columns]);
-
-  const filteredData = useMemo(() => {
-    const term = deferredSearchTerm.trim().toLowerCase();
-    if (!term) return dataWithIndices;
-
-    return dataWithIndices.filter((row) =>
-      Object.entries(row).some(([key, val]) => {
-        if (key === "_originalIndex") return false;
-        if (!searchableColumns.has(key)) return false;
-        if (val === null || val === undefined) return false;
-        if (typeof val === "object") {
-          return JSON.stringify(val).toLowerCase().includes(term);
-        }
-        return String(val).toLowerCase().includes(term);
-      }),
-    );
-  }, [dataWithIndices, deferredSearchTerm, searchableColumns]);
+  const rowCount = filteredRows ? filteredRows.length : data.length;
 
   const rowVirtualizer = useVirtualizer({
-    count: filteredData.length,
+    count: rowCount,
     getScrollElement: () => parentRef.current,
     estimateSize: () => (mini ? 32 : 40),
     overscan: 10,
@@ -141,7 +186,8 @@ export function SQLLabDataTable({
   const totalSize = rowVirtualizer.getTotalSize();
   const columnWidths = useMemo(
     () => estimateColumnWidths(columns, data, showNullAs),
-    [columns, data, showNullAs],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [columnsKey, data, showNullAs],
   );
   const tableWidth = useMemo(
     () =>
@@ -223,7 +269,7 @@ export function SQLLabDataTable({
           )}
         </div>
         <div className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-widest px-2">
-          {filteredData.length} of {data.length} {mini ? "" : "rows"}
+          {rowCount} of {data.length} {mini ? "" : "rows"}
         </div>
       </div>
       <div
@@ -275,7 +321,9 @@ export function SQLLabDataTable({
             )}
             {virtualRows.map((virtualRow) => {
               const i = virtualRow.index;
-              const row = filteredData[i];
+              const originalIndex = filteredRows
+                ? filteredRows[i]._originalIndex
+                : i;
               return (
                 <tr
                   key={virtualRow.key}
@@ -287,12 +335,12 @@ export function SQLLabDataTable({
                     {i + 1}
                   </td>
                   {columns.map((col, j) => {
-                    const val = getCellValue(row._originalIndex, col);
+                    const val = getCellValue(originalIndex, col);
                     const isEdited =
-                      pendingChanges[row._originalIndex] && col in pendingChanges[row._originalIndex];
+                      pendingChanges[originalIndex] && col in pendingChanges[originalIndex];
                     const isObject = val !== null && typeof val === "object";
                     const isEditing =
-                      editingCell?.rowIndex === row._originalIndex &&
+                      editingCell?.rowIndex === originalIndex &&
                       editingCell?.colName === col;
 
                     return (
@@ -314,7 +362,7 @@ export function SQLLabDataTable({
                         }}
                         onDoubleClick={() => {
                           if (isColumnEditable(col) && !isObject) {
-                            setEditingCell({ rowIndex: row._originalIndex, colName: col });
+                            setEditingCell({ rowIndex: originalIndex, colName: col });
                           }
                         }}
                       >
@@ -324,7 +372,7 @@ export function SQLLabDataTable({
                             className="w-full h-full bg-background border-2 border-primary px-2 py-1 outline-none text-[11px]"
                             value={val === null ? "" : String(val)}
                             onChange={(e) =>
-                              handleCellChange(row._originalIndex, col, e.target.value)
+                              handleCellChange(originalIndex, col, e.target.value)
                             }
                             onBlur={() => setEditingCell(null)}
                             onKeyDown={(e) => {
@@ -380,7 +428,7 @@ export function SQLLabDataTable({
               )}
           </tbody>
         </table>
-        {filteredData.length === 0 && (
+        {rowCount === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground/20">
             <Search className="h-8 w-8 mb-4 opacity-10" />
             <p className="text-[10px] uppercase font-black tracking-widest">

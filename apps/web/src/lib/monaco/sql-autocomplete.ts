@@ -20,6 +20,12 @@ interface InlineCompletionCacheEntry {
   expiresAt: number;
 }
 
+export interface SqlInlineAiConfig {
+  provider?: string;
+  modelId?: string;
+  revision?: string | number;
+}
+
 interface SqlColumnCompletion {
   table?: string | null;
   tableName?: string | null;
@@ -185,9 +191,19 @@ export const getSqlColumnCompletionParts = (
 const buildInlineCompletionCacheKey = (
   databaseId: string,
   schemaId: string | undefined,
+  aiConfig: SqlInlineAiConfig | undefined,
   prefix: string,
   suffix: string,
-): string => [databaseId, schemaId || "", prefix, suffix].join("\u0000");
+): string =>
+  [
+    databaseId,
+    schemaId || "",
+    aiConfig?.provider || "",
+    aiConfig?.modelId || "",
+    aiConfig?.revision ?? "",
+    prefix,
+    suffix,
+  ].join("\u0000");
 
 const toInlineCompletionItems = (
   monaco: Monaco,
@@ -209,22 +225,10 @@ const toInlineCompletionItems = (
 
 const MAX_COLUMN_SUGGESTIONS = 80;
 
-let aliasCacheVersionId = -1;
-let cachedAliases: Record<string, string> = {};
-
-const buildSqlTriggerCharacters = (
+export const buildSqlTriggerCharacters = (
   completions: ReturnType<typeof getSqlDialectCompletions>,
 ): string[] => {
-  const syntaxInitials = [
-    ...completions.keywords,
-    ...completions.snippets.map((snippet) => snippet.label),
-  ].flatMap((label) => {
-    const firstCharacter = label.trim().charAt(0);
-    if (!/^[a-z]$/i.test(firstCharacter)) return [];
-    return [firstCharacter.toLowerCase(), firstCharacter.toUpperCase()];
-  });
-
-  return Array.from(new Set([".", '"', ...syntaxInitials]));
+  return [".", '"', "`"];
 };
 
 const isSqlIdentifierCharacter = (text: string): boolean =>
@@ -271,9 +275,21 @@ export const registerSqlAutocomplete = (
   schemaId?: string,
   dialect?: string,
   enableInlineAi = false,
+  inlineAiConfig?: SqlInlineAiConfig,
+  metadataRevisionRef?: { current: number },
 ) => {
   const disposables: monacoEditor.IDisposable[] = [];
   const dialectCompletions = getSqlDialectCompletions(dialect);
+  let cachedColumnsSource: SqlColumnCompletion[] | null = null;
+  let cachedColumnsLength = -1;
+  let cachedFirstColumn: SqlColumnCompletion | undefined;
+  let cachedLastColumn: SqlColumnCompletion | undefined;
+  let cachedMetadataRevision: number | undefined;
+  let cachedNormalizedColumns: SqlColumnCompletionParts[] = [];
+  const aliasCache = new WeakMap<
+    monacoEditor.editor.ITextModel,
+    { versionId: number; aliases: Record<string, string> }
+  >();
 
   disposables.push(
     monaco.languages.registerCompletionItemProvider("sql", {
@@ -290,8 +306,6 @@ export const registerSqlAutocomplete = (
           endColumn: word.endColumn,
         };
 
-        const versionId = model.getVersionId();
-
         const textUntilPosition = model.getValueInRange({
           startLineNumber: position.lineNumber,
           startColumn: 1,
@@ -301,10 +315,24 @@ export const registerSqlAutocomplete = (
 
         const fullText = model.getValue();
 
-        // Compute normalized columns once — avoid double iteration
-        const normalizedColumns = columnsRef.current
-          .map(getSqlColumnCompletionParts)
-          .filter((col): col is SqlColumnCompletionParts => Boolean(col));
+        const columns = columnsRef.current;
+          if (
+            columns !== cachedColumnsSource ||
+            columns.length !== cachedColumnsLength ||
+            columns[0] !== cachedFirstColumn ||
+            columns[columns.length - 1] !== cachedLastColumn ||
+            metadataRevisionRef?.current !== cachedMetadataRevision
+          ) {
+          cachedColumnsSource = columns;
+          cachedColumnsLength = columns.length;
+            cachedFirstColumn = columns[0];
+            cachedLastColumn = columns[columns.length - 1];
+            cachedMetadataRevision = metadataRevisionRef?.current;
+          cachedNormalizedColumns = columns
+            .map(getSqlColumnCompletionParts)
+            .filter((col): col is SqlColumnCompletionParts => Boolean(col));
+        }
+        const normalizedColumns = cachedNormalizedColumns;
 
         // Table.column or Alias.column completion
         const match = textUntilPosition.match(/([a-zA-Z0-9_]+)\.$/);
@@ -312,13 +340,18 @@ export const registerSqlAutocomplete = (
           const prefix = match[1];
           let targetTable = prefix;
 
-          // Check if prefix is an alias — cache by model version
-          if (versionId !== aliasCacheVersionId) {
-            cachedAliases = extractTableAliases(fullText);
-            aliasCacheVersionId = versionId;
+          // Check if prefix is an alias — cache by model identity and version
+          const versionId = model.getVersionId();
+          const cachedModelAliases = aliasCache.get(model);
+          if (!cachedModelAliases || cachedModelAliases.versionId !== versionId) {
+            aliasCache.set(model, {
+              versionId,
+              aliases: extractTableAliases(fullText),
+            });
           }
-          if (cachedAliases[prefix]) {
-            targetTable = cachedAliases[prefix];
+          const aliases = aliasCache.get(model)?.aliases;
+          if (aliases?.[prefix]) {
+            targetTable = aliases[prefix];
           }
 
           const filteredColumns = normalizedColumns.filter(
@@ -404,9 +437,53 @@ export const registerSqlAutocomplete = (
     }),
   );
 
-  let timeout: any = null;
-  let currentRequestObj: AbortController | null = null;
+  const MAX_INLINE_COMPLETION_CACHE_ENTRIES = 100;
+  type InlineCompletionResult = { items: any[] };
+  type InlineRequest = {
+    id: number;
+    resolve: (result: InlineCompletionResult) => void;
+    timeout: ReturnType<typeof setTimeout> | null;
+    controller: AbortController | null;
+    cancellationDisposable: { dispose: () => void } | null;
+    settled: boolean;
+  };
+  let currentRequest: InlineRequest | null = null;
+  let requestId = 0;
+  let disposed = false;
   const completionCache = new Map<string, InlineCompletionCacheEntry>();
+
+  const settleRequest = (request: InlineRequest, result: InlineCompletionResult) => {
+    if (request.settled) return;
+    request.settled = true;
+    if (request.timeout) {
+      clearTimeout(request.timeout);
+      request.timeout = null;
+    }
+    request.cancellationDisposable?.dispose();
+    request.cancellationDisposable = null;
+    if (currentRequest === request) currentRequest = null;
+    request.resolve(result);
+  };
+
+  const cancelCurrentRequest = () => {
+    if (!currentRequest) return;
+    const request = currentRequest;
+    request.controller?.abort();
+    settleRequest(request, { items: [] });
+  };
+
+  const cacheInlineCompletion = (key: string, completion: string) => {
+    completionCache.delete(key);
+    while (completionCache.size >= MAX_INLINE_COMPLETION_CACHE_ENTRIES) {
+      const oldestKey = completionCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      completionCache.delete(oldestKey);
+    }
+    completionCache.set(key, {
+      completion,
+      expiresAt: Date.now() + AI_COMPLETION_CACHE_TTL_MS,
+    });
+  };
 
   if (enableInlineAi) {
     disposables.push(
@@ -417,7 +494,9 @@ export const registerSqlAutocomplete = (
           context: monacoEditor.languages.InlineCompletionContext,
           token: monacoEditor.CancellationToken,
         ) => {
-          if (!databaseId) return { items: [] };
+          if (disposed || !databaseId) return { items: [] };
+          if (token.isCancellationRequested) return { items: [] };
+          cancelCurrentRequest();
 
           const textUntilPosition = model.getValueInRange({
             startLineNumber: 1,
@@ -471,33 +550,60 @@ export const registerSqlAutocomplete = (
           const cacheKey = buildInlineCompletionCacheKey(
             databaseId,
             schemaId,
+            inlineAiConfig,
             trimmedContext.prefix,
             trimmedContext.suffix,
           );
           const cached = completionCache.get(cacheKey);
           if (cached && cached.expiresAt > Date.now()) {
+            completionCache.delete(cacheKey);
+            completionCache.set(cacheKey, cached);
             return toInlineCompletionItems(monaco, position, cached.completion);
           }
+          if (cached) completionCache.delete(cacheKey);
 
           return new Promise((resolve) => {
-            if (timeout) clearTimeout(timeout);
-            if (currentRequestObj) currentRequestObj.abort();
-
             const modelVersionId = model.getVersionId();
+            const configKey = buildInlineCompletionCacheKey(
+              databaseId,
+              schemaId,
+              inlineAiConfig,
+              "",
+              "",
+            );
+            const request: InlineRequest = {
+              id: ++requestId,
+              resolve,
+              timeout: null,
+              controller: null,
+              cancellationDisposable: null,
+              settled: false,
+            };
+            currentRequest = request;
 
-            token.onCancellationRequested(() => {
-              if (currentRequestObj) currentRequestObj.abort();
-              resolve({ items: [] });
+            request.cancellationDisposable = token.onCancellationRequested(() => {
+              if (currentRequest === request) {
+                request.controller?.abort();
+                settleRequest(request, { items: [] });
+              }
             });
 
-            timeout = setTimeout(async () => {
+            request.timeout = setTimeout(async () => {
+              request.timeout = null;
+              if (
+                disposed ||
+                currentRequest !== request ||
+                token.isCancellationRequested
+              ) {
+                return settleRequest(request, { items: [] });
+              }
               // If model changed before timeout, cancel
               if (model.getVersionId() !== modelVersionId) {
-                return resolve({ items: [] });
+                return settleRequest(request, { items: [] });
               }
 
               const abortController = new AbortController();
-              currentRequestObj = abortController;
+              request.controller = abortController;
 
               try {
                 const res = await aiApi.completeSql(
@@ -506,15 +612,28 @@ export const registerSqlAutocomplete = (
                     schema_name: schemaId || "public",
                     prefix: trimmedContext.prefix,
                     suffix: trimmedContext.suffix,
+                    ...(inlineAiConfig?.modelId
+                      ? { modelId: inlineAiConfig.modelId }
+                      : {}),
                   },
                   abortController.signal,
                 );
 
                 if (
+                  disposed ||
+                  currentRequest !== request ||
                   abortController.signal.aborted ||
-                  token.isCancellationRequested
+                  token.isCancellationRequested ||
+                  model.getVersionId() !== modelVersionId ||
+                  buildInlineCompletionCacheKey(
+                    databaseId,
+                    schemaId,
+                    inlineAiConfig,
+                    "",
+                    "",
+                  ) !== configKey
                 ) {
-                  return resolve({ items: [] });
+                  return settleRequest(request, { items: [] });
                 }
 
                 const completionText = sanitizeInlineSqlCompletion(
@@ -522,29 +641,33 @@ export const registerSqlAutocomplete = (
                   (res as any).completion,
                 );
                 if (completionText) {
-                  completionCache.set(cacheKey, {
-                    completion: completionText,
-                    expiresAt: Date.now() + AI_COMPLETION_CACHE_TTL_MS,
-                  });
-                  resolve(
+                  cacheInlineCompletion(cacheKey, completionText);
+                  settleRequest(
+                    request,
                     toInlineCompletionItems(monaco, position, completionText),
                   );
                 } else {
-                  resolve({ items: [] });
+                  settleRequest(request, { items: [] });
                 }
               } catch (err) {
-                resolve({ items: [] });
+                settleRequest(request, { items: [] });
               }
             }, AI_COMPLETION_DEBOUNCE_MS);
           });
         },
-        disposeInlineCompletions() {},
+        disposeInlineCompletions() {
+          cancelCurrentRequest();
+          completionCache.clear();
+        },
       }),
     );
   }
 
   return {
     dispose: () => {
+      disposed = true;
+      cancelCurrentRequest();
+      completionCache.clear();
       disposables.forEach((d) => d.dispose());
     },
   };

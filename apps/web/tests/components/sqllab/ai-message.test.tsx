@@ -3,6 +3,7 @@
  * @description Unit tests for the SQL Lab AI assistant message presentation and interactions.
  */
 
+import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -232,5 +233,36 @@ describe("AIMessage", () => {
     const code = container.querySelector("pre code");
     expect(code).toHaveTextContent("SELECT id, name FROM users;");
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+  });
+
+  it("persists toggled thought visibility exactly once per click under StrictMode", () => {
+    const onMessageUiStateChange = vi.fn();
+
+    render(
+      <React.StrictMode>
+        <AIMessage
+          message={{
+            id: "msg-1",
+            role: "assistant",
+            content: "Đây là câu trả lời.",
+            thought: "Đang phân tích...",
+          }}
+          onExplain={vi.fn()}
+          onOptimize={vi.fn()}
+          messageUiState={{ isThoughtVisible: false }}
+          onMessageUiStateChange={onMessageUiStateChange}
+        />
+      </React.StrictMode>,
+    );
+
+    // StrictMode double-invokes state updater functions in development; a side
+    // effect inside the updater would therefore fire twice on a single click.
+    fireEvent.click(screen.getByRole("button", { name: /Xem hoạt động trợ lý/i }));
+    expect(onMessageUiStateChange).toHaveBeenCalledTimes(1);
+    expect(onMessageUiStateChange).toHaveBeenCalledWith("msg-1", { isThoughtVisible: true });
+
+    fireEvent.click(screen.getByRole("button", { name: /Ẩn hoạt động trợ lý/i }));
+    expect(onMessageUiStateChange).toHaveBeenCalledTimes(2);
+    expect(onMessageUiStateChange).toHaveBeenLastCalledWith("msg-1", { isThoughtVisible: false });
   });
 });

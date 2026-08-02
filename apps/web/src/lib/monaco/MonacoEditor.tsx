@@ -36,17 +36,7 @@ interface SQLEditorProps {
   onSave?: () => void;
   tabSize?: number;
   tables?: string[];
-  columns?: Array<{
-    table?: string | null;
-    tableName?: string | null;
-    table_name?: string | null;
-    name?: string | null;
-    columnName?: string | null;
-    column_name?: string | null;
-    type?: string | null;
-    dataType?: string | null;
-    data_type?: string | null;
-  }>;
+  columns?: SQLEditorColumn[];
   undoTrigger?: number;
   redoTrigger?: number;
   enableValidation?: boolean;
@@ -64,6 +54,62 @@ interface SQLEditorProps {
   validationDebounceMs?: number;
   onValidationChange?: (errorCount: number, warningCount: number) => void;
   onErrorsChange?: (errors: any[]) => void;
+}
+
+/**
+ * A single column entry accepted by the SQL editor for autocomplete metadata.
+ * Mirrors the backend's all-columns payload, which may use either camelCase or
+ * snake_case field names.
+ */
+export interface SQLEditorColumn {
+  table?: string | null;
+  tableName?: string | null;
+  table_name?: string | null;
+  name?: string | null;
+  columnName?: string | null;
+  column_name?: string | null;
+  type?: string | null;
+  dataType?: string | null;
+  data_type?: string | null;
+}
+
+/**
+ * Keeps the Monaco autocomplete metadata refs and the metadata revision in sync
+ * with the `tables`/`columns` props. The revision only advances when the
+ * metadata actually changes: unrelated re-renders (SQL text, cursor movement)
+ * never invalidate the SQL autocomplete cache, and parents that rebuild the
+ * arrays with identical content do not bump the revision either.
+ */
+export function useSqlMetadataSync(
+  tables: string[],
+  columns: SQLEditorColumn[],
+) {
+  const tablesRef = useRef<string[]>(tables);
+  const columnsRef = useRef<SQLEditorColumn[]>(columns);
+  const metadataRevisionRef = useRef(0);
+
+  // Sync refs
+  useEffect(() => {
+    const prevTables = tablesRef.current;
+    const prevColumns = columnsRef.current;
+    const tablesChanged =
+      tables.length !== prevTables.length ||
+      tables.some((name, index) => name !== prevTables[index]);
+    const columnsChanged =
+      columns.length !== prevColumns.length ||
+      columns.some((column, index) => column !== prevColumns[index]);
+
+    // Identity changed (the effect only fires on new `tables`/`columns`
+    // references), but the content is identical to what is already synced.
+    // Keep the refs and revision untouched so the autocomplete cache survives.
+    if (!tablesChanged && !columnsChanged) return;
+
+    metadataRevisionRef.current += 1;
+    tablesRef.current = tables;
+    columnsRef.current = columns;
+  }, [tables, columns]);
+
+  return { tablesRef, columnsRef, metadataRevisionRef };
 }
 
 export function SQLEditor({
@@ -98,8 +144,10 @@ export function SQLEditor({
   );
   const monacoRef = useRef<Monaco | null>(null);
   const autocompleteDisposablesRef = useRef<monacoEditor.IDisposable[]>([]);
-  const tablesRef = useRef<string[]>(tables);
-  const columnsRef = useRef(columns);
+  const { tablesRef, columnsRef, metadataRevisionRef } = useSqlMetadataSync(
+    tables,
+    columns,
+  );
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -110,12 +158,6 @@ export function SQLEditor({
       }
     };
   }, []);
-
-  // Sync refs
-  useEffect(() => {
-    tablesRef.current = tables;
-    columnsRef.current = columns;
-  }, [tables, columns]);
 
   const validationOptions: ValidationOptions = useMemo(
     () => ({ sqlDialect }),
@@ -236,14 +278,17 @@ export function SQLEditor({
       language === "sql"
         ? [
             registerSqlSuggestOnTyping(editorRef.current),
-            registerSqlAutocomplete(
-              monacoRef.current,
-              tablesRef,
-              columnsRef,
+              registerSqlAutocomplete(
+                monacoRef.current,
+                tablesRef,
+                columnsRef,
               databaseId,
-              schemaId,
-              sqlDialect,
-            ),
+                schemaId,
+                sqlDialect,
+                false,
+                undefined,
+                metadataRevisionRef,
+              ),
           ]
         : [];
 

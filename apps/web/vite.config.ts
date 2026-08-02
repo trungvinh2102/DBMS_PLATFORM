@@ -41,11 +41,23 @@ export default defineConfig(({ mode }) => {
       sourcemap: mode === 'development',
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-xyflow': ['@xyflow/react'],
-            'vendor-monaco': ['monaco-editor', '@monaco-editor/react'],
-            'vendor-tanstack': ['@tanstack/react-query', '@tanstack/react-table', '@tanstack/react-virtual', '@tanstack/react-form'],
+          manualChunks(id: string) {
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('@xyflow/react') || id.includes('@xyflow/system')) {
+              return 'vendor-xyflow';
+            }
+            if (id.includes('monaco-editor') || id.includes('@monaco-editor/react')) {
+              return 'vendor-monaco';
+            }
+            if (id.includes('@tanstack/react-query') || id.includes('@tanstack/react-table') || id.includes('@tanstack/react-virtual') || id.includes('@tanstack/react-form')) {
+              return 'vendor-tanstack';
+            }
+            if (id.includes('node_modules/zustand') || id.includes('node_modules/use-sync-external-store')) {
+              return 'vendor-state';
+            }
+            return undefined;
           },
         },
       },

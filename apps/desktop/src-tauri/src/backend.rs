@@ -3,8 +3,12 @@
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 use std::net::TcpListener;
+#[cfg(debug_assertions)]
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
+#[cfg(debug_assertions)]
+use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::process::CommandEvent;
@@ -17,6 +21,52 @@ pub const BACKEND_STATUS_EVENT: &str = "backend-status-changed";
 const DESKTOP_PORT_ENV: &str = "QURIODB_DESKTOP_PORT";
 const DESKTOP_NONCE_ENV: &str = "QURIODB_STARTUP_NONCE";
 const DESKTOP_PARENT_PID_ENV: &str = "QURIODB_DESKTOP_PARENT_PID";
+
+#[cfg(debug_assertions)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StartupMark {
+    DesktopSpawn,
+    BackendReady,
+}
+
+#[cfg(debug_assertions)]
+#[derive(Default)]
+struct StartupEventRecorder {
+    events: Vec<(StartupMark, u128)>,
+}
+
+#[cfg(debug_assertions)]
+impl StartupEventRecorder {
+    fn record(&mut self, mark: StartupMark, timestamp: u128) -> bool {
+        let expected = match self.events.len() {
+            0 => StartupMark::DesktopSpawn,
+            1 => StartupMark::BackendReady,
+            _ => return false,
+        };
+        if mark != expected {
+            return false;
+        }
+        self.events.push((mark, timestamp));
+        true
+    }
+}
+
+#[cfg(debug_assertions)]
+fn record_startup_mark(recorder: &Arc<Mutex<StartupEventRecorder>>, mark: StartupMark) {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default();
+    if let Ok(mut recorder) = recorder.lock() {
+        if recorder.record(mark, timestamp) {
+            let name = match mark {
+                StartupMark::DesktopSpawn => "desktop_spawn",
+                StartupMark::BackendReady => "backend_ready",
+            };
+            log::info!("desktop_startup_mark name={name} timestamp_ms={timestamp}");
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -293,6 +343,8 @@ pub fn start_backend(app: AppHandle) -> Result<BackendStatus, String> {
     let manager = app.state::<BackendManager>();
     let generation = manager.begin_generation();
     emit_status(&app, &BackendStatus::Starting { generation });
+    #[cfg(debug_assertions)]
+    let startup_marks = Arc::new(Mutex::new(StartupEventRecorder::default()));
     let port = match allocate_loopback_port() {
         Ok(port) => port,
         Err(error) => {
@@ -320,6 +372,8 @@ pub fn start_backend(app: AppHandle) -> Result<BackendStatus, String> {
             return Err(error);
         }
     };
+    #[cfg(debug_assertions)]
+    record_startup_mark(&startup_marks, StartupMark::DesktopSpawn);
 
     match manager.attach_child(generation, child) {
         Ok(Some(previous)) => kill_child(previous),
@@ -359,11 +413,15 @@ pub fn start_backend(app: AppHandle) -> Result<BackendStatus, String> {
     });
 
     let readiness_app = app.clone();
+    #[cfg(debug_assertions)]
+    let readiness_marks = startup_marks.clone();
     tauri::async_runtime::spawn(async move {
         let result = wait_for_backend_ready(port, &nonce, terminated_rx).await;
         let manager = readiness_app.state::<BackendManager>();
         match result {
             Ok(()) => {
+                #[cfg(debug_assertions)]
+                record_startup_mark(&readiness_marks, StartupMark::BackendReady);
                 emit_status_transition(
                     &readiness_app,
                     manager.mark_ready(generation, format!("http://127.0.0.1:{port}/api/")),
@@ -903,5 +961,43 @@ mod tests {
             wait_for_backend_ready_with_retries(port, "launch-secret", &mut terminated_rx, 1).await;
 
         assert_eq!(result, Err(BackendErrorCode::SidecarExited));
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn startup_marks_record_spawn_before_backend_ready() {
+        let mut recorder = StartupEventRecorder::default();
+
+        assert!(recorder.record(StartupMark::DesktopSpawn, 10));
+        assert!(recorder.record(StartupMark::BackendReady, 20));
+        assert_eq!(
+            &recorder.events,
+            &[
+                (StartupMark::DesktopSpawn, 10),
+                (StartupMark::BackendReady, 20),
+            ]
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn startup_marks_ignore_duplicates_and_out_of_order_events_without_lifecycle_mutation() {
+        let manager = BackendManager::default();
+        let generation = manager.begin_generation();
+        let status_before = manager.status();
+        let mut recorder = StartupEventRecorder::default();
+
+        assert!(recorder.record(StartupMark::DesktopSpawn, 10));
+        assert!(!recorder.record(StartupMark::DesktopSpawn, 11));
+        assert!(recorder.record(StartupMark::BackendReady, 20));
+        assert!(!recorder.record(StartupMark::DesktopSpawn, 21));
+        assert!(!recorder.record(StartupMark::BackendReady, 22));
+
+        assert_eq!(recorder.events.len(), 2);
+        assert_eq!(manager.status(), status_before);
+        assert!(matches!(
+            manager.status(),
+            BackendStatus::Starting { generation: current } if current == generation
+        ));
     }
 }

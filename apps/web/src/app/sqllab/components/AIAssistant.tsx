@@ -81,6 +81,7 @@ function AIAssistantContent({
 
   const {
     messages,
+    streamingMessage,
     isTyping,
     handleSend: _handleSend,
     loadConversations,
@@ -122,10 +123,11 @@ function AIAssistantContent({
     init();
   }, [selectedDatabaseId, loadConversations]);
 
-  // Auto-scroll logic
+  // Auto-scroll logic. The streaming message lives outside committed history,
+  // so it must drive the same scroll-to-bottom behavior during streaming.
   useEffect(() => {
-    if (messages.length > 0 && parentRef.current) {
-      parentRef.current.scrollTo({
+    if ((messages.length > 0 || streamingMessage) && parentRef.current) {
+      parentRef.current.scrollTo?.({
         top: parentRef.current.scrollHeight,
         behavior: "smooth",
       });
@@ -135,6 +137,9 @@ function AIAssistantContent({
     messages[messages.length - 1]?.content,
     messages[messages.length - 1]?.analysis,
     messages[messages.length - 1]?.suggestions?.length,
+    streamingMessage?.content,
+    streamingMessage?.analysis,
+    streamingMessage?.suggestions?.length,
     isTyping,
   ]);
 
@@ -403,6 +408,7 @@ function AIAssistantContent({
 
         <AIChatMessages
           messages={messages}
+          streamingMessage={streamingMessage}
           isTyping={isTyping}
           isFetchingConversation={isFetchingConversation}
           parentRef={parentRef}

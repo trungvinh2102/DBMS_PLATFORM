@@ -283,7 +283,12 @@ export const aiApi = {
       headers: { "Content-Type": "multipart/form-data" },
     }));
   },
-  streamChat: async (data: any, onChunk: (chunk: string, event?: string) => void, onHeaders?: (headers: Headers) => void) => {
+  streamChat: async (
+    data: any,
+    onChunk: (chunk: string, event?: string) => void,
+    onHeaders?: (headers: Headers) => void,
+    signal?: AbortSignal,
+  ) => {
     const token = useAuth.getState().token;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -302,6 +307,7 @@ export const aiApi = {
       headers,
       credentials: "include",
       body: JSON.stringify(data),
+      signal,
     });
 
 

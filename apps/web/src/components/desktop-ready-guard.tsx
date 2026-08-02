@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Database, Loader2, Server, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { markPerformance } from "@/lib/performance/performance-marks";
 import { configureDesktopApi, isTauriRuntime } from "@/lib/runtime-api";
 import {
   getBackendStatus,
@@ -66,6 +67,7 @@ export function DesktopReadyGuard({ children }: DesktopReadyGuardProps) {
         if (nextStatus.status === "ready") {
           try {
             configureDesktopApi(nextStatus.apiBaseUrl);
+            markPerformance("frontend_ready");
           } catch {
             const failedStatus: BackendStatus = {
               status: "failed",

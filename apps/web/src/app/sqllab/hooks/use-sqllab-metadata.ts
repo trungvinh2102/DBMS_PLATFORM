@@ -3,7 +3,7 @@
  * @description Hook to fetch and manage database metadata such as schemas, tables, views, functions, and specific table details.
  */
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -59,14 +59,14 @@ export function useSQLLabMetadata({
   const tablesQuery = useQuery({
     queryKey: ["tables", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getTables(selectedDS, selectedSchema),
-    enabled: !!selectedDS,
+    enabled: !!selectedDS && !!selectedSchema,
   });
   const tables = (tablesQuery.data as any) || [];
 
   const viewsQuery = useQuery({
     queryKey: ["views", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getViews(selectedDS, selectedSchema),
-    enabled: !!selectedDS,
+    enabled: !!selectedDS && !!selectedSchema,
   });
   const views = (viewsQuery.data as any) || [];
 
@@ -79,28 +79,28 @@ export function useSQLLabMetadata({
   const functionsQuery = useQuery({
     queryKey: ["functions", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getFunctions(selectedDS, selectedSchema),
-    enabled: !!selectedDS && !skipFunctionsProcsEvents,
+    enabled: !!selectedDS && !!selectedSchema && !skipFunctionsProcsEvents,
   });
   const functions = skipFunctionsProcsEvents ? [] : ((functionsQuery.data as any) || []);
 
   const proceduresQuery = useQuery({
     queryKey: ["procedures", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getProcedures(selectedDS, selectedSchema),
-    enabled: !!selectedDS && !skipFunctionsProcsEvents,
+    enabled: !!selectedDS && !!selectedSchema && !skipFunctionsProcsEvents,
   });
   const procedures = skipFunctionsProcsEvents ? [] : ((proceduresQuery.data as any) || []);
 
   const triggersQuery = useQuery({
     queryKey: ["triggers", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getTriggers(selectedDS, selectedSchema),
-    enabled: !!selectedDS && selectedDSType !== "duckdb" && !isClickHouse,
+    enabled: !!selectedDS && !!selectedSchema && selectedDSType !== "duckdb" && !isClickHouse,
   });
   const triggers = (selectedDSType === "duckdb" || isClickHouse) ? [] : ((triggersQuery.data as any) || []);
 
   const eventsQuery = useQuery({
     queryKey: ["events", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getEvents(selectedDS, selectedSchema),
-    enabled: !!selectedDS && !skipFunctionsProcsEvents,
+    enabled: !!selectedDS && !!selectedSchema && !skipFunctionsProcsEvents,
   });
   const events = skipFunctionsProcsEvents ? [] : ((eventsQuery.data as any) || []);
 
@@ -108,17 +108,17 @@ export function useSQLLabMetadata({
   const materializedViewsQuery = useQuery({
     queryKey: ["materialized-views", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getMaterializedViews(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
   const sequencesQuery = useQuery({
     queryKey: ["sequences", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getSequences(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
   const partitionsQuery = useQuery({
     queryKey: ["partitions", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getPartitions(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
   const rolesQuery = useQuery({
     queryKey: ["roles", selectedDS],
@@ -128,7 +128,7 @@ export function useSQLLabMetadata({
   const grantsQuery = useQuery({
     queryKey: ["grants", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getGrants(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
   const tablespacesQuery = useQuery({
     queryKey: ["tablespaces", selectedDS],
@@ -138,17 +138,17 @@ export function useSQLLabMetadata({
   const extensionsQuery = useQuery({
     queryKey: ["extensions", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getExtensions(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
   const synonymsQuery = useQuery({
     queryKey: ["synonyms", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getSynonyms(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
   const jobsQuery = useQuery({
     queryKey: ["jobs", selectedDS, selectedSchema],
     queryFn: () => databaseApi.getJobs(selectedDS, selectedSchema),
-    enabled: canLoadEngineObjects,
+    enabled: canLoadEngineObjects && !!selectedSchema,
   });
 
   const metadata = {
@@ -170,34 +170,34 @@ export function useSQLLabMetadata({
 
   const indexesQuery = useQuery({
     queryKey: ["indexes", selectedDS, selectedSchema, selectedTable],
-    queryFn: () => databaseApi.getIndexes(selectedDS, selectedTable!),
-    enabled: !!selectedDS && !!selectedTable && selectedDSType !== "duckdb",
+    queryFn: () => databaseApi.getIndexes(selectedDS, selectedTable!, selectedSchema),
+    enabled: !!selectedDS && !!selectedSchema && !!selectedTable && selectedDSType !== "duckdb",
   });
 
   const foreignKeysQuery = useQuery({
     queryKey: ["fks", selectedDS, selectedSchema, selectedTable],
-    queryFn: () => databaseApi.getForeignKeys(selectedDS, selectedTable!),
-    enabled: !!selectedDS && !!selectedTable && selectedDSType !== "duckdb" && selectedDSType !== "clickhouse",
+    queryFn: () => databaseApi.getForeignKeys(selectedDS, selectedTable!, selectedSchema),
+    enabled: !!selectedDS && !!selectedSchema && !!selectedTable && selectedDSType !== "duckdb" && selectedDSType !== "clickhouse",
   });
 
   const tableInfoQuery = useQuery({
     queryKey: ["tableInfo", selectedDS, selectedSchema, selectedTable],
-    queryFn: () => databaseApi.getTableInfo(selectedDS, selectedTable!),
-    enabled: !!selectedDS && !!selectedTable,
+    queryFn: () => databaseApi.getTableInfo(selectedDS, selectedTable!, selectedSchema),
+    enabled: !!selectedDS && !!selectedSchema && !!selectedTable,
   });
 
   const tableDDLQuery = useQuery({
     queryKey: ["ddl", selectedDS, selectedSchema, selectedTable],
     queryFn: () =>
       databaseApi.getDDL(selectedDS, selectedTable!, selectedSchema),
-    enabled: !!selectedDS && !!selectedTable && selectedDSType !== "duckdb",
+    enabled: !!selectedDS && !!selectedSchema && !!selectedTable && selectedDSType !== "duckdb",
   });
 
   const allColumnsQuery = useQuery({
     queryKey: ["columns", selectedDS, selectedSchema, selectedTable],
     queryFn: () =>
       databaseApi.getColumns(selectedDS, selectedTable!, selectedSchema),
-    enabled: !!selectedDS && !!selectedTable,
+    enabled: !!selectedDS && !!selectedSchema && !!selectedTable,
   });
   const allColumns = (allColumnsQuery.data as any[]) || [];
 
@@ -206,8 +206,14 @@ export function useSQLLabMetadata({
     queryFn: () => databaseApi.getAllColumns(selectedDS, selectedSchema),
     enabled: !!selectedDS && !!selectedSchema,
   });
-  const autocompleteColumns = flattenSchemaColumnsForAutocomplete(
-    schemaColumnsQuery.data as ColumnsByTable,
+  // Memoized on the schema metadata source so unchanged data keeps its array
+  // identity across unrelated re-renders (SQL text, cursor position updates).
+  const autocompleteColumns = useMemo(
+    () =>
+      flattenSchemaColumnsForAutocomplete(
+        schemaColumnsQuery.data as ColumnsByTable,
+      ),
+    [schemaColumnsQuery.data],
   );
 
   useEffect(() => {

@@ -7,14 +7,22 @@ import { render } from "../../test-utils";
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getLab, hostMounts } = vi.hoisted(() => ({
+const { getLab, getResult, hostMounts, markPerformance } = vi.hoisted(() => ({
   getLab: vi.fn(),
+  getResult: vi.fn(),
   hostMounts: vi.fn(),
+  markPerformance: vi.fn(),
 }));
 
 vi.mock("@/app/sqllab/context/SQLLabContext", () => ({
   SQLLabProvider: ({ children }: { children: React.ReactNode }) => children,
   useSQLLabContext: getLab,
+  useSQLLabTabMetadataContext: () => ({ activeTabName: undefined }),
+  useSQLLabResultContext: getResult,
+}));
+
+vi.mock("@/lib/performance/performance-marks", () => ({
+  markPerformance,
 }));
 
 vi.mock("@/app/sqllab/components/SQLLabEditorContainer", () => ({
@@ -71,11 +79,22 @@ const createLab = (showAISidebar: boolean) => ({
   setIsImportWizardOpen: vi.fn(),
   handleSaveConfirmed: vi.fn(),
   handleSelectSavedQuery: vi.fn(),
+  isLoadingColumns: false,
+});
+
+const createResult = (overrides: Record<string, unknown> = {}) => ({
+  results: [],
+  columns: [],
+  error: null,
+  executing: false,
+  ...overrides,
 });
 
 describe("SQL Lab page lifecycle host", () => {
   beforeEach(() => {
     hostMounts.mockClear();
+    markPerformance.mockClear();
+    getResult.mockReturnValue(createResult());
   });
 
   it("keeps the lifecycle host mounted while switching Editor and AI modes", async () => {
@@ -92,5 +111,33 @@ describe("SQL Lab page lifecycle host", () => {
 
     expect(hostMounts).toHaveBeenCalledTimes(1);
     expect(view.getByTestId("sql-lab-lifecycle-host")).toBeInTheDocument();
+  });
+
+  it("marks metadata only after metadata loading finishes", async () => {
+    getLab.mockReturnValue({ ...createLab(false), isLoadingColumns: true });
+    const { default: SQLLabPage } = await import("@/app/sqllab/page");
+    const view = render(<SQLLabPage />);
+
+    expect(markPerformance).not.toHaveBeenCalledWith("metadata_loaded");
+
+    getLab.mockReturnValue({ ...createLab(false), isLoadingColumns: false });
+    view.rerender(<SQLLabPage />);
+
+    expect(markPerformance).toHaveBeenCalledWith("metadata_loaded");
+  });
+
+  it("marks successful result rendering but excludes error results", async () => {
+    getLab.mockReturnValue(createLab(false));
+    getResult.mockReturnValue({ results: [{ id: 1 }], columns: ["id"], executing: false, error: null });
+    const { default: SQLLabPage } = await import("@/app/sqllab/page");
+    const view = render(<SQLLabPage />);
+
+    expect(markPerformance).toHaveBeenCalledWith("result_rendered");
+
+    markPerformance.mockClear();
+    getResult.mockReturnValue(createResult({ error: "query failed" }));
+    view.rerender(<SQLLabPage />);
+
+    expect(markPerformance).not.toHaveBeenCalledWith("result_rendered");
   });
 });

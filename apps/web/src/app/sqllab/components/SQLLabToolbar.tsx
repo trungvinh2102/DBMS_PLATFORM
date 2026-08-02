@@ -23,10 +23,11 @@ import { cn } from "@/lib/utils";
 import { ToolbarButton } from "./ToolbarButton";
 import { Input } from "@/components/ui/input";
 
-import { useSQLLabContext } from "../context/SQLLabContext";
+import { useSQLLabContext, useSQLLabResultContext } from "../context/SQLLabContext";
 
 export function SQLLabToolbar() {
   const lab = useSQLLabContext();
+  const result = useSQLLabResultContext();
   return (
     <header className="flex items-center h-14 border-b bg-background/80 backdrop-blur-md sticky top-0 z-10 px-3 shrink-0 gap-1 overflow-x-auto no-scrollbar">
       {/* Run & Stop Group */}
@@ -36,28 +37,28 @@ export function SQLLabToolbar() {
             <Play
               className={cn(
                 "h-4 w-4 text-emerald-600 dark:text-emerald-500",
-                lab.executing && "animate-pulse",
+                result.executing && "animate-pulse",
               )}
             />
           }
           label="Run"
           onClick={() => lab.handleRun()}
-          disabled={lab.executing || !lab.selectedDS}
+           disabled={result.executing || !lab.selectedDS}
           className="font-bold text-emerald-600 dark:text-emerald-500"
         />
         <ToolbarButton
           icon={<Square className="h-4 w-4 text-red-500/60" />}
           label="Stop"
-          disabled={!lab.executing}
+           disabled={!result.executing}
           onClick={lab.handleStop}
           className="hover:bg-red-500/5"
         />
         {lab.isRelational && lab.selectedDSType !== "clickhouse" && (
             <ToolbarButton
-              icon={<Zap className={cn("h-4 w-4 text-amber-500", lab.executing && "animate-pulse")} />}
+               icon={<Zap className={cn("h-4 w-4 text-amber-500", result.executing && "animate-pulse")} />}
               label="Explain"
               onClick={() => lab.handleExplain()}
-              disabled={lab.executing || !lab.selectedDS}
+               disabled={result.executing || !lab.selectedDS}
               className="font-bold text-amber-600 dark:text-amber-500"
             />
         )}
@@ -101,27 +102,27 @@ export function SQLLabToolbar() {
           {/* Auto Commit Toggle */}
           <div
             role="switch"
-            aria-checked={lab.activeResultTab === "results"}
+            aria-checked={result.activeResultTab === "results"}
             tabIndex={0}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                lab.setActiveResultTab(lab.activeResultTab === "results" ? "messages" : "results");
+                result.setActiveResultTab(result.activeResultTab === "results" ? "messages" : "results");
               }
             }}
             className="flex items-center gap-2 px-3 h-9 hover:bg-muted/50 transition-colors rounded-md cursor-pointer border border-transparent hover:border-border/50"
-            onClick={() => lab.setActiveResultTab(lab.activeResultTab === "results" ? "messages" : "results")}
+            onClick={() => result.setActiveResultTab(result.activeResultTab === "results" ? "messages" : "results")}
           >
             <div
               className={cn(
                 "relative w-8 h-4 rounded-full transition-all",
-                lab.activeResultTab === "results" ? "bg-primary" : "bg-muted",
+                result.activeResultTab === "results" ? "bg-primary" : "bg-muted",
               )}
             >
               <div
                 className={cn(
                   "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm",
-                  lab.activeResultTab === "results" ? "left-4.5" : "left-0.5",
+                  result.activeResultTab === "results" ? "left-4.5" : "left-0.5",
                 )}
               />
             </div>

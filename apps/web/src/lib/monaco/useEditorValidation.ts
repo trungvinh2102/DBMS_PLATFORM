@@ -80,28 +80,14 @@ interface UseEditorValidationReturn {
 }
 
 // ============================================================================
-// DEBOUNCE UTILITY
+// DEFERRED SCHEDULING
 // ============================================================================
 
 /**
- * Creates a debounced function that delays invoking func until after wait milliseconds
- * have elapsed since the last time the debounced function was invoked.
+ * Deferred work is scheduled after the debounce interval to keep parser work
+ * out of the active typing path.
  */
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number,
-): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout | null = null;
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    timeoutId = setTimeout(() => {
-      func(...args);
-    }, wait);
-  };
-}
+type DeferredCallback = () => void;
 
 // ============================================================================
 // HOOK IMPLEMENTATION
@@ -133,6 +119,12 @@ export function useEditorValidation({
 
   // Track last validated code to avoid redundant validations
   const lastValidatedCode = useRef<string>("");
+  const validationVersion = useRef(0);
+  const isMounted = useRef(true);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idleCallbackId = useRef<number | null>(null);
+  const deferredTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const usesIdleCallback = useRef(false);
 
   // ============================================================================
   // DERIVED STATE
@@ -172,8 +164,8 @@ export function useEditorValidation({
   // ============================================================================
 
   const performValidation = useCallback(
-    (code: string) => {
-      if (!enabled) return;
+    (code: string, version: number) => {
+      if (!enabled || !isMounted.current || version !== validationVersion.current) return;
 
       // Skip if code hasn't changed
       if (code === lastValidatedCode.current) {
@@ -192,6 +184,7 @@ export function useEditorValidation({
         );
 
         // Update markers state
+        if (!isMounted.current || version !== validationVersion.current) return;
         setMarkers(result.markers);
         setLastValidationTime(result.validationTime || 0);
 
@@ -201,7 +194,7 @@ export function useEditorValidation({
 
         if (monaco && editor) {
           const model = editor.getModel();
-          if (model) {
+          if (model && isMounted.current && version === validationVersion.current) {
             // Convert our markers to Monaco's IMarkerData format
             const monacoMarkers = result.markers.map((marker) => ({
               startLineNumber: marker.startLineNumber,
@@ -220,11 +213,15 @@ export function useEditorValidation({
         }
 
         // Notify caller using ref to avoid stale closure
-        onValidationCompleteRef.current?.(result);
+        if (isMounted.current && version === validationVersion.current) {
+          onValidationCompleteRef.current?.(result);
+        }
       } catch (error) {
         console.error("Validation error:", error);
       } finally {
-        setIsValidating(false);
+        if (isMounted.current && version === validationVersion.current) {
+          setIsValidating(false);
+        }
       }
     },
     [enabled, language, monacoRef, editorRef, markerId],
@@ -234,9 +231,46 @@ export function useEditorValidation({
   // DEBOUNCED VALIDATION
   // ============================================================================
 
-  const debouncedValidate = useMemo(
-    () => debounce(performValidation, debounceMs),
-    [performValidation, debounceMs],
+  const cancelDeferredValidation = useCallback(() => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+
+    if (idleCallbackId.current !== null) {
+      if (usesIdleCallback.current) {
+        globalThis.cancelIdleCallback?.(idleCallbackId.current);
+      }
+      idleCallbackId.current = null;
+    }
+
+    if (deferredTimer.current) {
+      clearTimeout(deferredTimer.current);
+      deferredTimer.current = null;
+    }
+  }, []);
+
+  const scheduleDeferredValidation = useCallback(
+    (callback: DeferredCallback) => {
+      const requestIdle = globalThis.requestIdleCallback;
+
+      if (typeof requestIdle === "function") {
+        usesIdleCallback.current = true;
+        idleCallbackId.current = requestIdle(() => {
+          idleCallbackId.current = null;
+          usesIdleCallback.current = false;
+          callback();
+        });
+        return;
+      }
+
+      usesIdleCallback.current = false;
+      deferredTimer.current = setTimeout(() => {
+        deferredTimer.current = null;
+        callback();
+      }, 0);
+    },
+    [],
   );
 
   // ============================================================================
@@ -249,15 +283,26 @@ export function useEditorValidation({
    */
   const validate = useCallback(
     (code: string) => {
-      debouncedValidate(code);
+      const version = ++validationVersion.current;
+      cancelDeferredValidation();
+
+      if (!enabled || !isMounted.current) return;
+
+      debounceTimer.current = setTimeout(() => {
+        debounceTimer.current = null;
+        if (!isMounted.current || version !== validationVersion.current) return;
+        scheduleDeferredValidation(() => performValidation(code, version));
+      }, debounceMs);
     },
-    [debouncedValidate],
+    [cancelDeferredValidation, debounceMs, enabled, performValidation, scheduleDeferredValidation],
   );
 
   /**
    * Clear all markers and reset validation state.
    */
   const clearMarkers = useCallback(() => {
+    validationVersion.current += 1;
+    cancelDeferredValidation();
     setMarkers([]);
     lastValidatedCode.current = "";
 
@@ -277,11 +322,23 @@ export function useEditorValidation({
   // ============================================================================
 
   useEffect(() => {
+    isMounted.current = true;
+
     return () => {
-      // Clear markers on unmount
-      clearMarkers();
+      isMounted.current = false;
+      validationVersion.current += 1;
+      cancelDeferredValidation();
+      lastValidatedCode.current = "";
+
+      // Clear Monaco markers without scheduling a React state update on unmount.
+      const monaco = monacoRef.current;
+      const editor = editorRef.current;
+      const model = monaco && editor ? editor.getModel() : null;
+      if (monaco && model) {
+        monaco.editor.setModelMarkers(model, markerId, []);
+      }
     };
-  }, [clearMarkers]);
+  }, [cancelDeferredValidation, editorRef, markerId, monacoRef]);
 
   // ============================================================================
   // LANGUAGE CHANGE HANDLER
@@ -289,9 +346,11 @@ export function useEditorValidation({
 
   useEffect(() => {
     // Clear markers and revalidate when language changes
+    validationVersion.current += 1;
+    cancelDeferredValidation();
     clearMarkers();
     lastValidatedCode.current = "";
-  }, [language, clearMarkers]);
+  }, [language, cancelDeferredValidation, clearMarkers]);
 
   // ============================================================================
   // RETURN
