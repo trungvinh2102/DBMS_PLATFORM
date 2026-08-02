@@ -4,6 +4,18 @@ QurioDB is a desktop-first database management and analytics platform built with
 
 The desktop app is the primary target. It bundles the React UI and starts the Python API as a local sidecar process, so users do not need to run a backend manually.
 
+## See QurioDB In Action
+
+SQL Lab brings database browsing, SQL editing, and query results together in one workspace.
+
+![QurioDB SQL Lab overview](assets/sqllab-overview.png)
+
+*SQL Lab workspace with connection browsing, SQL editor, and result panels.*
+
+![QurioDB SQL Lab query results](assets/sqllab-query-results.png)
+
+*SQL Lab running a sample query with tabular results.*
+
 ## Quick Launch
 
 This project includes local scripts for easy startup:
@@ -17,7 +29,8 @@ The desktop app is built with Tauri 2 and includes an embedded Python FastAPI si
 
 ### Download Installer
 
-[Download Installer Directly (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/1.0.0/QurioDB_1.0.0_x64_en-US.msi)
+- [Download Windows Installer (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/1.0.0/QurioDB_1.0.0_x64_en-US.msi)
+- [Download Linux Package (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/v1.0.0/QurioDB_1.0.0_amd64.deb)
 
 This link points to the current stable release. To download the latest official version, visit the [Releases Page](https://github.com/trungvinh2102/QurioDB/releases).
 
@@ -271,83 +284,6 @@ flowchart TD
   Fuse --> Rerank[Deterministic rerank: exact object/schema/source-type boosts]
   Rerank --> Budget[Token budget and duplicate citation filtering]
   Budget --> Context[RAG context with identifier contract, citations, warnings, retrieval trace]
-```
-
-### Streaming And Observability
-
-AI chat streams over Server-Sent Events from:
-
-```text
-POST /api/ai/stream
-```
-
-The stream persists conversation snapshots and retrieval traces so the frontend can render thinking, SQL, analysis, citations, warnings, and diagnostics without storing provider secrets or raw prompts in diagnostic responses.
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant UI as SQL Lab AI Assistant
-  participant Client as aiApi.streamChat
-  participant Route as POST /api/ai/stream
-  participant Store as SQLite metadata DB
-  participant Service as AIService
-  participant RAG as RAG pipeline
-  participant Runtime as LangChain runtime
-  participant Model as Provider model
-
-  UI->>Client: Send messages, databaseId, modelId, taskKey
-  Client->>Route: fetch text/event-stream
-  Route->>Store: Ensure conversation and save user message
-  Route->>Service: stream_generate_response(...)
-
-  Service-->>Route: event thinking: model preflight
-  Service->>Runtime: validate_model_ready(probe_remote=true)
-  Runtime->>Model: minimal probe call
-  Model-->>Runtime: OK or provider error
-
-  Service->>Service: Quick general response check
-  alt general quick reply
-    Service-->>Route: event message
-  else normal AI path
-    Service->>RAG: understand_query(...)
-    RAG-->>Service: intent, behavior, rag_mode, source_types
-    Service->>Service: resolve task model and provider
-    opt database/document request
-      Service->>RAG: build_context_for_understanding(...)
-      RAG-->>Service: context, citations, retrieval_trace, warnings
-      Service-->>Route: event retrieval_trace
-      Service-->>Route: event citations
-      Service-->>Route: event warnings
-    end
-    Service->>Runtime: stream_text(system_prompt, prompt, history)
-    Runtime->>Model: provider stream
-    Model-->>Runtime: text chunks
-    Runtime-->>Service: normalized chunks
-    Service->>Service: TaggedResponseStreamParser
-    Service-->>Route: semantic events: thinking, message, sql, analysis, confidence, suggestions
-  end
-
-  Route->>Store: Persist assistant snapshot after each event
-  Route-->>Client: SSE event/data frames
-  Client->>Client: Parse event: and data: lines
-  Client-->>UI: onChunk(content, event)
-  UI->>UI: Render thinking, SQL, analysis, citations, warnings, suggestions
-```
-
-For SQL-generation intents, the stream has an additional safety path: QurioDB extracts generated SQL, runs a read-only preview through `sql_execution_verifier.preview`, and asks the model to repair failed SQL up to two times before returning a warning.
-
-LangSmith tracing is opt-in:
-
-```powershell
-$env:LANGSMITH_TRACING="true"
-$env:LANGSMITH_API_KEY="your-langsmith-key"
-$env:LANGSMITH_PROJECT="QurioDB AI Assistant"
-```
-
-Use the RAG regression suite for AI/RAG backend changes:
-
-```bash
-bun run test:rag
 ```
 
 ## License
