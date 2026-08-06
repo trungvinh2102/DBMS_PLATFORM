@@ -4,37 +4,40 @@ QurioDB is a desktop-first database management and analytics platform built with
 
 The desktop app is the primary target. It bundles the React UI and starts the Python API as a local sidecar process, so users do not need to run a backend manually.
 
-## See QurioDB In Action
+## ✨ See QurioDB In Action
 
 SQL Lab brings database browsing, SQL editing, and query results together in one workspace.
-
-![QurioDB SQL Lab overview](assets/sqllab-overview.png)
-
-*SQL Lab workspace with connection browsing, SQL editor, and result panels.*
 
 ![QurioDB SQL Lab query results](assets/sqllab-query-results.png)
 
 *SQL Lab running a sample query with tabular results.*
 
-## Quick Launch
+![QurioDB Text-to-SQL generation](assets/text-to-sql.png)
+
+*AI Assistant generating SQL from a natural-language request.*
+
+## 🚀 Quick Launch
 
 This project includes local scripts for easy startup:
 
 - **Web Browser Version**: double-click `run-web.bat` to launch the API and open the web interface.
 - **Desktop Application**: double-click `run-desktop.bat` to launch the standalone desktop app.
 
-## Desktop Application (.msi)
+## 📦 Desktop Application (.msi / .exe)
 
 The desktop app is built with Tauri 2 and includes an embedded Python FastAPI sidecar for local/offline operation.
 
-### Download Installer
+### ⬇️ Download Windows Installers
 
-- [Download Windows Installer (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/1.0.0/QurioDB_1.0.0_x64_en-US.msi)
+- [Download Windows Installer (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/v1.0.0/QurioDB_1.0.0_x64_en-US.msi)
+- [Download Windows Setup (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/v1.0.0/QurioDB_1.0.0_x64-setup.exe)
+
+### 🐧 Download Linux Installers
 - [Download Linux Package (v1.0.0)](https://github.com/trungvinh2102/QurioDB/releases/download/v1.0.0/QurioDB_1.0.0_amd64.deb)
 
 This link points to the current stable release. To download the latest official version, visit the [Releases Page](https://github.com/trungvinh2102/QurioDB/releases).
 
-### Build from Source
+### 🔨 Build from Source
 
 To generate a fresh `.msi` installer:
 
@@ -47,7 +50,7 @@ To generate a fresh `.msi` installer:
 
 3. The setup file is generated under `apps/desktop/src-tauri/target/`.
 
-## Architecture
+## 🏗️ Architecture
 
 - **Frontend (`apps/web`)**: React 19, Vite 6, TypeScript, Tailwind CSS 4, shadcn-style primitives, TanStack Query/Table, Monaco Editor, and Zustand.
 - **Backend (`apps/api`)**: FastAPI, SQLAlchemy, SQLite metadata storage, database connectors, import flows, and AI/RAG services.
@@ -59,23 +62,23 @@ The desktop shell keeps one running instance and focuses the existing window whe
 
 Browser development remains independent of this flow and defaults to `http://127.0.0.1:5000/api/` unless `VITE_API_URL` is set.
 
-## Setup & Development
+## 🛠️ Setup & Development
 
-### Requirements
+### 📋 Requirements
 
 - Bun 1.3.6+
 - Node.js 20+
 - Python 3.10+
 - Rust/Cargo for desktop builds
 
-### Installation
+### 📥 Installation
 
 ```bash
 bun install
 pip install -r apps/api/requirements.txt
 ```
 
-### Database Setup
+### 🗄️ Database Setup
 
 QurioDB uses SQLite automatically for its internal system metadata.
 
@@ -87,7 +90,7 @@ On first run, it creates a local database file at:
 
 No external system database is required for the app metadata store.
 
-### Initialize & Seed
+### 🌱 Initialize & Seed
 
 The backend initializes tables on first run. If you want to seed default data manually:
 
@@ -97,7 +100,7 @@ python apps/api/scripts/seed.py
 
 Default admin credentials are `admin` / `password123` when no users exist.
 
-### Running in Development
+### ▶️ Running in Development
 
 ```bash
 # Start web and API
@@ -110,7 +113,7 @@ bun run dev:web
 bun run dev:backend
 ```
 
-### Desktop Sidecar Sync
+### 🔄 Desktop Sidecar Sync
 
 If you modify Python code under `apps/api/` and need those changes in the desktop app, rebuild the sidecar:
 
@@ -120,7 +123,7 @@ powershell -ExecutionPolicy Bypass -File build-backend.ps1
 
 Tauri uses prebuilt sidecar binaries from `apps/desktop/src-tauri/bin/`. Without a rebuild, the desktop app can keep running an older `api.exe`.
 
-## Environment Configuration
+## ⚙️ Environment Configuration
 
 The frontend resolves API URLs automatically for browser development and Tauri desktop mode.
 
@@ -130,11 +133,15 @@ To customize the API target during a Vite build, set:
 $env:VITE_API_URL="http://127.0.0.1:5000/api/"
 ```
 
-## AI Assistant
+## 🤖 AI Assistant
 
 QurioDB's AI Assistant is available primarily in SQL Lab and is configured from **Settings -> AI Assistant**. It supports chat, SQL generation, explanation, optimization, repair, autocomplete, safe agent execution, conversation history, feedback, diagnostics, and database-aware RAG.
 
-### AI Runtime
+![QurioDB AI Assistant settings](assets/config-ai-assistant.png)
+
+*AI Assistant settings for provider and encrypted authentication key configuration.*
+
+### 🧠 AI Runtime
 
 The backend uses LangChain as the provider runtime and keeps OpenAI-style chat messages as the internal message format. Provider adapters currently support:
 
@@ -153,7 +160,7 @@ $env:QWEN_BASE_URL="https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 $env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
 ```
 
-### AI Settings
+### 🧩 AI Settings
 
 The AI settings screen manages:
 
@@ -164,7 +171,7 @@ The AI settings screen manages:
 - **RAG Index**: database schema sync, saved-query sync, optional query-history sync, file/URL/text ingestion, and retrieval evaluation.
 - **Vector Store Map**: visual inspection of indexed sources, chunks, pipeline stages, and vector backend status.
 
-### RAG Pipeline
+### 🔎 RAG Pipeline
 
 RAG is enabled by default and is desktop-safe. The default vector backend is SQLite JSON storage, with optional `sqlite_vec` acceleration when available.
 
@@ -203,7 +210,7 @@ URL ingestion blocks private, local, and reserved hosts by default. For local re
 $env:QURIODB_RAG_ALLOW_PRIVATE_URLS="true"
 ```
 
-### Document Indexing And Chunking Flow
+### 📚 Document Indexing And Chunking Flow
 
 Document ingestion uses desktop-safe local parsers first, then passes extracted text into the generalized RAG indexer.
 
@@ -253,7 +260,7 @@ Chunking strategies by source:
 - **Saved queries**: one reusable SQL knowledge chunk per saved query.
 - **Query history**: one query chunk per history item after masking quoted strings and numeric literals.
 
-### Retrieval Flow
+### 🔍 Retrieval Flow
 
 When an AI stream needs database or document context, QurioDB retrieves chunks with a hybrid lexical/semantic path and keeps permission filtering inside the local metadata store.
 
@@ -286,10 +293,10 @@ flowchart TD
   Budget --> Context[RAG context with identifier contract, citations, warnings, retrieval trace]
 ```
 
-## License
+## 📄 License
 
-Internal Development - QurioDB Team.
+Internal Development - Nguyễn Trung Vĩnh.
 
 ---
 
-QurioDB Team - v1.0.0
+QurioDB - v1.0.0
