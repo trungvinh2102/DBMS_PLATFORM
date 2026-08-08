@@ -3,7 +3,7 @@
  * @description Master composition hook for SQL Lab, integrating state management, query execution, and metadata retrieval.
  */
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -195,12 +195,15 @@ export function useSQLLab() {
   }, [ui.selectedTable, ui.setDataOffset]);
 
   // Auto-show right panel when a table is selected
+  const previousSelectedTable = useRef<string | null>(null);
+
   useEffect(() => {
-    if (ui.selectedTable && !ui.showRightPanel) {
+    if (ui.selectedTable && ui.selectedTable !== previousSelectedTable.current) {
       ui.setShowRightPanel(true);
       ui.setRightPanelMode("object");
     }
-  }, [ui.selectedTable, ui]);
+    previousSelectedTable.current = ui.selectedTable;
+  }, [ui.selectedTable, ui.setShowRightPanel, ui.setRightPanelMode]);
 
   const [selectedText, setSelectedText] = [ui.cursorPos, ui.setCursorPos]; // Mocked locally for now, to be integrated better.
 
