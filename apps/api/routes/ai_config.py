@@ -4,16 +4,25 @@ from pydantic import BaseModel
 from models import SessionLocal, UserAIConfig
 from utils.auth_middleware import get_current_user
 import uuid
+import base64
 from cryptography.fernet import Fernet
 import os
 
 ai_config_bp = APIRouter(dependencies=[Depends(get_current_user)])
 
-MASTER_KEY = (os.getenv("ENCRYPTION_KEY") or "").strip() or None
-if not MASTER_KEY:
-    MASTER_KEY = "dummy_encryption_key_for_development_only_123"
-    import base64
-    MASTER_KEY = base64.urlsafe_b64encode(MASTER_KEY.encode().ljust(32)[:32]).decode()
+AI_CONFIG_FALLBACK_SECRET = "dummy_encryption_key_for_development_only_123"
+
+
+def _resolve_master_key() -> str:
+    configured_key = (os.getenv("ENCRYPTION_KEY") or "").strip()
+    if configured_key:
+        return configured_key
+    return base64.urlsafe_b64encode(
+        AI_CONFIG_FALLBACK_SECRET.encode().ljust(32)[:32]
+    ).decode()
+
+
+MASTER_KEY = _resolve_master_key()
 
 cipher = Fernet(MASTER_KEY.encode())
 
@@ -121,7 +130,7 @@ def save_config(data: SaveConfigRequest, current_user: dict = Depends(get_curren
     finally:
         session.close()
 
-def decrypt_key(encrypted_key):
+def decrypt_key(encrypted_key: str) -> str | None:
     try:
         return cipher.decrypt(encrypted_key.encode()).decode()
     except:
