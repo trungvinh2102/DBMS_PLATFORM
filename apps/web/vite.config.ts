@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 3001,
+      watch: {
+        ignored: ['**/.turbo/**'],
+      },
       proxy: {
         '/api': {
           target: env.VITE_API_URL ? new URL(env.VITE_API_URL).origin : 'http://localhost:5000',
