@@ -5,6 +5,8 @@ Regression tests for QurioDB's LangChain provider runtime, OpenAI-compatible
 provider selection, and provider-safe AI service fallback behavior.
 """
 
+import json
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -22,12 +24,331 @@ from services.ai.base import BaseAIService
 pytestmark = pytest.mark.rag
 
 
+class FakeHTTPResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def read(self):
+        return json.dumps(self.payload).encode("utf-8")
+
+
 def test_infer_provider_from_model_id():
     assert infer_provider_from_model_id("gpt-4o-mini") == "openai"
     assert infer_provider_from_model_id("gemini-2.5-flash") == "google"
     assert infer_provider_from_model_id("claude-3-5-haiku-latest") == "anthropic"
     assert infer_provider_from_model_id("qwen-plus") == "qwen"
     assert infer_provider_from_model_id("deepseek-chat") == "deepseek"
+
+
+@pytest.mark.parametrize(
+    ("provider", "base_url"),
+    [
+        ("9router", "http://127.0.0.1:20128/v1/"),
+        ("qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/"),
+    ],
+)
+def test_list_available_models_uses_resolved_url_and_bearer_key(monkeypatch, provider, base_url):
+    subject = runtime.LangChainRuntime()
+    observed = {}
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: f"secret-{provider}")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: base_url)
+
+    def fake_urlopen(request, timeout):
+        observed["url"] = request.full_url
+        observed["authorization"] = request.get_header("Authorization")
+        observed["timeout"] = timeout
+        return FakeHTTPResponse({"data": [
+            {"id": "model-a"},
+            {"id": "model-a"},
+            {"id": "model-b", "capabilities": {"chat_completion": True}},
+            {"id": "embedding-model", "capabilities": {"chat_completion": False}},
+            {"id": ""},
+        ]})
+
+    monkeypatch.setattr(runtime, "urlopen", fake_urlopen)
+
+    assert subject.list_available_models(provider, "user-1") == ["model-a", "model-b"]
+    assert observed == {
+        "url": f"{base_url.rstrip('/')}/models",
+        "authorization": f"Bearer secret-{provider}",
+        "timeout": 5,
+    }
+
+
+def test_openai_is_inventory_compatible():
+    subject = runtime.LangChainRuntime()
+    assert subject.is_openai_compatible_provider("OpenAI") is True
+    assert subject.is_openai_compatible_provider("Google") is False
+    assert subject.is_openai_compatible_provider("Anthropic") is False
+
+
+def test_model_inventory_cache_expires_after_sixty_seconds(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    now = [100.0]
+    calls = []
+    monkeypatch.setattr(runtime.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: "http://gateway.test/v1")
+    monkeypatch.setattr(
+        runtime,
+        "urlopen",
+        lambda request, timeout: calls.append(request.full_url) or FakeHTTPResponse({"data": [{"id": "model-a"}]}),
+    )
+
+    assert subject.list_available_models("9router", "user-1") == ["model-a"]
+    now[0] = 159.9
+    assert subject.list_available_models("9router", "user-1") == ["model-a"]
+    now[0] = 160.0
+    assert subject.list_available_models("9router", "user-1") == ["model-a"]
+    assert calls == ["http://gateway.test/v1/models", "http://gateway.test/v1/models"]
+
+
+def test_model_inventory_ttl_starts_after_response_parsing(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    now = [100.0]
+    calls = []
+    monkeypatch.setattr(runtime.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: "http://gateway.test/v1")
+
+    def fake_urlopen(request, timeout):
+        calls.append(request.full_url)
+        if len(calls) == 1:
+            now[0] = 130.0
+        return FakeHTTPResponse({"data": [{"id": "model-a"}]})
+
+    monkeypatch.setattr(runtime, "urlopen", fake_urlopen)
+
+    assert subject.list_available_models("9router", "user-1") == ["model-a"]
+    now[0] = 189.9
+    assert subject.list_available_models("9router", "user-1") == ["model-a"]
+    assert calls == ["http://gateway.test/v1/models"]
+    now[0] = 190.0
+    assert subject.list_available_models("9router", "user-1") == ["model-a"]
+    assert calls == ["http://gateway.test/v1/models", "http://gateway.test/v1/models"]
+
+
+def test_model_inventory_cache_isolated_by_user_provider_and_base_url(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    calls = []
+    current_base_url = ["http://gateway.test/v1"]
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret-value")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: current_base_url[0])
+
+    def fake_urlopen(request, timeout):
+        calls.append(request.full_url)
+        return FakeHTTPResponse({"data": [{"id": "model-a"}]})
+
+    monkeypatch.setattr(runtime, "urlopen", fake_urlopen)
+
+    subject.list_available_models("9 Router", "user-1")
+    subject.list_available_models("9router", "user-1")
+    subject.list_available_models("9router", "user-2")
+    current_base_url[0] = "http://other-gateway.test/v1"
+    subject.list_available_models("9router", "user-1")
+
+    assert calls == [
+        "http://gateway.test/v1/models",
+        "http://gateway.test/v1/models",
+        "http://other-gateway.test/v1/models",
+    ]
+    assert all("secret-value" not in repr(key) and "secret-value" not in repr(value)
+               for key, value in subject._model_inventory_cache.items())
+
+
+def test_empty_model_inventory_is_not_cached(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    calls = []
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: "http://gateway.test/v1")
+
+    def fake_urlopen(request, timeout):
+        calls.append(request.full_url)
+        return FakeHTTPResponse({"data": []})
+
+    monkeypatch.setattr(runtime, "urlopen", fake_urlopen)
+    with pytest.raises(RuntimeError, match="no usable models"):
+        subject.list_available_models("9router", "user-1")
+    with pytest.raises(RuntimeError, match="no usable models"):
+        subject.list_available_models("9router", "user-1")
+    assert calls == ["http://gateway.test/v1/models", "http://gateway.test/v1/models"]
+
+
+def test_failed_model_inventory_is_not_cached(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    calls = []
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: "http://gateway.test/v1")
+
+    def fail_urlopen(request, timeout):
+        calls.append(request.full_url)
+        raise RuntimeError("inventory unavailable")
+
+    monkeypatch.setattr(runtime, "urlopen", fail_urlopen)
+    with pytest.raises(RuntimeError, match="inventory unavailable"):
+        subject.list_available_models("9router", "user-1")
+    with pytest.raises(RuntimeError, match="inventory unavailable"):
+        subject.list_available_models("9router", "user-1")
+    assert calls == ["http://gateway.test/v1/models", "http://gateway.test/v1/models"]
+
+
+def test_select_auto_model_stops_on_first_success_within_three_attempts(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    probes = []
+    monkeypatch.setattr(subject, "list_available_models", lambda provider, user_id=None: ["model-a", "model-b", "model-c", "model-d"])
+    monkeypatch.setattr(runtime.random, "shuffle", lambda values: None)
+
+    def probe(model_id, user_id, provider):
+        probes.append(model_id)
+        if model_id != "model-b":
+            raise RuntimeError("unavailable")
+
+    monkeypatch.setattr(subject, "_probe_model_access", probe)
+
+    assert subject.select_auto_model("9router", "user-1") == {"provider": "9router", "model": "model-b"}
+    assert probes == ["model-a", "model-b"]
+
+
+def test_select_auto_model_limits_failures_to_three_unique_models(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    probes = []
+    monkeypatch.setattr(
+        subject,
+        "list_available_models",
+        lambda provider, user_id=None: ["model-a", "model-a", "model-b", "model-c", "model-c", "model-d"],
+    )
+    monkeypatch.setattr(runtime.random, "shuffle", lambda values: None)
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "never-expose-this-key")
+
+    def fail_probe(model_id, user_id, provider):
+        probes.append(model_id)
+        raise RuntimeError("credential never-expose-this-key rejected")
+
+    monkeypatch.setattr(subject, "_probe_model_access", fail_probe)
+
+    with pytest.raises(RuntimeError) as error:
+        subject.select_auto_model("9router", "user-1")
+
+    assert probes == ["model-a", "model-b", "model-c"]
+    assert str(error.value).startswith("Auto model selection failed for provider 9router after 3 attempts:")
+    assert "never-expose-this-key" not in str(error.value)
+
+
+def test_select_auto_model_uses_default_once_when_inventory_fails(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    probes = []
+    monkeypatch.setattr(subject, "list_available_models", lambda provider, user_id=None: (_ for _ in ()).throw(RuntimeError("404 models")))
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret")
+    monkeypatch.setattr(subject, "_probe_model_access", lambda model_id, user_id, provider: probes.append(model_id))
+
+    assert subject.select_auto_model("9router", "user-1") == {
+        "provider": "9router",
+        "model": "cc/claude-sonnet-4.5",
+    }
+    assert probes == ["cc/claude-sonnet-4.5"]
+
+
+def test_select_auto_model_sanitizes_inventory_and_default_failure(monkeypatch):
+    subject = runtime.LangChainRuntime()
+    probes = []
+    monkeypatch.setattr(subject, "list_available_models", lambda provider, user_id=None: (_ for _ in ()).throw(RuntimeError("404 models")))
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "never-expose-this-key")
+
+    def fail_probe(model_id, user_id, provider):
+        probes.append(model_id)
+        raise RuntimeError(
+            "Error code: 404 - {'error': {'message': 'credential never-expose-this-key rejected'}}"
+        )
+
+    monkeypatch.setattr(subject, "_probe_model_access", fail_probe)
+
+    with pytest.raises(RuntimeError) as error:
+        subject.select_auto_model("9router", "user-1")
+
+    message = str(error.value)
+    assert message.startswith("Auto model inventory failed for provider 9router:")
+    assert "default model preflight failed:" in message
+    assert "never-expose-this-key" not in message
+    assert probes == ["cc/claude-sonnet-4.5"]
+
+
+@pytest.mark.parametrize(
+    "inventory_response",
+    [
+        RuntimeError("inventory unavailable"),
+        {"unexpected": []},
+        {"data": []},
+    ],
+)
+def test_select_auto_model_uses_default_once_for_inventory_compatibility_fallback(monkeypatch, inventory_response):
+    subject = runtime.LangChainRuntime()
+    probes = []
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret-value")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: "http://gateway.test/v1")
+
+    def fake_urlopen(request, timeout):
+        if isinstance(inventory_response, Exception):
+            raise inventory_response
+        return FakeHTTPResponse(inventory_response)
+
+    monkeypatch.setattr(runtime, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        subject,
+        "_probe_model_access",
+        lambda model_id, user_id, provider: probes.append((model_id, provider)),
+    )
+
+    assert subject.select_auto_model("9router", "user-1") == {
+        "provider": "9router",
+        "model": "cc/claude-sonnet-4.5",
+    }
+    assert probes == [("cc/claude-sonnet-4.5", "9router")]
+
+
+@pytest.mark.parametrize(
+    "inventory_response",
+    [
+        RuntimeError("inventory unavailable: secret-value"),
+        {"unexpected": [{"body": "upstream-secret-body"}]},
+        {"data": []},
+    ],
+)
+def test_select_auto_model_reports_distinct_redacted_inventory_and_default_failures(
+    monkeypatch, inventory_response
+):
+    subject = runtime.LangChainRuntime()
+    probes = []
+    monkeypatch.setattr(runtime, "get_ai_api_key", lambda user_id=None, provider=None: "secret-value")
+    monkeypatch.setattr(runtime, "resolve_base_url", lambda provider, user_id=None: "http://gateway.test/v1")
+
+    def fake_urlopen(request, timeout):
+        if isinstance(inventory_response, Exception):
+            raise inventory_response
+        return FakeHTTPResponse(inventory_response)
+
+    monkeypatch.setattr(runtime, "urlopen", fake_urlopen)
+
+    def fail_probe(model_id, user_id, provider):
+        probes.append((model_id, provider))
+        raise RuntimeError("default preflight failed: secret-value {'upstream-secret-body': true}")
+
+    monkeypatch.setattr(subject, "_probe_model_access", fail_probe)
+
+    with pytest.raises(RuntimeError) as error:
+        subject.select_auto_model("9router", "user-1")
+
+    message = str(error.value)
+    assert message.startswith("Auto model inventory failed for provider 9router:")
+    assert "default model preflight failed:" in message
+    assert "secret-value" not in message
+    assert "upstream-secret-body" not in message
+    assert probes == [("cc/claude-sonnet-4.5", "9router")]
 
 
 def test_build_model_for_supported_providers_uses_db_keys(monkeypatch):
@@ -73,6 +394,58 @@ def test_build_model_for_9router_uses_local_openai_compatible_base_url(monkeypat
     model = langchain_runtime.build_model(model_id="cc/claude-opus-4-7", provider="9router")
     assert model.__class__.__name__ == "ChatOpenAI"
     assert str(model.openai_api_base) == "http://127.0.0.1:20128/v1"
+
+
+def test_build_model_for_openai_uses_custom_resolved_base_url(monkeypatch):
+    monkeypatch.setattr(
+        runtime,
+        "_read_provider_ai_config",
+        lambda provider, user_id=None: {
+            "api_key": "test-openai",
+            "provider": "OpenAI",
+            "base_url": "http://gateway-a.test/v1",
+        },
+    )
+
+    model = langchain_runtime.build_model(
+        model_id="gateway/available-model",
+        provider="OpenAI",
+        user_id="user-1",
+    )
+
+    assert model.__class__.__name__ == "ChatOpenAI"
+    assert str(model.openai_api_base) == "http://gateway-a.test/v1"
+
+
+def test_openai_auto_inventory_and_generation_share_override_or_native_default(monkeypatch):
+    config = {
+        "api_key": "test-openai",
+        "provider": "OpenAI",
+        "base_url": "http://gateway-a.test/v1",
+    }
+    observed = []
+    monkeypatch.setattr(runtime, "_read_provider_ai_config", lambda provider, user_id=None: config)
+    monkeypatch.setattr(
+        runtime,
+        "urlopen",
+        lambda request, timeout: observed.append((request.full_url, timeout))
+        or FakeHTTPResponse({"data": [{"id": "gateway/available-model"}]}),
+    )
+
+    models = langchain_runtime.list_available_models("OpenAI", "user-1")
+    model = langchain_runtime.build_model(
+        model_id=models[0],
+        provider="OpenAI",
+        user_id="user-1",
+    )
+
+    assert observed == [("http://gateway-a.test/v1/models", 5)]
+    assert str(model.openai_api_base).rstrip("/") == observed[0][0].removesuffix("/models")
+
+    config = {"api_key": "test-openai", "provider": "OpenAI", "base_url": None}
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    native_model = langchain_runtime.build_model(model_id="gpt-4o-mini", provider="OpenAI", user_id="user-1")
+    assert native_model.openai_api_base is None
 
 
 def test_resolve_base_url_prefers_db_override(monkeypatch):

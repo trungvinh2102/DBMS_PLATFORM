@@ -228,7 +228,9 @@ const AIMessageComponent = ({
 
       <div className={cn(
         "group flex min-w-0 flex-col gap-1.5",
-        message.role === "user" ? "max-w-[78%] items-end" : "w-full flex-1 items-start ai-message",
+        message.role === "user"
+          ? cn(message.action ? "max-w-[90%]" : "max-w-[78%]", "items-end")
+          : "w-full flex-1 items-start ai-message",
       )}>
         {/* 1. Reasoning Section (Assistant only) */}
         {message.role === "assistant" && (message.thought || (message.steps && message.steps.length > 0)) && (

@@ -19,7 +19,11 @@ from .ai.retrieval.pipeline import rag_pipeline_service
 from .ai.sql_execution import sql_execution_verifier
 from .ai.stream_parser import TaggedResponseStreamParser
 from .ai.task_model_router import task_model_router
-from .prompts import VIETNAMESE_RESPONSE_POLICY
+from .prompts import (
+    VIETNAMESE_RESPONSE_POLICY,
+    get_sql_explanation_prompt,
+    get_sql_optimization_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +104,17 @@ class AIService(SqlAIService, AgentAIService):
     ):
         """Streams responses for chat interfaces using SSE events."""
         history = history or []
+        request_model_id = model_id
         readiness_checked = False
-        if model_id:
-            provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
+        provider = None
+        preselected_auto = None
+        triage_model_id = None
+        if request_model_id:
+            provider = langchain_runtime.resolve_provider(model_id=request_model_id, user_id=user_id)
             yield "thinking", MODEL_PREFLIGHT_STATUS
             try:
                 langchain_runtime.validate_model_ready(
-                    model_id=model_id,
+                    model_id=request_model_id,
                     user_id=user_id,
                     provider=provider,
                     probe_remote=True,
@@ -116,11 +124,45 @@ class AIService(SqlAIService, AgentAIService):
                 logger.warning("AI model readiness check failed before stream setup: %s", readiness_error)
                 yield "error", str(readiness_error)
                 return
-
-        quick_response = self._quick_general_response(prompt)
-        if quick_response:
-            yield "message", quick_response
-            return
+            quick_response = self._quick_general_response(prompt)
+            if quick_response:
+                yield "message", quick_response
+                return
+        else:
+            quick_response = self._quick_general_response(prompt)
+            if quick_response:
+                yield "message", quick_response
+                return
+            triage_model_id = task_model_router.resolve_model_id("router.triage", user_id, None, db_id)
+            if triage_model_id:
+                model_id = triage_model_id
+                provider = langchain_runtime.resolve_provider(model_id=triage_model_id, user_id=user_id)
+                yield "thinking", MODEL_PREFLIGHT_STATUS
+                try:
+                    langchain_runtime.validate_model_ready(
+                        model_id=triage_model_id,
+                        user_id=user_id,
+                        provider=provider,
+                        probe_remote=True,
+                    )
+                except Exception as readiness_error:
+                    logger.warning("AI triage model readiness check failed before understanding: %s", readiness_error)
+                    yield "error", str(readiness_error)
+                    return
+            else:
+                provider = langchain_runtime.resolve_provider(model_id=None, user_id=user_id)
+                if langchain_runtime.is_openai_compatible_provider(provider):
+                    yield "thinking", MODEL_PREFLIGHT_STATUS
+                    try:
+                        selection = langchain_runtime.select_auto_model(provider=provider, user_id=user_id)
+                        preselected_auto = selection
+                        model_id = selection["model"]
+                        provider = selection["provider"]
+                        readiness_checked = True
+                    except Exception as readiness_error:
+                        logger.warning("AI model readiness check failed before understanding: %s", readiness_error)
+                        yield "error", str(readiness_error)
+                        return
 
         understanding = rag_pipeline_service.understand_query(
             prompt,
@@ -138,9 +180,17 @@ class AIService(SqlAIService, AgentAIService):
         )
 
         resolved_task_key = task_key or ("chat.database" if is_database_request else "chat.general")
-        model_id = task_model_router.resolve_model_id(resolved_task_key, user_id, model_id, db_id)
-        provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
-        if not readiness_checked:
+        final_assignment = task_model_router.resolve_model_id(
+            resolved_task_key,
+            user_id,
+            request_model_id,
+            db_id,
+        )
+        if request_model_id:
+            model_id = request_model_id
+        elif final_assignment:
+            model_id = final_assignment
+            provider = langchain_runtime.resolve_provider(model_id=model_id, user_id=user_id)
             yield "thinking", MODEL_PREFLIGHT_STATUS
             try:
                 langchain_runtime.validate_model_ready(
@@ -149,6 +199,29 @@ class AIService(SqlAIService, AgentAIService):
                     provider=provider,
                     probe_remote=True,
                 )
+            except Exception as readiness_error:
+                logger.warning("AI model readiness check failed before streaming: %s", readiness_error)
+                yield "error", str(readiness_error)
+                return
+        elif preselected_auto:
+            model_id = preselected_auto["model"]
+            provider = preselected_auto["provider"]
+        else:
+            model_id = None
+            provider = langchain_runtime.resolve_provider(model_id=None, user_id=user_id)
+            yield "thinking", MODEL_PREFLIGHT_STATUS
+            try:
+                if langchain_runtime.is_openai_compatible_provider(provider):
+                    selection = langchain_runtime.select_auto_model(provider=provider, user_id=user_id)
+                    model_id = selection["model"]
+                    provider = selection["provider"]
+                else:
+                    langchain_runtime.validate_model_ready(
+                        model_id=None,
+                        user_id=user_id,
+                        provider=provider,
+                        probe_remote=True,
+                    )
             except Exception as readiness_error:
                 logger.warning("AI model readiness check failed before streaming: %s", readiness_error)
                 yield "error", str(readiness_error)
@@ -162,6 +235,7 @@ class AIService(SqlAIService, AgentAIService):
             "You are QurioDB's SQL-focused database assistant.\n"
             f"{VIETNAMESE_RESPONSE_POLICY}"
         )
+        context_result = None
         if db_id and is_database_request:
             if is_deep_data_exploration:
                 yield "thinking", "Phân tích mục tiêu khám phá dữ liệu..."
@@ -181,7 +255,16 @@ class AIService(SqlAIService, AgentAIService):
                 yield "thinking", "Học hỏi từ phản hồi của các bạn..."
                 feedback = feedback_context_service.get_feedback_context(db_id, user_id)
 
-            system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
+            if resolved_task_key == "sql.explain":
+                system_prompt = get_sql_explanation_prompt(prompt)
+            elif resolved_task_key == "sql.optimize":
+                system_prompt = get_sql_optimization_prompt(context_result.context, prompt)
+            else:
+                system_prompt = build_rag_prompt(context_result.context, understanding, feedback_context=feedback)
+            yield "thinking", "Sẵn sàng."
+        elif resolved_task_key == "sql.optimize":
+            optimization_context = context_result.context if context_result else ""
+            system_prompt = get_sql_optimization_prompt(optimization_context, prompt)
             yield "thinking", "Sẵn sàng."
         elif db_id:
             from .prompts import get_general_chat_prompt
@@ -189,6 +272,10 @@ class AIService(SqlAIService, AgentAIService):
             yield "thinking", "Khởi tạo xong."
         else:
             yield "thinking", "Khởi tạo xong."
+
+        if resolved_task_key == "sql.explain" and not (db_id and is_database_request):
+            system_prompt = get_sql_explanation_prompt(prompt)
+        stream_prompt = "Analyze the supplied SQL." if resolved_task_key in {"sql.explain", "sql.optimize"} else prompt
 
         try:
             langchain_history = history
@@ -198,7 +285,7 @@ class AIService(SqlAIService, AgentAIService):
             if db_id and getattr(understanding, "intent", "") in SQL_PREVIEW_INTENTS:
                 yield from self._stream_sql_with_preview_repair(
                     system_prompt=system_prompt,
-                    prompt=prompt,
+                    prompt=stream_prompt,
                     db_id=db_id,
                     model_id=model_id,
                     user_id=user_id,
@@ -210,7 +297,7 @@ class AIService(SqlAIService, AgentAIService):
             parser = TaggedResponseStreamParser()
             for chunk in langchain_runtime.stream_text(
                 system_prompt=system_prompt,
-                prompt=prompt,
+                prompt=stream_prompt,
                 db_id=db_id,
                 model_id=model_id,
                 user_id=user_id,

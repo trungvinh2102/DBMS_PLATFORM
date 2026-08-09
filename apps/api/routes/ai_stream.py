@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from models import AIChatMessage, AIConversation, SessionLocal
-from schemas.ai import StreamChatRequest
+from schemas.ai import ExplainSqlStreamRequest, OptimizeSqlStreamRequest, StreamChatRequest
 from services.ai.conversation_store import conversation_store
 from services.ai.streaming import (
     append_stream_part,
@@ -47,6 +47,75 @@ def stream_chat(data: StreamChatRequest, current_user: dict = Depends(get_curren
         media_type="text/event-stream",
         headers=_stream_headers(conversation_id),
     )
+
+
+@router.post("/explain-sql/stream")
+def stream_explain_sql(data: ExplainSqlStreamRequest, current_user: dict = Depends(get_current_user)):
+    return _stream_action(data, current_user, "Explain")
+
+
+@router.post("/optimize-sql/stream")
+def stream_optimize_sql(data: OptimizeSqlStreamRequest, current_user: dict = Depends(get_current_user)):
+    return _stream_action(data, current_user, "Optimize")
+
+
+def _stream_action(data, current_user: dict, action: str):
+    user_id = current_user.get("userId")
+    prompt = f"{action} this SQL: {data.sql}"
+    conversation_id = conversation_store.ensure_conversation(
+        user_id,
+        data.databaseId,
+        prompt,
+        data.conversationId,
+    )
+    history = conversation_store.load_recent_history(conversation_id) if user_id else []
+    ai_service._save_chat(
+        "user",
+        prompt,
+        user_id,
+        data.databaseId,
+        conv_id=conversation_id,
+    )
+
+    return StreamingResponse(
+        _stream_action_response(data, user_id, prompt, conversation_id, history, action),
+        media_type="text/event-stream",
+        headers=_stream_headers(conversation_id),
+    )
+
+
+def _stream_action_response(data, user_id: str, prompt: str, conversation_id: str, history: list, action: str):
+    response_parts = new_response_parts()
+    assistant_message_id = None
+    task_key = "sql.explain" if action == "Explain" else "sql.optimize"
+    try:
+        for event, chunk in ai_service.stream_generate_response(
+            prompt,
+            db_id=data.databaseId,
+            schema=data.schema_name,
+            model_id=data.modelId,
+            task_key=task_key,
+            user_id=user_id,
+            history=history,
+            conv_id=conversation_id,
+        ):
+            append_stream_part(response_parts, event, chunk)
+            assistant_message_id = _persist_stream_snapshot(
+                response_parts,
+                assistant_message_id,
+                user_id,
+                data.databaseId,
+                conversation_id,
+            )
+            yield encode_sse_event(event, chunk)
+    except Exception as exc:
+        error_message = f"Error: {exc}"
+        if assistant_message_id:
+            append_stream_part(response_parts, "message", f"\n\n{error_message}")
+            _persist_stream_snapshot(response_parts, assistant_message_id, user_id, data.databaseId, conversation_id)
+        else:
+            ai_service._save_chat("assistant", error_message, user_id, data.databaseId, conv_id=conversation_id)
+        yield encode_sse_event("error", error_message)
 
 
 def _resolve_stream_messages(data: StreamChatRequest):

@@ -28,6 +28,14 @@ class ExplainSqlRequest(BaseModel):
     modelId: Optional[str] = None
 
 
+class ExplainSqlStreamRequest(BaseModel):
+    sql: str
+    conversationId: Optional[str] = None
+    databaseId: Optional[str] = None
+    schema_name: Optional[str] = None
+    modelId: Optional[str] = None
+
+
 class ExplainPlanRequest(BaseModel):
     sql: str
     dialect: str
@@ -40,6 +48,14 @@ class ExplainPlanRequest(BaseModel):
 
 class OptimizeSqlRequest(BaseModel):
     sql: str
+    databaseId: str
+    schema_name: Optional[str] = None
+    modelId: Optional[str] = None
+
+
+class OptimizeSqlStreamRequest(BaseModel):
+    sql: str
+    conversationId: Optional[str] = None
     databaseId: str
     schema_name: Optional[str] = None
     modelId: Optional[str] = None

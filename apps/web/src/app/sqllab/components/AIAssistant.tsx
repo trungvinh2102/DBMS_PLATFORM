@@ -84,6 +84,7 @@ function AIAssistantContent({
     streamingMessage,
     isTyping,
     handleSend: _handleSend,
+    handleActionStream,
     loadConversations,
     loadConversation,
     startNewChat,
@@ -251,28 +252,33 @@ function AIAssistantContent({
   }, [commandMenuIndex, filteredCommandOptions, handleCommandSelect, handleSendRequest, showCommandMenu]);
 
   const handleExplain = useCallback(async (s: string) => {
-    setIsTyping(true);
     try {
-      const res = await aiApi.explainSQL({
-        sql: s,
-        modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
+      await handleActionStream("explain", s, {
+        databaseId: selectedDatabaseId,
+        schema_name: selectedSchema,
+        modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel,
       });
-      addAssistantMessage(res.explanation);
-    } finally { setIsTyping(false); }
-  }, [selectedModel, addAssistantMessage, setIsTyping]);
+    } catch (err: any) {
+      toast.error(typeof err === "string" ? err : err?.message || "Không thể giải thích SQL.");
+    }
+  }, [handleActionStream, selectedDatabaseId, selectedModel, selectedSchema]);
 
   const handleOptimize = useCallback(async (s: string) => {
-    setIsTyping(true);
+    if (!selectedDatabaseId) {
+      toast.error("Chọn database trước khi tối ưu SQL.");
+      return;
+    }
+
     try {
-      const res = await aiApi.optimizeSQL({
-        sql: s,
+      await handleActionStream("optimize", s, {
         databaseId: selectedDatabaseId,
-        schema: selectedSchema,
-        modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel
+        schema_name: selectedSchema,
+        modelId: selectedModel === AUTO_MODEL_VALUE ? undefined : selectedModel,
       });
-      addAssistantMessage("Đây là phiên bản đã tối ưu:", res.sql || res.result);
-    } finally { setIsTyping(false); }
-  }, [selectedDatabaseId, selectedSchema, selectedModel, addAssistantMessage, setIsTyping]);
+    } catch (err: any) {
+      toast.error(typeof err === "string" ? err : err?.message || "Không thể tối ưu SQL.");
+    }
+  }, [handleActionStream, selectedDatabaseId, selectedModel, selectedSchema]);
 
   const handleShowSqlData = useCallback(async (s: string) => {
     if (!selectedDatabaseId) {

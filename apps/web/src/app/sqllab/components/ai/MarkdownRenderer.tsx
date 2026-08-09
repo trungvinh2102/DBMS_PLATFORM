@@ -8,6 +8,102 @@ import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 
+const SQL_KEYWORDS = new Set([
+  "SELECT", "FROM", "WHERE", "AS", "AND", "OR", "NOT", "INSERT", "INTO", "VALUES",
+  "UPDATE", "SET", "DELETE", "CREATE", "ALTER", "DROP", "TABLE", "JOIN", "INNER", "LEFT",
+  "RIGHT", "FULL", "OUTER", "ON", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET",
+  "DISTINCT", "UNION", "ALL", "NULL", "IS", "IN", "LIKE", "BETWEEN", "CASE", "WHEN",
+  "THEN", "ELSE", "END", "WITH", "RETURNING", "PRIMARY", "KEY", "INDEX", "ASC", "DESC",
+]);
+
+function tokenizeSql(source: string, isLightUserSql: boolean) {
+  const tokens: React.ReactNode[] = [];
+  let index = 0;
+  let textStart = 0;
+
+  const pushText = (end: number) => {
+    if (end > textStart) tokens.push(source.slice(textStart, end));
+  };
+
+  const pushToken = (end: number, className: string) => {
+    pushText(index);
+    tokens.push(<span key={`${className}-${index}`} className={className}>{source.slice(index, end)}</span>);
+    index = end;
+    textStart = end;
+  };
+
+  while (index < source.length) {
+    if (source.startsWith("/*", index)) {
+      const closeIndex = source.indexOf("*/", index + 2);
+      pushToken(
+        closeIndex === -1 ? source.length : closeIndex + 2,
+        `sql-token-comment ${isLightUserSql ? "text-slate-600" : "text-muted-foreground"} italic`,
+      );
+      continue;
+    }
+
+    if (source.startsWith("--", index)) {
+      const end = source.indexOf("\n", index);
+      pushToken(
+        end === -1 ? source.length : end,
+        `sql-token-comment ${isLightUserSql ? "text-slate-600" : "text-muted-foreground"} italic`,
+      );
+      continue;
+    }
+
+    if (source[index] === "'") {
+      let end = index + 1;
+      while (end < source.length) {
+        if (source[end] === "'" && source[end + 1] === "'") {
+          end += 2;
+        } else if (source[end] === "'") {
+          end += 1;
+          break;
+        } else {
+          end += 1;
+        }
+      }
+      pushToken(
+        end,
+        `sql-token-string ${isLightUserSql ? "text-emerald-800" : "text-emerald-600 dark:text-emerald-400"}`,
+      );
+      continue;
+    }
+
+    const number = /^(?:\d+(?:\.\d+)?)/.exec(source.slice(index));
+    if (number) {
+      pushToken(
+        index + number[0].length,
+        `sql-token-number ${isLightUserSql ? "text-amber-800" : "text-amber-600 dark:text-amber-400"}`,
+      );
+      continue;
+    }
+
+    const word = /^[A-Za-z_][A-Za-z0-9_]*/.exec(source.slice(index));
+    if (word && SQL_KEYWORDS.has(word[0].toUpperCase())) {
+      pushToken(
+        index + word[0].length,
+        `sql-token-keyword font-semibold ${isLightUserSql ? "text-indigo-800" : "text-sky-600 dark:text-sky-400"}`,
+      );
+      continue;
+    }
+
+    const operator = /^(?:<>|!=|<=|>=|=|<|>|\+|-|\*|\/|%)/.exec(source.slice(index));
+    if (operator) {
+      pushToken(
+        index + operator[0].length,
+        `sql-token-operator ${isLightUserSql ? "text-violet-800" : "text-violet-600 dark:text-violet-400"}`,
+      );
+      continue;
+    }
+
+    index += 1;
+  }
+
+  pushText(source.length);
+  return tokens;
+}
+
 interface MarkdownRendererProps {
   content: string;
   isDark: boolean;
@@ -17,6 +113,7 @@ interface MarkdownRendererProps {
 
 export const MarkdownRenderer = React.memo(({
   content,
+  isDark,
   role,
   className
 }: MarkdownRendererProps) => {
@@ -81,17 +178,25 @@ export const MarkdownRenderer = React.memo(({
     },
     code({ className: codeClassName, children, ...props }: any) {
       const match = /language-(\w+)/.exec(codeClassName || "");
+      const isSql = match?.[1].toLowerCase() === "sql";
+      const isLightUserSql = role === "user" && !isDark && isSql;
       return match ? (
         <pre
           className={cn(
             "my-2 max-h-72 overflow-auto rounded-lg border p-2.5 font-mono text-[11px] leading-5",
             role === "user"
-              ? "border-white/15 bg-black/20 text-primary-foreground"
+              ? isDark
+                ? "border-white/15 bg-black/20 text-primary-foreground"
+                : isSql
+                  ? "border-indigo-200 bg-indigo-50 text-slate-900"
+                  : "border-white/15 bg-black/20 text-primary-foreground"
               : "border-border bg-muted/40 text-foreground"
           )}
         >
           <code className={cn("block min-w-max", codeClassName)} {...props}>
-            {String(children).replace(/\n$/, "")}
+            {isSql
+              ? tokenizeSql(String(children).replace(/\n$/, ""), isLightUserSql)
+              : String(children).replace(/\n$/, "")}
           </code>
         </pre>
       ) : (
@@ -103,7 +208,7 @@ export const MarkdownRenderer = React.memo(({
         </code>
       );
     },
-  }), [role]);
+  }), [isDark, role]);
 
   return (
     <div className={cn(

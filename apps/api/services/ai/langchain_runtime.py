@@ -7,9 +7,14 @@ and message conversion so route/service code can stay focused on product logic.
 """
 
 import logging
+import json
 import os
+import random
 import re
+import time
+from threading import Lock
 from typing import Any, Dict, Iterable, List, Optional
+from urllib.request import Request, urlopen
 
 try:
     from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
@@ -74,6 +79,10 @@ DEFAULT_PROVIDER_MODELS = {
     "9router": "cc/claude-sonnet-4.5",
 }
 SUPPORTED_PROVIDERS = tuple(DEFAULT_PROVIDER_MODELS.keys())
+MODEL_INVENTORY_TTL_SECONDS = 60
+MODEL_INVENTORY_TIMEOUT_SECONDS = 5
+AUTO_MODEL_MAX_ATTEMPTS = 3
+OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 def _read_user_ai_config(user_id: Optional[str]) -> Dict[str, Optional[str]]:
     """Reads user-scoped provider and API key settings when available."""
@@ -210,6 +219,8 @@ class LangChainRuntime:
 
     def __init__(self, default_model: str = "gemini-2.5-flash"):
         self.default_model = default_model
+        self._model_inventory_cache = {}
+        self._model_inventory_lock = Lock()
         ensure_langsmith_environment()
 
     @property
@@ -241,6 +252,104 @@ class LangChainRuntime:
         if user_provider:
             return normalize_provider(user_provider)
         return infer_provider_from_model_id(model_id)
+
+    def is_openai_compatible_provider(self, provider: Optional[str]) -> bool:
+        normalized = normalize_provider(provider)
+        return normalized == "openai" or normalized in OPENAI_COMPATIBLE_BASE_URLS
+
+    def list_available_models(self, provider: str, user_id: Optional[str] = None) -> List[str]:
+        normalized = normalize_provider(provider)
+        if not self.is_openai_compatible_provider(normalized):
+            raise RuntimeError(f"Provider {normalized} does not support OpenAI-compatible model inventory")
+
+        api_key = get_ai_api_key(user_id, normalized)
+        if not api_key:
+            raise RuntimeError(f"Missing {normalized} API key. Configure environment variables or AI Settings.")
+
+        base_url = resolve_base_url(normalized, user_id) or OPENAI_DEFAULT_BASE_URL
+        normalized_base_url = base_url.rstrip("/")
+        cache_key = (user_id or "", normalized, normalized_base_url)
+        now = time.monotonic()
+        with self._model_inventory_lock:
+            cached = self._model_inventory_cache.get(cache_key)
+            if cached and now - cached[0] < MODEL_INVENTORY_TTL_SECONDS:
+                return list(cached[1])
+
+        request = Request(
+            f"{normalized_base_url}/models",
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+            method="GET",
+        )
+        with urlopen(request, timeout=MODEL_INVENTORY_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, list):
+            raise RuntimeError(f"Invalid model inventory returned by provider {normalized}")
+
+        model_ids = []
+        seen = set()
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            model_id = str(item.get("id") or "").strip()
+            capabilities = item.get("capabilities")
+            if isinstance(capabilities, dict):
+                chat_flags = [capabilities.get(name) for name in ("chat", "chat_completion", "completion")]
+                if any(flag is not None for flag in chat_flags) and not any(flag is True for flag in chat_flags):
+                    continue
+            if model_id and model_id not in seen:
+                seen.add(model_id)
+                model_ids.append(model_id)
+
+        if not model_ids:
+            raise RuntimeError(f"Provider {normalized} returned no usable models")
+
+        cached_at = time.monotonic()
+        with self._model_inventory_lock:
+            self._model_inventory_cache[cache_key] = (cached_at, list(model_ids))
+        return model_ids
+
+    def _safe_provider_error(self, error: Exception, api_key: Optional[str]) -> str:
+        message = " ".join(str(error).split())
+        if api_key:
+            message = message.replace(api_key, "[redacted]")
+        message = re.sub(r"\s+(?:-\s+)?[\{\[].*$", " [upstream response omitted]", message)
+        return message[:300] or error.__class__.__name__
+
+    def select_auto_model(self, provider: str, user_id: Optional[str] = None) -> Dict[str, str]:
+        normalized = normalize_provider(provider)
+        api_key = get_ai_api_key(user_id, normalized)
+        try:
+            candidates = self.list_available_models(normalized, user_id)
+        except Exception as inventory_error:
+            default_model = DEFAULT_PROVIDER_MODELS.get(normalized, self.default_model)
+            try:
+                self._probe_model_access(default_model, user_id, normalized)
+                return {"provider": normalized, "model": default_model}
+            except Exception as default_error:
+                inventory_reason = self._safe_provider_error(inventory_error, api_key)
+                default_reason = self._safe_provider_error(default_error, api_key)
+                raise RuntimeError(
+                    f"Auto model inventory failed for provider {normalized}: {inventory_reason}; "
+                    f"default model preflight failed: {default_reason}"
+                ) from default_error
+
+        candidates = list(dict.fromkeys(model_id for model_id in candidates if model_id))
+        random.shuffle(candidates)
+        attempts = candidates[:AUTO_MODEL_MAX_ATTEMPTS]
+        last_error = None
+        for model_id in attempts:
+            try:
+                self._probe_model_access(model_id, user_id, normalized)
+                return {"provider": normalized, "model": model_id}
+            except Exception as error:
+                last_error = error
+
+        reason = self._safe_provider_error(last_error or RuntimeError("no candidates"), api_key)
+        raise RuntimeError(
+            f"Auto model selection failed for provider {normalized} after {len(attempts)} attempts: {reason}"
+        ) from last_error
 
     def status(self, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Reports local AI integration readiness without exposing secrets."""
@@ -345,9 +454,10 @@ class LangChainRuntime:
                 raise RuntimeError("Anthropic integration is not installed")
             return ChatAnthropic(api_key=api_key, **kwargs)
 
-        if target_provider in OPENAI_COMPATIBLE_BASE_URLS:
+        if self.is_openai_compatible_provider(target_provider):
             base_url = resolve_base_url(target_provider, user_id)
-            return ChatOpenAI(api_key=api_key, base_url=base_url, **kwargs)
+            if base_url:
+                return ChatOpenAI(api_key=api_key, base_url=base_url, **kwargs)
 
         return ChatOpenAI(api_key=api_key, **kwargs)
 

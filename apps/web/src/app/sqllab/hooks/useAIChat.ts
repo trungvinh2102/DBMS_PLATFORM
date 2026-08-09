@@ -45,8 +45,18 @@ const clearStoredActiveConversationId = (databaseId?: string) => {
   }
 };
 
+const getSqlFence = (sql: string) => {
+  const longestBacktickRun = Math.max(0, ...Array.from(sql.matchAll(/`+/g), ([match]) => match.length));
+  return "`".repeat(Math.max(3, longestBacktickRun + 1));
+};
+
+const formatFencedSql = (sql: string) => {
+  const fence = getSqlFence(sql);
+  return `${fence}sql\n${sql}\n${fence}`;
+};
+
 const serializeMessageContent = (message: Message) => {
-  const parts = [message.content, message.sql ? `\`\`\`sql\n${message.sql}\n\`\`\`` : "", message.analysis].filter(Boolean);
+  const parts = [message.content, message.sql ? formatFencedSql(message.sql) : "", message.analysis].filter(Boolean);
   return parts.join("\n\n").trim();
 };
 
@@ -308,10 +318,14 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<any[]>([]);
+  const conversationIdRef = useRef<string | null>(null);
   const messagesRef = useRef<Message[]>([]);
   const streamingMessageRef = useRef<Message | null>(null);
   const streamGenerationRef = useRef(0);
+  const databaseGenerationRef = useRef(0);
+  const conversationLoadTokenRef = useRef(0);
   const restoredConversationRef = useRef<string | null>(null);
+  const databaseIdRef = useRef(databaseId);
   // AbortController for the in-flight stream so conversation switches can stop
   // the underlying request instead of waiting for it to settle on its own.
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -358,8 +372,36 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     };
   }, [invalidateStream]);
 
+  useEffect(() => {
+    if (databaseIdRef.current === databaseId) return;
+
+    databaseIdRef.current = databaseId;
+    databaseGenerationRef.current += 1;
+    conversationLoadTokenRef.current += 1;
+    invalidateStream();
+    conversationIdRef.current = null;
+    restoredConversationRef.current = null;
+    setConversationId(null);
+    setMessages([]);
+  }, [databaseId, invalidateStream]);
+
   const parseMessageContent = useCallback((message: any): Partial<Message> => {
-    if (message.role === "user") return { content: String(message.content || "") };
+    if (message.role === "user") {
+      const content = String(message.content || "");
+      const actionMatch = content.match(/^(Explain|Optimize) (?:this SQL: |SQL:\r?\n\r?\n)([\s\S]+)$/);
+      if (actionMatch) {
+        const [, label, actionContent] = actionMatch;
+        const fencedSqlMatch = actionContent.match(/^(`{3,})sql\r?\n([\s\S]*?)\r?\n\1$/i);
+        const sql = fencedSqlMatch ? fencedSqlMatch[2] : actionContent;
+        const action = label.toLowerCase() as "explain" | "optimize";
+        return {
+          action,
+          content: `${label} SQL:\n\n${formatFencedSql(sql)}`,
+        };
+      }
+
+      return { content };
+    }
 
     if (message.events || message.sql || message.analysis || message.thought || message.confidence !== undefined) {
       const steps = Array.isArray(message.events) ? toThinkingSteps(message.events) : undefined;
@@ -527,11 +569,14 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, []);
 
   const loadHistory = async (dbId?: string) => {
+    const requestDatabaseId = dbId;
+    const requestGeneration = databaseGenerationRef.current;
     invalidateStream();
     setIsFetchingConversation(true);
     setMessages([]);
     try {
       const history = await aiApi.getHistory(dbId);
+      if (databaseIdRef.current !== requestDatabaseId || databaseGenerationRef.current !== requestGeneration) return;
       if (history && history.length > 0) {
         setMessages(history.map((m: any) => ({
           id: m.id,
@@ -545,7 +590,9 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     } catch (e) {
       console.error("Failed to load chat history", e);
     } finally {
-      setIsFetchingConversation(false);
+      if (databaseIdRef.current === requestDatabaseId && databaseGenerationRef.current === requestGeneration) {
+        setIsFetchingConversation(false);
+      }
     }
   };
 
@@ -562,11 +609,22 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, []);
 
   const loadConversation = useCallback(async (id: string) => {
+    const requestDatabaseId = databaseId;
+    const requestGeneration = databaseGenerationRef.current;
+    const requestToken = conversationLoadTokenRef.current + 1;
+    conversationLoadTokenRef.current = requestToken;
+    const isActiveRequest = () =>
+      databaseIdRef.current === requestDatabaseId &&
+      databaseGenerationRef.current === requestGeneration &&
+      conversationLoadTokenRef.current === requestToken;
+
     invalidateStream();
     setIsFetchingConversation(true);
     setMessages([]); // Clear immediately to show skeletons
     try {
       const res = await aiApi.getConversationMessages(id);
+      if (!isActiveRequest()) return;
+      conversationIdRef.current = res.id;
       setConversationId(res.id);
       storeActiveConversationId(databaseId, res.id);
       if (res.messages) {
@@ -578,11 +636,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
         } as Message)));
       }
     } catch (e) {
+      if (!isActiveRequest()) return;
       clearStoredActiveConversationId(databaseId);
       setConversationId(null);
       toast.error("Failed to load conversation");
     } finally {
-      setIsFetchingConversation(false);
+      if (isActiveRequest()) setIsFetchingConversation(false);
     }
   }, [databaseId, parseMessageContent, invalidateStream]);
 
@@ -600,16 +659,27 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
   }, [conversationId, databaseId, loadConversation]);
 
   const startNewChat = useCallback(() => {
+    conversationLoadTokenRef.current += 1;
     invalidateStream();
     clearStoredActiveConversationId(databaseId);
     restoredConversationRef.current = null;
+    conversationIdRef.current = null;
     setConversationId(null);
     setMessages([]);
   }, [databaseId, invalidateStream]);
 
-  const handleSend = useCallback(async (input: string) => {
-    if (!input.trim() || isTyping || !databaseId) {
-      if (!databaseId) toast.error("Connect a database first.");
+  const streamWithLifecycle = useCallback(async (
+    input: string,
+    streamRequest: (
+      onChunk: (chunk: string, event?: string) => void,
+      onHeaders: (headers: Headers) => void,
+      signal: AbortSignal,
+      ) => Promise<void>,
+    requiresDatabase = true,
+    userMessage?: Pick<Message, "action" | "content">,
+  ) => {
+    if (!input.trim() || isTyping || (requiresDatabase && !databaseId)) {
+      if (requiresDatabase && !databaseId) toast.error("Connect a database first.");
       return;
     }
 
@@ -618,7 +688,8 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     const userMsg: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: userMessage?.content ?? input,
+      ...(userMessage?.action ? { action: userMessage.action } : {}),
     };
     const assistantMsgId = (Date.now() + 1).toString();
     const initialAssistantMsg: Message = {
@@ -654,7 +725,8 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     let pendingAssistantEvent: string | undefined;
     let pendingAssistantChunk: unknown;
     let scheduledAssistantFrame: number | null = null;
-    let streamError: unknown = null;
+    let streamRejected = false;
+    let streamFailed = false;
 
     const completeStreamSteps = () => {
       streamSteps = streamSteps.map((step) => ({ ...step, status: "complete" as const }));
@@ -761,26 +833,10 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     };
 
     try {
-      const chatMessages = [
-        ...messagesRef.current
-          .map((message) => ({
-            role: message.role,
-            content: serializeMessageContent(message),
-          }))
-          .filter((message) => message.content),
-        { role: "user", content: input },
-      ];
-
-      await aiApi.streamChat(
-        {
-          text: input,
-          messages: chatMessages,
-          databaseId,
-          schema: schema || "public",
-          modelId: selectedModel || undefined,
-          conversationId: conversationId || undefined,
-        },
+      await streamRequest(
         (chunk, event) => {
+          if (streamGeneration !== streamGenerationRef.current || streamFailed) return;
+          if (event === "error") streamFailed = true;
           if (event === "thinking") {
             const rawText = String(chunk || "");
             const text = rawText.trim();
@@ -846,8 +902,10 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
           scheduleAssistantMessageFlush(event, chunk);
         },
         (headers) => {
+          if (streamGeneration !== streamGenerationRef.current) return;
           const cid = headers.get("X-Conversation-Id");
           if (cid && !conversationId) {
+            conversationIdRef.current = cid;
             setConversationId(cid);
             storeActiveConversationId(databaseId, cid);
             loadConversations(databaseId);
@@ -857,15 +915,20 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       );
 
     } catch (error: any) {
-      streamError = error;
+      streamRejected = true;
       // An abandoned stream (conversation switched, new chat started) or an
       // explicit abort must not render error UI or overwrite the newer stream.
       if (streamGeneration === streamGenerationRef.current && error?.name !== "AbortError") {
-        toast.error(error.message || "Failed to generate SQL");
+        const errorMessage = error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Failed to generate SQL";
+        toast.error(errorMessage);
         cancelScheduledAssistantFrame();
         updateStreamingMessage(prev => ({
           ...(prev ?? initialAssistantMsg),
-          content: `Error: ${error.message}`,
+          content: `Error: ${errorMessage}`,
           isStreaming: false,
           isActionable: false,
           steps: (prev?.steps ?? []).map((step) => ({ ...step, status: "complete" as const })),
@@ -873,8 +936,12 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
       }
     } finally {
       // On success flush any last pending chunk; on failure keep the error text.
-      if (streamError) {
-        cancelScheduledAssistantFrame();
+      if (streamRejected || streamFailed) {
+        if (streamFailed && pendingAssistantEvent === "error") {
+          flushAssistantMessage();
+        } else {
+          cancelScheduledAssistantFrame();
+        }
       } else {
         flushAssistantMessage();
       }
@@ -889,6 +956,57 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     }
   }, [databaseId, schema, selectedModel, isTyping, conversationId, parseMessageContent, loadConversations, updateStreamingMessage]);
 
+  const handleSend = useCallback(async (input: string) => {
+    const chatMessages = [
+      ...messagesRef.current
+        .map((message) => ({
+          role: message.role,
+          content: serializeMessageContent(message),
+        }))
+        .filter((message) => message.content),
+      { role: "user", content: input },
+    ];
+
+    await streamWithLifecycle(input, (onChunk, onHeaders, signal) => aiApi.streamChat(
+      {
+        text: input,
+        messages: chatMessages,
+        databaseId,
+        schema: schema || "public",
+        modelId: selectedModel || undefined,
+        conversationId: conversationId || undefined,
+      },
+      onChunk,
+      onHeaders,
+      signal,
+    ));
+  }, [databaseId, schema, selectedModel, conversationId, streamWithLifecycle]);
+
+  const handleActionStream = useCallback(async (
+    action: "explain" | "optimize",
+    sql: string,
+    context?: { databaseId?: string; schema_name?: string; modelId?: string },
+  ) => {
+    const actionInput = `${action === "explain" ? "Explain" : "Optimize"} SQL:\n\n${sql}`;
+    const actionMessage = {
+      action,
+      content: `${actionInput.split("\n\n")[0]}\n\n${formatFencedSql(sql)}`,
+    } as const;
+    await streamWithLifecycle(actionInput, (onChunk, onHeaders, signal) => aiApi.streamAction(
+      action,
+      {
+        sql,
+        conversationId: conversationIdRef.current || conversationId || undefined,
+        databaseId: context?.databaseId ?? databaseId,
+        schema_name: context?.schema_name ?? schema,
+        modelId: context?.modelId ?? selectedModel,
+      },
+      onChunk,
+       onHeaders,
+       signal,
+     ), action === "optimize", actionMessage);
+  }, [conversationId, databaseId, schema, selectedModel, streamWithLifecycle]);
+
   return {
     messages,
     setMessages,
@@ -898,6 +1016,7 @@ export function useAIChat(databaseId?: string, schema?: string, selectedModel?: 
     isFetchingConversation,
     isLoadingConversations,
     handleSend,
+    handleActionStream,
     loadHistory,
     loadConversations,
     loadConversation,

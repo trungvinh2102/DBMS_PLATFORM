@@ -20,6 +20,18 @@ class AIConversationStore:
     def ensure_conversation(self, user_id: str, database_id: str, title_source: str, conversation_id: Optional[str]) -> str:
         """Returns an existing conversation id or creates a new conversation."""
         if conversation_id:
+            session = SessionLocal()
+            try:
+                conversation = session.query(AIConversation).get(conversation_id)
+                if (
+                    not conversation
+                    or conversation.userId != user_id
+                    or (database_id is None and conversation.databaseId is not None)
+                    or (database_id is not None and conversation.databaseId != database_id)
+                ):
+                    raise HTTPException(status_code=404, detail="Conversation not found")
+            finally:
+                session.close()
             return conversation_id
 
         session = SessionLocal()

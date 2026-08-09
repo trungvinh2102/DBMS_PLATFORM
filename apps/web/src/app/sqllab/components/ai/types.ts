@@ -32,6 +32,7 @@ export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  action?: "explain" | "optimize";
   sql?: string;
   explanation?: string;
   thought?: string;

@@ -11,7 +11,7 @@ from .base import BaseAIService
 from .feedback_context import feedback_context_service
 from .prompt_contracts import build_rag_prompt
 from .retrieval.pipeline import rag_pipeline_service
-from ..prompts import get_sql_explanation_prompt
+from ..prompts import get_sql_explanation_prompt, get_sql_optimization_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +57,10 @@ class SqlAIService(BaseAIService):
     def explain_sql(self, sql: str, user_id: Optional[str] = None, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Provides a natural language explanation of a SQL query."""
         self._save_chat("user", f"Explain this SQL: {sql}", user_id)
-        system_prompt = get_sql_explanation_prompt()
+        system_prompt = get_sql_explanation_prompt(sql)
         
         response = self._generate_response(
-            f"{system_prompt}\n\nSQL:\n{sql}",
+            system_prompt,
             model_id=model_id,
             user_id=user_id,
             task_key="sql.explain",
@@ -114,12 +114,11 @@ class SqlAIService(BaseAIService):
         self._save_chat("user", f"Optimize this SQL: {sql}", user_id, db_id)
         prompt = f"Optimize SQL: {sql}"
         pipeline_context = rag_pipeline_service.build_context(prompt, db_id, schema, user_id=user_id, model_id=model_id)
-        understanding = pipeline_context.understanding
         context_result = pipeline_context.package
-        system_prompt = build_rag_prompt(context_result.context, understanding)
+        system_prompt = get_sql_optimization_prompt(context_result.context, sql)
         
         response = self._generate_response(
-            f"{system_prompt}\n\nCURRENT SQL:\n{sql}",
+            system_prompt,
             model_id=model_id,
             user_id=user_id,
             task_key="sql.optimize",

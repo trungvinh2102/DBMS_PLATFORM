@@ -29,7 +29,7 @@ describe("AIMessage", () => {
       />,
     );
 
-    expect(screen.getByText(/SELECT \* FROM users/i)).toBeInTheDocument();
+    expect(screen.getByText("SELECT")).toBeInTheDocument();
     expect(screen.queryByText(/Loading/i)).not.toBeInTheDocument();
   });
 

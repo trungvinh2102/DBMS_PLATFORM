@@ -289,6 +289,29 @@ export const aiApi = {
     onHeaders?: (headers: Headers) => void,
     signal?: AbortSignal,
   ) => {
+    await streamSSE("ai/stream", data, onChunk, onHeaders, signal);
+  },
+  streamAction: async (
+    action: "explain" | "optimize",
+    data: Record<string, unknown>,
+    onChunk: (chunk: string, event?: string) => void,
+    onHeaders?: (headers: Headers) => void,
+    signal?: AbortSignal,
+  ) => {
+    const endpoint = action === "explain" ? "ai/explain-sql/stream" : "ai/optimize-sql/stream";
+    await streamSSE(endpoint, data, onChunk, onHeaders, signal);
+  },
+  submitFeedback: (data: { messageId: string; rating: 1 | -1; correction?: string; conversationId?: string }) =>
+    req(api.post("ai/feedback", data)),
+};
+
+async function streamSSE(
+  endpoint: string,
+  data: any,
+  onChunk: (chunk: string, event?: string) => void,
+  onHeaders?: (headers: Headers) => void,
+  signal?: AbortSignal,
+) {
     const token = useAuth.getState().token;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -302,7 +325,7 @@ export const aiApi = {
       headers["X-App-Platform"] = "tauri";
     }
 
-    const response = await fetch(`${getApiBaseUrl()}ai/stream`, {
+    const response = await fetch(`${getApiBaseUrl()}${endpoint}`, {
       method: "POST",
       headers,
       credentials: "include",
@@ -323,6 +346,11 @@ export const aiApi = {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
     if (!reader) return;
+
+    const abortReader = () => {
+      void reader.cancel();
+    };
+    signal?.addEventListener("abort", abortReader, { once: true });
 
     let buffer = "";
     let currentEvent = "message";
@@ -351,30 +379,31 @@ export const aiApi = {
       }
     };
 
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) {
-        // Process any remaining data in buffer
-        if (buffer.trim()) {
-          processPart(buffer);
-        }
-        break;
-      }
-      
-      buffer += decoder.decode(value, { stream: true });
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() || "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-      for (const part of parts) {
-        processPart(part);
-        currentEvent = "message"; // Reset to default after each full event block
+        if (done) {
+          // Process any remaining data in buffer
+          if (buffer.trim()) {
+            processPart(buffer);
+          }
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() || "";
+
+        for (const part of parts) {
+          processPart(part);
+          currentEvent = "message"; // Reset to default after each full event block
+        }
       }
+    } finally {
+      signal?.removeEventListener("abort", abortReader);
     }
-  },
-  submitFeedback: (data: { messageId: string; rating: 1 | -1; correction?: string; conversationId?: string }) =>
-    req(api.post("ai/feedback", data)),
-};
+}
 
 export const resolveUrl = (path: string | null | undefined) => {
   if (!path) return "";
