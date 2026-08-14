@@ -4,6 +4,7 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SQLLabDataTable } from "@/app/sqllab/components/SQLLabDataTable";
@@ -15,7 +16,14 @@ function getColWidth(col: HTMLTableColElement) {
 describe("SQLLabDataTable", () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
+
+  function renderWithViewport(ui: React.ReactElement) {
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(400);
+    return render(ui);
+  }
 
   it("uses precomputed fixed column widths instead of auto max-content layout", () => {
     const { container } = render(
@@ -70,4 +78,73 @@ describe("SQLLabDataTable", () => {
 
     expect(container).toHaveTextContent("1 of 2 rows");
   });
+
+  it("opens a dialog for serialized JSON objects with parsed values", () => {
+    renderWithViewport(
+      <SQLLabDataTable
+        columns={["payload"]}
+        data={[{ payload: '{"status":"ready"}' }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('{"status":"ready"}'));
+
+    expect(screen.getByText("JSON Preview: payload")).toBeInTheDocument();
+    expect(screen.getByText('"ready"')).toBeInTheDocument();
+  });
+
+  it("opens a dialog for native JSON objects and arrays", () => {
+    renderWithViewport(
+      <SQLLabDataTable
+        columns={["payload"]}
+        data={[{ payload: { status: "ready" } }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('{"status":"ready"}'));
+
+    expect(screen.getByText("JSON Preview: payload")).toBeInTheDocument();
+    expect(screen.getByText('"ready"')).toBeInTheDocument();
+  });
+
+  it("opens a dialog for native JSON arrays with parsed values", () => {
+    renderWithViewport(
+      <SQLLabDataTable
+        columns={["payload"]}
+        data={[{ payload: [{ id: 1 }] }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('[{"id":1}]'));
+
+    expect(screen.getByText("JSON Preview: payload")).toBeInTheDocument();
+    expect(screen.getByText("1", { selector: "span" })).toBeInTheDocument();
+  });
+
+  it("opens a dialog for serialized JSON arrays with parsed values", () => {
+    renderWithViewport(
+      <SQLLabDataTable
+        columns={["payload"]}
+        data={[{ payload: '[{"id":1}]' }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('[{"id":1}]'));
+
+    expect(screen.getByText("JSON Preview: payload")).toBeInTheDocument();
+    expect(screen.getByText("1", { selector: "span" })).toBeInTheDocument();
+  });
+
+  it.each(["ordinary string", "not valid JSON", "null", "42", '"text"'])(
+    "does not open a dialog for %s",
+    (value) => {
+      renderWithViewport(
+        <SQLLabDataTable columns={["payload"]} data={[{ payload: value }]} />,
+      );
+
+      fireEvent.click(screen.getByText(value === "null" ? "null" : value));
+
+      expect(screen.queryByText("JSON Preview: payload")).not.toBeInTheDocument();
+    },
+  );
 });

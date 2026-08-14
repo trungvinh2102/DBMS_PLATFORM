@@ -38,6 +38,20 @@ const MONOSPACE_CHAR_WIDTH_PX = 8;
  */
 export const COLUMN_WIDTH_SAMPLE_ROWS = 100;
 
+export function parseJsonDetailValue(
+  value: unknown,
+): Record<string, unknown> | unknown[] | null {
+  const parsed = typeof value === "string" ? (() => {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  })() : value;
+
+  return parsed !== null && typeof parsed === "object" ? parsed : null;
+}
+
 function formatCellValue(val: any, nullText: string) {
   if (val === null) return nullText;
   if (typeof val === "object") return JSON.stringify(val);
@@ -338,7 +352,8 @@ export function SQLLabDataTable({
                     const val = getCellValue(originalIndex, col);
                     const isEdited =
                       pendingChanges[originalIndex] && col in pendingChanges[originalIndex];
-                    const isObject = val !== null && typeof val === "object";
+                    const jsonDetailValue = parseJsonDetailValue(val);
+                    const isObject = jsonDetailValue !== null;
                     const isEditing =
                       editingCell?.rowIndex === originalIndex &&
                       editingCell?.colName === col;
@@ -357,7 +372,7 @@ export function SQLLabDataTable({
                         title={isEditing ? "" : displayValue(val)}
                         onClick={() => {
                           if (isObject) {
-                            setSelectedJson({ key: col, value: val });
+                            setSelectedJson({ key: col, value: jsonDetailValue });
                           }
                         }}
                         onDoubleClick={() => {
