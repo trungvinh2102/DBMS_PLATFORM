@@ -20,11 +20,12 @@ export interface SyntaxError {
   endColumn: number;
   message: string;
   severity: number;
-  severityLabel: string;
+  severityLabel: "Error" | "Warning" | "Info" | "Hint";
 }
 
 import { useSQLLabContext, useSQLLabEditorContext, useSQLLabResultContext } from "../context/SQLLabContext";
 import { formatDBName } from "./sidebar/sidebar-utils";
+import type { RevealPositionRequest } from "@/lib/monaco/types";
 
 const MongoAggregationBuilder = lazy(() => import("./MongoAggregationBuilder").then(m => ({ default: m.MongoAggregationBuilder })));
 
@@ -32,10 +33,12 @@ export function SQLLabEditorContainer({
   enableValidation = true,
   showErrorPanel = false,
   onErrorsChange,
+  revealRequest,
 }: {
   enableValidation?: boolean;
   showErrorPanel?: boolean;
   onErrorsChange?: (errors: SyntaxError[]) => void;
+  revealRequest?: RevealPositionRequest | null;
 }) {
   const lab = useSQLLabContext();
   const editor = useSQLLabEditorContext();
@@ -276,10 +279,11 @@ export function SQLLabEditorContainer({
                   showErrorPanel={showErrorPanel}
                   sqlDialect={sqlDialect}
                   language={language}
-                  databaseId={lab.selectedDS}
-                  schemaId={lab.selectedSchema}
-                  onErrorsChange={onErrorsChange}
-                />
+                   databaseId={lab.selectedDS}
+                   schemaId={lab.selectedSchema}
+                   onErrorsChange={onErrorsChange}
+                   revealRequest={revealRequest}
+                 />
               </div>
             </>
           </Suspense>

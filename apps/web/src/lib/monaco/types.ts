@@ -118,3 +118,17 @@ export interface ErrorPanelEntry {
   /** Severity as string for display */
   severityLabel: "Error" | "Warning" | "Info" | "Hint";
 }
+
+/**
+ * Externally triggerable request that moves the editor caret to a diagnostic
+ * position. The `nonce` lets the same position be re-triggered: consumers
+ * apply every request whose nonce they have not seen yet.
+ */
+export interface RevealPositionRequest {
+  /** Line to move the caret to (1-indexed) */
+  lineNumber: number;
+  /** Column to move the caret to (1-indexed) */
+  column: number;
+  /** Monotonic activation counter */
+  nonce: number;
+}

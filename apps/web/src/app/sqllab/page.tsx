@@ -21,6 +21,7 @@ import {
   useSQLLabTabMetadataContext,
   useSQLLabResultContext,
 } from "./context/SQLLabContext";
+import { useSyntaxDiagnostics } from "./hooks/use-syntax-diagnostics";
 
 // Static imports
 import { SQLLabSidebar } from "./components/SQLLabSidebar";
@@ -56,6 +57,8 @@ export default function SQLLabPage() {
 
 function SQLLabContent() {
   const lab = useSQLLabContext();
+  const { syntaxErrors, revealRequest, handleErrorsChange, handleErrorClick } =
+    useSyntaxDiagnostics();
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background text-foreground">
@@ -79,7 +82,10 @@ function SQLLabContent() {
                     minSize={20}
                     className={lab.showAISidebar ? "!basis-full" : undefined}
                   >
-                    <SQLLabEditorContainer />
+                    <SQLLabEditorContainer
+                      onErrorsChange={handleErrorsChange}
+                      revealRequest={revealRequest}
+                    />
                   </ResizablePanel>
 
                   {!lab.showAISidebar && (
@@ -87,7 +93,10 @@ function SQLLabContent() {
                       <ResizableHandle withHandle className="h-1 hover:bg-primary/20 transition-colors" />
 
                       <ResizablePanel defaultSize={40} minSize={10}>
-                        <LiveSQLLabResultPanel />
+                        <LiveSQLLabResultPanel
+                          syntaxErrors={syntaxErrors}
+                          onErrorClick={handleErrorClick}
+                        />
                       </ResizablePanel>
                     </>
                   )}

@@ -7,15 +7,28 @@ import React from "react";
 import { act, fireEvent, render, waitFor } from "../../test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { useSQLLabMock, sidebarRenders, toolbarRenders, resultRenders, editorRenders, dialogRenders } = vi.hoisted(() => ({
+const { useSQLLabMock, sidebarRenders, toolbarRenders, resultRenders, editorRenders, dialogRenders, resultPanelPropsCapture, editorContainerPropsCapture } = vi.hoisted(() => ({
   useSQLLabMock: vi.fn(),
   sidebarRenders: vi.fn(),
   toolbarRenders: vi.fn(),
   resultRenders: vi.fn(),
   editorRenders: vi.fn(),
   dialogRenders: vi.fn(),
+  resultPanelPropsCapture: vi.fn(),
+  editorContainerPropsCapture: vi.fn(),
 }));
 const stableEmpty: never[] = [];
+
+const parserDiagnostic = {
+  id: "error-2-8",
+  line: 2,
+  column: 8,
+  endLine: 2,
+  endColumn: 12,
+  message: "Expected FROM",
+  severity: 8,
+  severityLabel: "Error",
+};
 
 vi.mock("@/app/sqllab/hooks/useSQLLab", () => ({ useSQLLab: useSQLLabMock }));
 vi.mock("@/lib/performance/performance-marks", () => ({ markPerformance: vi.fn() }));
@@ -26,11 +39,22 @@ vi.mock("@/app/sqllab/components/SQLLabToolbar", () => ({
   SQLLabToolbar: () => { toolbarRenders(); return <div data-testid="toolbar" />; },
 }));
 vi.mock("@/app/sqllab/components/SQLLabResultPanel", () => ({
-  SQLLabResultPanel: () => { resultRenders(); return <div data-testid="result-panel" />; },
+  SQLLabResultPanel: (props: any) => {
+    resultRenders();
+    resultPanelPropsCapture(props);
+    return (
+      <div data-testid="result-panel">
+        <button type="button" onClick={() => props.onErrorClick?.(4, 12)}>
+          Activate problem
+        </button>
+      </div>
+    );
+  },
 }));
 vi.mock("@/app/sqllab/components/SQLLabEditorContainer", () => ({
-  SQLLabEditorContainer: () => {
+  SQLLabEditorContainer: (props: any) => {
     editorRenders();
+    editorContainerPropsCapture(props);
     const editor = useSQLLabEditorContext();
     const lab = useSQLLabContext();
     return (
@@ -38,6 +62,8 @@ vi.mock("@/app/sqllab/components/SQLLabEditorContainer", () => ({
         <button type="button" onClick={() => editor.setSql("SELECT * FROM users;")}>Update SQL</button>
         <button type="button" onClick={() => editor.setActiveTabId("2")}>Switch tab</button>
         <button type="button" onClick={() => lab.renameTab("2", "renamed")}>Rename tab</button>
+        <button type="button" onClick={() => props.onErrorsChange?.([parserDiagnostic])}>Emit diagnostics</button>
+        <button type="button" onClick={() => props.onErrorsChange?.([])}>Clear diagnostics</button>
       </>
     );
   },
@@ -70,6 +96,8 @@ describe("SQL Lab page layout boundary", () => {
     resultRenders.mockClear();
     editorRenders.mockClear();
     dialogRenders.mockClear();
+    resultPanelPropsCapture.mockClear();
+    editorContainerPropsCapture.mockClear();
     useSQLLabMock.mockImplementation(() => {
       const [sql, setSql] = React.useState("SELECT 1;");
       const [activeTabId, setActiveTabId] = React.useState("1");
@@ -150,5 +178,42 @@ describe("SQL Lab page layout boundary", () => {
     act(() => fireEvent.click(view.getByRole("button", { name: "Rename tab" })));
     expect(view.getByTestId("dialog-default-name")).toHaveTextContent("renamed");
     expect(dialogRenders).toHaveBeenCalledTimes(initialDialogRenders + 2);
+  });
+
+  it("routes parser diagnostics from the editor into the Problems panel state", () => {
+    const view = render(<SQLLabPage />);
+
+    act(() => fireEvent.click(view.getByRole("button", { name: "Emit diagnostics" })));
+
+    const resultProps = resultPanelPropsCapture.mock.calls.at(-1)?.[0];
+    expect(resultProps).toBeDefined();
+    expect(resultProps.syntaxErrors).toEqual([parserDiagnostic]);
+  });
+
+  it("clears the page-owned syntax error state when the editor reports valid SQL", () => {
+    const view = render(<SQLLabPage />);
+    act(() => fireEvent.click(view.getByRole("button", { name: "Emit diagnostics" })));
+
+    act(() => fireEvent.click(view.getByRole("button", { name: "Clear diagnostics" })));
+
+    const resultProps = resultPanelPropsCapture.mock.calls.at(-1)?.[0];
+    expect(resultProps).toBeDefined();
+    expect(resultProps.syntaxErrors).toEqual([]);
+  });
+
+  it("requests an editor reveal with a fresh nonce for every problem activation", () => {
+    const view = render(<SQLLabPage />);
+
+    act(() => fireEvent.click(view.getByRole("button", { name: "Activate problem" })));
+    const firstRequest = editorContainerPropsCapture.mock.calls.at(-1)?.[0]?.revealRequest;
+    expect(firstRequest).toEqual({ lineNumber: 4, column: 12, nonce: expect.any(Number) });
+
+    act(() => fireEvent.click(view.getByRole("button", { name: "Activate problem" })));
+    const secondRequest = editorContainerPropsCapture.mock.calls.at(-1)?.[0]?.revealRequest;
+    expect(secondRequest).toEqual({
+      lineNumber: 4,
+      column: 12,
+      nonce: firstRequest.nonce + 1,
+    });
   });
 });

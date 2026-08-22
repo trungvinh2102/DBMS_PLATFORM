@@ -57,9 +57,18 @@ export function ProblemsList({ errors, onItemClick }: ProblemsListProps) {
       {errors.map((err) => (
         <div
           key={err.id}
+          role="button"
+          tabIndex={0}
+          aria-label={`Problem at ${err.line}:${err.column}: ${err.message}`}
           onClick={() => onItemClick?.(err.line, err.column)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onItemClick?.(err.line, err.column);
+            }
+          }}
           className={cn(
-            "flex items-start gap-3 px-4 py-2.5 cursor-pointer transition-colors",
+            "flex items-start gap-3 px-4 py-2.5 cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
             getSeverityClass(err.severity),
           )}
         >

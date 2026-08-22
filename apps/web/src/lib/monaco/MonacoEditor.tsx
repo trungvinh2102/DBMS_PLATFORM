@@ -13,8 +13,9 @@ import { useTheme } from "next-themes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorValidation } from "@/lib/monaco/useEditorValidation";
+import { useRevealPositionRequest } from "@/lib/monaco/useRevealPositionRequest";
 import { ErrorPanel } from "@/lib/monaco/ErrorPanel";
-import type { ValidationOptions } from "@/lib/monaco/types";
+import type { RevealPositionRequest, ValidationOptions } from "@/lib/monaco/types";
 import { useSettingsStore } from "@/stores/use-settings-store";
 import { defineThemes } from "@/lib/monaco/themes";
 import {
@@ -54,6 +55,7 @@ interface SQLEditorProps {
   validationDebounceMs?: number;
   onValidationChange?: (errorCount: number, warningCount: number) => void;
   onErrorsChange?: (errors: any[]) => void;
+  revealRequest?: RevealPositionRequest | null;
 }
 
 /**
@@ -134,6 +136,7 @@ export function SQLEditor({
   validationDebounceMs = 300,
   onValidationChange,
   onErrorsChange,
+  revealRequest,
 }: SQLEditorProps) {
   const { resolvedTheme } = useTheme();
   const currentTheme = resolvedTheme || "light";
@@ -196,6 +199,10 @@ export function SQLEditor({
   useEffect(() => {
     onErrorsChange?.(errors);
   }, [errors, onErrorsChange]);
+
+  // `mounted` is the readiness signal: Monaco mounts asynchronously, so a
+  // reveal request that arrives earlier must apply once the editor exists.
+  useRevealPositionRequest(revealRequest, editorRef, mounted);
 
   const handleErrorClick = useCallback((line: number, column: number) => {
     const editor = editorRef.current;
