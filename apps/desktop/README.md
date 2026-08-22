@@ -125,4 +125,4 @@ If you make any changes to the Python code in `apps/api/`, those changes **will 
 
 ---
 
-_QurioDB Team - v1.0.0_
+_QurioDB Team - v0.1.0_
