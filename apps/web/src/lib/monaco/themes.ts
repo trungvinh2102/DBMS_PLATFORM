@@ -38,6 +38,12 @@ export const defineThemes = (monaco: Monaco) => {
         "editorGutter.background": "#FFFFFF",
         "editorOverviewRuler.errorForeground": "#E51400",
         "editorOverviewRuler.warningForeground": "#BF8803",
+        "editorSuggestWidget.background": "#FFFFFF",
+        "editorSuggestWidget.border": "#E2E2E2",
+        "editorSuggestWidget.foreground": "#333333",
+        "editorSuggestWidget.selectedBackground": "#B3D7FF66",
+        "editorSuggestWidget.selectedIconForeground": "#333333",
+        "editorSuggestWidget.focusHighlightForeground": "#1a85ff",
       },
     });
 
@@ -73,6 +79,12 @@ export const defineThemes = (monaco: Monaco) => {
         "editorGutter.background": "#050505",
         "editorOverviewRuler.errorForeground": "#F14C4C",
         "editorOverviewRuler.warningForeground": "#CCA700",
+        "editorSuggestWidget.background": "#141414",
+        "editorSuggestWidget.border": "#333333",
+        "editorSuggestWidget.foreground": "#CCCCCC",
+        "editorSuggestWidget.selectedBackground": "#264F78",
+        "editorSuggestWidget.selectedIconForeground": "#CCCCCC",
+        "editorSuggestWidget.focusHighlightForeground": "#3794FF",
       },
     });
     

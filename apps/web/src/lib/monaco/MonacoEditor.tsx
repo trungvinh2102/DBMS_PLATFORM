@@ -320,7 +320,7 @@ export function SQLEditor({
           height="100%"
           defaultLanguage={language}
           language={language}
-          theme={currentTheme === "dark" ? "vs-dark" : "vs"}
+          theme={currentTheme === "dark" ? "quriodb-dark" : "quriodb-light"}
           beforeMount={(monaco) => {
             defineThemes(monaco);
           }}
@@ -355,6 +355,9 @@ export function SQLEditor({
               strings: false,
             },
             quickSuggestionsDelay: 100,
+            // Keeps the empty "No suggestions." widget tall enough to enclose
+            // its 24px message (default 0 yields a clipped 21px widget).
+            suggestLineHeight: 24,
             wordBasedSuggestions: "off",
             suggest: {
               showWords: false,
