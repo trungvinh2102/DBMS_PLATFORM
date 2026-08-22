@@ -12,7 +12,7 @@ export type SQLLabStableContextType = Omit<
   SQLLabContextType,
   | "sql" | "tabs" | "activeTabId" | "activeTab" | "cursorPos"
   | "results" | "columns" | "error" | "executing" | "executionTime"
-  | "currentTData" | "currentTColumns" | "loadingTData" | "activeResultTab" | "setActiveResultTab"
+   | "currentTData" | "currentTColumns" | "loadingTData" | "activeResultTab" | "setActiveResultTab" | "autoCommit" | "setAutoCommit"
 >;
 export type SQLLabEditorTab = Pick<SQLLabTab, "id" | "name" | "sql">;
 export type SQLLabEditorContextType = Pick<
@@ -28,7 +28,7 @@ export type SQLLabTabMetadataContextType = {
 export type SQLLabResultContextType = Pick<
   SQLLabContextType,
   "results" | "columns" | "error" | "executing" | "executionTime" |
-    "currentTData" | "currentTColumns" | "loadingTData" | "activeResultTab" | "setActiveResultTab"
+  "currentTData" | "currentTColumns" | "loadingTData" | "activeResultTab" | "setActiveResultTab" | "autoCommit" | "setAutoCommit"
 >;
 
 const SQLLabContext = createContext<SQLLabStableContextType | null>(null);
@@ -44,7 +44,7 @@ export function SQLLabProvider({ children }: { children: ReactNode }) {
 
   const {
     sql, cursorPos, tabs, activeTabId, activeTab, results, columns, error, executing, executionTime,
-    currentTData, currentTColumns, loadingTData, activeResultTab, setActiveResultTab, ...stableSource
+    currentTData, currentTColumns, loadingTData, activeResultTab, setActiveResultTab, autoCommit, setAutoCommit, ...stableSource
   } = value;
   // The active tab identity changes on every SQL/result update because tabs are
   // recreated, so it must never feed the stable context dependencies. It stays in
@@ -122,6 +122,8 @@ export function SQLLabProvider({ children }: { children: ReactNode }) {
     loadingTData: value.loadingTData,
     activeResultTab: value.activeResultTab,
     setActiveResultTab: value.setActiveResultTab,
+    autoCommit: value.autoCommit,
+    setAutoCommit: value.setAutoCommit,
   }), [
     effectiveActiveTab?.results,
     effectiveActiveTab?.columns,
@@ -133,6 +135,8 @@ export function SQLLabProvider({ children }: { children: ReactNode }) {
     value.loadingTData,
     value.activeResultTab,
     value.setActiveResultTab,
+    value.autoCommit,
+    value.setAutoCommit,
   ]);
   const cursorValue = useMemo(() => ({ cursorPos: value.cursorPos }), [value.cursorPos]);
   

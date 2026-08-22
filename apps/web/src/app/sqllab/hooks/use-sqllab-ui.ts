@@ -9,6 +9,7 @@ import type { RightPanelMode, ResultTab, CursorPosition } from "../types";
 export function useSQLLabUI() {
   const [activeRightTab, setActiveRightTab] = useState<string>("data");
   const [activeResultTab, setActiveResultTab] = useState<ResultTab>("results");
+  const [autoCommit, setAutoCommit] = useState<boolean>(true);
   const [rightPanelMode, setRightPanelMode] = useState<RightPanelMode>("object");
   const [showRightPanel, setShowRightPanel] = useState<boolean>(true);
   const [showAISidebar, setShowAISidebar] = useState<boolean>(false);
@@ -38,6 +39,8 @@ export function useSQLLabUI() {
     setActiveRightTab,
     activeResultTab,
     setActiveResultTab,
+    autoCommit,
+    setAutoCommit,
     rightPanelMode,
     setRightPanelMode,
     showRightPanel,

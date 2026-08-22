@@ -58,7 +58,7 @@ export function useSQLLab() {
   } = useSQLLabQuery({
     selectedDS: activeTab.selectedDS,
     sql: activeTab.sql,
-    autoCommit: ui.activeResultTab === "results", // Generic, specific ones can override
+    autoCommit: ui.autoCommit,
     limit: ui.queryLimit,
     onSuccess: (res: any) => {
       updateActiveTab({

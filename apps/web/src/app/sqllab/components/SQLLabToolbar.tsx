@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ToolbarButton } from "./ToolbarButton";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 import { useSQLLabContext, useSQLLabResultContext } from "../context/SQLLabContext";
 
@@ -100,36 +101,17 @@ export function SQLLabToolbar() {
           <div className="w-px h-6 bg-border/60 mx-1" />
 
           {/* Auto Commit Toggle */}
-          <div
-            role="switch"
-            aria-checked={result.activeResultTab === "results"}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                result.setActiveResultTab(result.activeResultTab === "results" ? "messages" : "results");
-              }
-            }}
-            className="flex items-center gap-2 px-3 h-9 hover:bg-muted/50 transition-colors rounded-md cursor-pointer border border-transparent hover:border-border/50"
-            onClick={() => result.setActiveResultTab(result.activeResultTab === "results" ? "messages" : "results")}
-          >
-            <div
-              className={cn(
-                "relative w-8 h-4 rounded-full transition-all",
-                result.activeResultTab === "results" ? "bg-primary" : "bg-muted",
-              )}
-            >
-              <div
-                className={cn(
-                  "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all shadow-sm",
-                  result.activeResultTab === "results" ? "left-4.5" : "left-0.5",
-                )}
-              />
-            </div>
+          <label className="flex items-center gap-2 px-3 h-9 hover:bg-muted/50 transition-colors rounded-md cursor-pointer border border-transparent hover:border-border/50">
+            <Switch
+              checked={result.autoCommit}
+              onCheckedChange={(checked) => result.setAutoCommit(checked)}
+              disabled={result.executing}
+              aria-label="Auto Commit"
+            />
             <span className="text-[10px] font-bold uppercase tracking-tight opacity-70">
               Auto Commit
             </span>
-          </div>
+          </label>
         </>
       )}
 
