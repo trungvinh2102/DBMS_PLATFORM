@@ -11,7 +11,7 @@ The most important product target is the desktop application. The desktop app is
 Before making product, architecture, UI, backend, or desktop changes, read:
 
 - `README.md`
-- Relevant `.codex/rules/*`
+- Relevant `.agents/rules/*`
 
 ## Repository Layout
 
@@ -19,9 +19,9 @@ Before making product, architecture, UI, backend, or desktop changes, read:
 - `apps/api`: Python FastAPI backend.
 - `apps/desktop`: Tauri 2 desktop wrapper.
 - `build-backend.ps1`: Builds the Python backend into the Tauri sidecar binary.
-- `.codex/rules`: Project behavior rules.
-- `.codex/workflows`: Project workflows.
-- `.codex/skills`: Role-specific reference skills.
+- `.agents/rules`: Project behavior rules.
+- `.agents/workflows`: Project workflows.
+- `.agents/skills`: Role-specific reference skills.
 
 ## Tech Stack
 
@@ -189,30 +189,30 @@ python -m pytest
 
 Read project rules when relevant:
 
-- `.codex/rules/clean-code.md`: code quality, naming, file size, file headers.
-- `.codex/rules/code-change-quality-gate.md`: mandatory quality gate for every code edit, bug fix, refactor, and generated implementation.
-- `.codex/rules/tests.md`: test expectations for features, fixes, and refactors.
-- `.codex/rules/documents.md`: documentation structure under `docs/`.
-- `.codex/rules/research.md`: research expectations for large/uncertain tasks.
-- `.codex/rules/nano-banana.md`: image generation guidance.
+- `.agents/rules/clean-code.md`: code quality, naming, file size, file headers.
+- `.agents/rules/code-change-quality-gate.md`: mandatory quality gate for every code edit, bug fix, refactor, and generated implementation.
+- `.agents/rules/tests.md`: test expectations for features, fixes, and refactors.
+- `.agents/rules/documents.md`: documentation structure under `docs/`.
+- `.agents/rules/research.md`: research expectations for large/uncertain tasks.
+- `.agents/rules/nano-banana.md`: image generation guidance.
 
 Known mismatch:
 
-- Some `.codex/workflows` files still reference `.agent/rules/...`.
-- In this repository, use `.codex/rules/...` instead.
+- Some `.agents/workflows` files still reference `.agent/rules/...`.
+- In this repository, use `.agents/rules/...` instead.
 
 ## Workflows
 
 Use these workflows when requested or when the task naturally fits:
 
-- `.codex/workflows/debug.md`: evidence-based debugging.
-- `.codex/workflows/development.md`: normal code changes and small fixes.
-- `.codex/workflows/implement-feature.md`: larger feature work.
-- `.codex/workflows/documentation.md`: generating architecture/API/spec docs.
-- `.codex/workflows/gen-tests.md`: generating tests.
-- `.codex/workflows/qa.md`: QA docs and test cases.
-- `.codex/workflows/ui-ux-design.md`: UI/UX design work.
-- `.codex/workflows/custom-behavior.md`: changing rules/workflows.
+- `.agents/workflows/debug.md`: evidence-based debugging.
+- `.agents/workflows/development.md`: normal code changes and small fixes.
+- `.agents/workflows/implement-feature.md`: larger feature work.
+- `.agents/workflows/documentation.md`: generating architecture/API/spec docs.
+- `.agents/workflows/gen-tests.md`: generating tests.
+- `.agents/workflows/qa.md`: QA docs and test cases.
+- `.agents/workflows/ui-ux-design.md`: UI/UX design work.
+- `.agents/workflows/custom-behavior.md`: changing rules/workflows.
 
 ## Engineering Guidance
 
