@@ -80,9 +80,7 @@ apps/api/database/samples/
 bin/
 
 # AI Agents Skill
-skills/
-.agent/
-.codex/
+.agents/
 
 # Superpowers visual companion
 .superpowers/
