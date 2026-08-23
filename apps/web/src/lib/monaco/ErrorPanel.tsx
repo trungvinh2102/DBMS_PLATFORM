@@ -13,7 +13,6 @@
 
 import type { ErrorPanelEntry } from "./types";
 import { MarkerSeverity } from "./types";
-import "./ErrorPanel.css";
 
 // ============================================================================
 // TYPES
@@ -59,6 +58,27 @@ const HintIcon = () => (
 );
 
 // ============================================================================
+// STYLES
+// ============================================================================
+
+/** Static Tailwind class mapping per severity (replaces the former CSS file). */
+const SEVERITY_STYLES: Record<MarkerSeverity, { icon: string; label: string }> = {
+  [MarkerSeverity.Error]: { icon: "text-red-400", label: "bg-red-500/20 text-red-400" },
+  [MarkerSeverity.Warning]: {
+    icon: "text-amber-400",
+    label: "bg-amber-500/20 text-amber-400",
+  },
+  [MarkerSeverity.Info]: { icon: "text-blue-400", label: "bg-blue-500/20 text-blue-400" },
+  [MarkerSeverity.Hint]: {
+    icon: "text-violet-400",
+    label: "bg-violet-500/20 text-violet-400",
+  },
+};
+
+const getSeverityStyles = (severity: MarkerSeverity) =>
+  SEVERITY_STYLES[severity] ?? SEVERITY_STYLES[MarkerSeverity.Error];
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -87,31 +107,16 @@ export function ErrorPanel({
     }
   };
 
-  const getSeverityClass = (severity: MarkerSeverity) => {
-    switch (severity) {
-      case MarkerSeverity.Error:
-        return "severity-error";
-      case MarkerSeverity.Warning:
-        return "severity-warning";
-      case MarkerSeverity.Info:
-        return "severity-info";
-      case MarkerSeverity.Hint:
-        return "severity-hint";
-      default:
-        return "severity-error";
-    }
-  };
-
   // ============================================================================
   // RENDER
   // ============================================================================
 
   return (
-    <div className="error-panel">
+    <div className="border-t border-border bg-muted text-xs">
       {/* Header */}
-      <div className="error-panel-header">
-        <span className="title">{title}</span>
-        <span className="count">
+      <div className="flex items-center justify-between border-b border-border bg-muted px-3 py-1.5">
+        <span className="font-semibold text-foreground">{title}</span>
+        <span className="text-[11px] text-[#888]">
           {errors.length === 0
             ? "No problems"
             : `${errors.length} problem${errors.length !== 1 ? "s" : ""}`}
@@ -119,36 +124,43 @@ export function ErrorPanel({
       </div>
 
       {/* Error List */}
-      <div className="error-list" style={{ maxHeight }}>
+      <div className="overflow-y-auto py-1" style={{ maxHeight }}>
         {errors.length === 0 ? (
-          <div className="empty-state">
-            <span className="check-icon">✓</span>
+          <div className="flex items-center justify-center gap-2 p-5 text-gray-500">
+            <span className="text-base text-green-500">✓</span>
             No syntax errors detected
           </div>
         ) : (
-          errors.map((error) => (
-            <div
-              key={error.id}
-              className={`error-item ${getSeverityClass(error.severity)}`}
-              onClick={() => onErrorClick?.(error.line, error.column)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  onErrorClick?.(error.line, error.column);
-                }
-              }}
-            >
-              <span className="severity-icon">
-                {getSeverityIcon(error.severity)}
-              </span>
-              <span className="location">
-                [{error.line}:{error.column}]
-              </span>
-              <span className="message">{error.message}</span>
-              <span className="severity-label">{error.severityLabel}</span>
-            </div>
-          ))
+          errors.map((error) => {
+            const severityStyles = getSeverityStyles(error.severity);
+            return (
+              <div
+                key={error.id}
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors duration-150 hover:bg-white/[0.05] focus:bg-white/[0.08] focus:outline-none"
+                onClick={() => onErrorClick?.(error.line, error.column)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    onErrorClick?.(error.line, error.column);
+                  }
+                }}
+              >
+                <span className={`flex shrink-0 items-center ${severityStyles.icon}`}>
+                  {getSeverityIcon(error.severity)}
+                </span>
+                <span className="shrink-0 font-mono text-[11px] text-gray-500">
+                  [{error.line}:{error.column}]
+                </span>
+                <span className="flex-1 truncate text-foreground">{error.message}</span>
+                <span
+                  className={`shrink-0 rounded-[3px] px-1.5 py-px text-[10px] font-semibold uppercase ${severityStyles.label}`}
+                >
+                  {error.severityLabel}
+                </span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>
