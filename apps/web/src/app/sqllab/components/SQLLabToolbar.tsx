@@ -43,7 +43,15 @@ export function SQLLabToolbar() {
             />
           }
           label="Run"
-          onClick={() => lab.handleRun()}
+          // resolveSelectedSql is the synchronous validity boundary: it
+          // checks the selection's owning tab, editor session and exact SQL
+          // content against the current context at click time, so a stale or
+          // superseded selection resolves to "" and Run falls back to the
+          // complete active-tab SQL — without waiting for effects.
+          onClick={() => {
+            const selectedSql = lab.resolveSelectedSql();
+            lab.handleRun(selectedSql.trim() ? selectedSql : undefined);
+          }}
            disabled={result.executing || !lab.selectedDS}
           className="font-bold text-emerald-600 dark:text-emerald-500"
         />

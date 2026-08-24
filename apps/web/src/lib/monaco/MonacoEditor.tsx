@@ -26,12 +26,39 @@ import { registerMongoAutocomplete } from "@/lib/monaco/mongodb-autocomplete";
 import { registerRedisAutocomplete } from "@/lib/monaco/redis-autocomplete";
 import { registerEditorCommands } from "../../app/sqllab/hooks/use-editor-commands";
 
+/**
+ * Metadata describing what a reported selection was made on. `ownerSql` is
+ * the exact editor content at selection-event time; `sessionId` identifies
+ * the editor mount that reported it. Consumers compare both against the
+ * current context to reject stale deliveries synchronously.
+ */
+export interface SQLSelectionMeta {
+  ownerSql: string;
+  sessionId: string;
+}
+
+/**
+ * Ownership intent for a Ctrl/Cmd+Enter run issued over a nonempty editor
+ * selection. Frozen from the live Monaco model at keypress time so the
+ * consumer can validate the override against the same synchronous boundary
+ * used for stored selections (current tab/session + owning SQL content).
+ */
+export interface SQLKeyboardSelection extends SQLSelectionMeta {
+  /** Exact selected text at keypress time (non-whitespace). */
+  text: string;
+}
+
 interface SQLEditorProps {
   value: string;
   onChange: (value: string | undefined) => void;
   onPositionChange?: (position: { lineNumber: number; column: number }) => void;
-  onSelectionChange?: (text: string) => void;
-  onRun?: (sql?: string) => void;
+  onSelectionChange?: (text: string, meta?: SQLSelectionMeta) => void;
+  /** Identity of this editor mount; travels with selection reports. */
+  selectionSessionId?: string;
+  onRun?: (
+    sql?: string,
+    keyboardSelection?: SQLKeyboardSelection,
+  ) => void;
   onFormat?: () => void;
   onStop?: () => void;
   onSave?: () => void;
@@ -119,6 +146,7 @@ export function SQLEditor({
   onChange,
   onPositionChange,
   onSelectionChange,
+  selectionSessionId,
   onRun,
   onFormat,
   onStop,
@@ -225,7 +253,43 @@ export function SQLEditor({
     onSaveRef.current = onSave;
   }, [onRun, onFormat, onStop, onSave]);
 
+  // Selection ownership is resolved through refs so the debounced delivery
+  // always reaches the latest consumer and always reports the content and
+  // session the selection event actually fired on — not whatever closure
+  // happened to be current at mount time.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const selectionSessionIdRef = useRef(selectionSessionId);
+  selectionSessionIdRef.current = selectionSessionId;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
+
   const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Replacing the editor content (typing, loading a saved query, formatting,
+  // a tab SQL update) invalidates any in-flight selection delivery: the old
+  // range resolved over new text would repopulate a dead selection.
+  useEffect(() => {
+    if (selectionTimeoutRef.current) {
+      clearTimeout(selectionTimeoutRef.current);
+      selectionTimeoutRef.current = null;
+    }
+  }, [value]);
+
+  // When the editor unmounts (e.g. a SQL Lab tab switch) any pending
+  // callback must also be dropped so it cannot deliver the old editor's
+  // selection after this component is gone.
+  useEffect(() => {
+    return () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+        selectionTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleEditorDidMount: OnMount = useCallback(
     (editor, monaco) => {
@@ -243,10 +307,18 @@ export function SQLEditor({
         if (selectionTimeoutRef.current) {
           clearTimeout(selectionTimeoutRef.current);
         }
+        // Ownership metadata is frozen at EVENT time: if the content or the
+        // owning session changes before the debounce delivers, consumers can
+        // detect the mismatch synchronously and treat it as no selection.
+        const ownerSql = valueRef.current;
+        const sessionId = selectionSessionIdRef.current;
         selectionTimeoutRef.current = setTimeout(() => {
           const selection = e.selection;
           const selectedText = editor.getModel()?.getValueInRange(selection);
-          onSelectionChange?.(selectedText || "");
+          onSelectionChangeRef.current?.(selectedText || "", {
+            ownerSql,
+            sessionId: sessionId ?? "",
+          });
         }, 200);
       });
 
@@ -258,12 +330,30 @@ export function SQLEditor({
       registerEditorCommands({
         editor,
         monaco,
+        // Keyboard run boundary: only a non-whitespace selection is an
+        // explicit override. Empty/whitespace selections must arrive as
+        // `undefined` so consumers keep their full-editor-content fallback
+        // instead of treating `""` as a valid query. A nonempty selection is
+        // accompanied by structured ownership intent frozen from the live
+        // model at keypress time — never trusted as a raw string alone.
         onRun: () => {
           const selection = editor.getSelection();
           const selectedText = selection
             ? editor.getModel()?.getValueInRange(selection)
             : undefined;
-          onRunRef.current?.(selectedText);
+          if (!selectedText?.trim()) {
+            onRunRef.current?.(undefined);
+            return;
+          }
+          // `ownerSql` comes from the live model (not the `value` prop):
+          // between a content mutation and the next model commit the two
+          // diverge, and only the model describes the text this selection
+          // was actually carved from.
+          onRunRef.current?.(selectedText, {
+            text: selectedText,
+            ownerSql: editor.getModel()?.getValue() ?? "",
+            sessionId: selectionSessionIdRef.current ?? "",
+          });
         },
         onFormat: () => onFormatRef.current?.(),
         onStop: () => onStopRef.current?.(),
@@ -272,7 +362,7 @@ export function SQLEditor({
 
       setMounted(true);
     },
-    [onPositionChange, onSelectionChange, currentTheme],
+    [onPositionChange, currentTheme],
   );
 
   useEffect(() => {

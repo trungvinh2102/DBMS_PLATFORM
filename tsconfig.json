@@ -4,7 +4,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ESNext"],
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
@@ -12,6 +12,10 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./apps/web/src/*"]
+    },
     "types": ["node"]
-  }
+}
 }

@@ -11,11 +11,14 @@ import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 
 // Sub-hooks
 import { useSQLLabTabs } from "./use-sqllab-tabs";
+import type { QueryTab } from "./use-sqllab-tabs";
 import { useSQLLabMetadata } from "./use-sqllab-metadata";
 import { useSQLLabQuery } from "./use-sqllab-query";
 import { useSQLLabUI } from "./use-sqllab-ui";
 import { useSQLLabActions } from "./use-sqllab-actions";
 import { useSettingsStore } from "@/stores/use-settings-store";
+import type { EditorSelection, EditorSelectionMeta } from "../types";
+import type { SQLKeyboardSelection } from "@/lib/monaco/MonacoEditor";
 
 export function useSQLLab() {
   const [searchParams] = useSearchParams();
@@ -131,6 +134,124 @@ export function useSQLLab() {
   }, [schemas, activeTab.selectedSchema, updateActiveTab, selectedDSType]);
 
   // 3. Dependent States/Actions
+  //
+  // Authoritative synchronous validity contract for the editor selection.
+  //
+  // A stored selection only describes the exact editor content and the exact
+  // editor mount (session) it was captured on. The Run decision resolves
+  // validity through synchronous refs — written eagerly on every mutation and
+  // re-synced on every render — never through effect-flushed state, so a Run
+  // issued in the same batched interaction as a tab/content change can never
+  // observe a stale verdict.
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
+  const activeSqlRef = useRef(activeTab.sql);
+  activeSqlRef.current = activeTab.sql;
+  const selectionRef = useRef<EditorSelection | null>(ui.selection);
+  selectionRef.current = ui.selection;
+  // The editor session advances every time the active tab changes so a
+  // remounted editor's dead instance can never have an old delivery treated
+  // as live, even when tab id and SQL content happen to match again
+  // (A→B→A with unchanged content).
+  const sessionRef = useRef<{ tabId: string; key: string }>({
+    tabId: activeTabId,
+    key: `${activeTabId}:0`,
+  });
+  if (sessionRef.current.tabId !== activeTabId) {
+    const epoch =
+      Number(sessionRef.current.key.slice(sessionRef.current.key.lastIndexOf(":") + 1)) + 1;
+    sessionRef.current = { tabId: activeTabId, key: `${activeTabId}:${epoch}` };
+  }
+  const selectionSessionId = sessionRef.current.key;
+
+  /** Synchronous Run-decision boundary: stale selections resolve to "". */
+  const resolveSelectedSql = useCallback((): string => {
+    const sel = selectionRef.current;
+    if (!sel) return "";
+    if (sel.sessionId !== sessionRef.current.key) return "";
+    if (sel.tabId !== activeTabIdRef.current) return "";
+    if (sel.ownerSql !== activeSqlRef.current) return "";
+    return sel.sql;
+  }, []);
+
+  const setSelectedSql = useCallback(
+    (tabId: string, meta: EditorSelectionMeta, sql: string) => {
+      const next: EditorSelection = {
+        tabId,
+        ownerSql: meta.ownerSql,
+        sessionId: meta.sessionId,
+        sql,
+      };
+      // Eager write: the value must already be visible to a Run decision that
+      // happens before React commits this update.
+      selectionRef.current = next;
+      ui.setSelection(next);
+    },
+    [ui.setSelection],
+  );
+
+  // Eager tab activation mirrors the commit synchronously so a Run inside the
+  // same batched interaction as a tab switch resolves against the newly
+  // active tab, before any render or effect has run.
+  const setActiveTabIdSync = useCallback(
+    (id: string | ((current: string) => string)) => {
+      const resolved =
+        typeof id === "function" ? id(activeTabIdRef.current) : id;
+      if (resolved !== activeTabIdRef.current) {
+        activeTabIdRef.current = resolved;
+        const epoch =
+          Number(sessionRef.current.key.slice(sessionRef.current.key.lastIndexOf(":") + 1)) + 1;
+        sessionRef.current = { tabId: resolved, key: `${resolved}:${epoch}` };
+        const target = tabsRef.current.find((tab) => tab.id === resolved);
+        if (target) activeSqlRef.current = target.sql;
+      }
+      setActiveTabId(resolved);
+    },
+    [setActiveTabId],
+  );
+
+  // Single synchronous write boundary for every active-tab SQL content
+  // change (editor typing, format, saved-query load, format-on-save). It
+  // eagerly mirrors the new content into activeSqlRef and drops any stored
+  // selection that no longer owns the content, so a Run issued in the same
+  // batched interaction as such a mutation resolves against the new full
+  // tab content — never against a pre-write selection — before any render
+  // or effect has run. Persistence still flows through updateActiveTab.
+  const updateActiveTabSqlSync = useCallback(
+    (updates: Partial<QueryTab>) => {
+      const nextSql = updates.sql;
+      if (nextSql !== undefined && nextSql !== activeSqlRef.current) {
+        activeSqlRef.current = nextSql;
+        const stored = selectionRef.current;
+        if (stored && stored.ownerSql !== nextSql) {
+          // Eager invalidation: the stored selection describes content that
+          // no longer exists in this tab.
+          selectionRef.current = null;
+          ui.setSelection(null);
+        }
+      }
+      updateActiveTab(updates);
+    },
+    [ui.setSelection, updateActiveTab],
+  );
+
+  const setSqlSync = useCallback(
+    (sql: string) => updateActiveTabSqlSync({ sql }),
+    [updateActiveTabSqlSync],
+  );
+
+  // Render-derived mirror of resolveSelectedSql for passive consumers; both
+  // apply the identical three-way validity check.
+  const selectedSql =
+    ui.selection &&
+    ui.selection.sessionId === selectionSessionId &&
+    ui.selection.tabId === activeTabId &&
+    ui.selection.ownerSql === activeTab.sql
+      ? ui.selection.sql
+      : "";
+
   const tableDataMutation = useMutation({
     mutationFn: (vars: { databaseId: string; sql: string }) => databaseApi.execute(vars.databaseId, vars.sql),
     onError: (err: any) => {
@@ -246,16 +367,18 @@ export function useSQLLab() {
     previousSelectedTable.current = ui.selectedTable;
   }, [ui.selectedTable, ui.setShowRightPanel, ui.setRightPanelMode]);
 
-  const [selectedText, setSelectedText] = [ui.cursorPos, ui.setCursorPos]; // Mocked locally for now, to be integrated better.
-
   // 4. Expose Clean API
   return {
     ...ui,
-    tabs, activeTabId, activeTab, setActiveTabId,
+    selectedSql,
+    resolveSelectedSql,
+    setSelectedSql,
+    selectionSessionId,
+    tabs, activeTabId, setActiveTabId: setActiveTabIdSync, activeTab,
     addTab: () => addTab(activeTab.selectedDS, activeTab.selectedSchema),
     closeTab, renameTab,
     sql: activeTab.sql,
-    setSql: (sql: string) => updateActiveTab({ sql }),
+    setSql: setSqlSync,
     selectedDS: activeTab.selectedDS,
     setSelectedDS: (ds: string) => updateActiveTab({ selectedDS: ds }),
     selectedSchema: activeTab.selectedSchema,
@@ -282,8 +405,31 @@ export function useSQLLab() {
     savedQueries, refetchSavedQueries,
 
     // Actions
-    handleRun: async (sqlOverride?: string | React.SyntheticEvent) => {
-      const actualSql = typeof sqlOverride === "string" ? sqlOverride : undefined;
+    handleRun: async (
+      sqlOverride?: string | React.SyntheticEvent,
+      keyboardSelection?: SQLKeyboardSelection,
+    ) => {
+      // When the editor sends structured keyboard-selection intent, it
+      // supersedes the raw string argument: the override is honored only if
+      // its frozen ownership intent still describes the current context —
+      // the exact same synchronous boundary (session + owning SQL)
+      // resolveSelectedSql applies to stored selections. After a
+      // format/saved-query write the Monaco model lags behind activeSqlRef,
+      // so the stale selection fails the ownerSql check and the new full tab
+      // content runs instead. Non-editor callers (toolbar, sidebar, builder)
+      // pass plain strings with no intent and keep their explicit override.
+      let actualSql: string | undefined;
+      if (keyboardSelection) {
+        if (
+          keyboardSelection.text.trim() !== "" &&
+          keyboardSelection.sessionId === sessionRef.current.key &&
+          keyboardSelection.ownerSql === activeSqlRef.current
+        ) {
+          actualSql = keyboardSelection.text;
+        }
+      } else if (typeof sqlOverride === "string") {
+        actualSql = sqlOverride;
+      }
       try {
         await saveActiveSavedQuery(actualSql);
       } catch (error: any) {
@@ -291,14 +437,18 @@ export function useSQLLab() {
         return;
       }
       updateActiveTab({ error: null });
-      return handleRun(actualSql || undefined);
+      // No valid explicit override means "run the active editor content":
+      // resolve it synchronously from the authoritative ref so a Run issued
+      // in the same batched interaction as a tab/content change targets the
+      // current tab's SQL, not the last committed render's closure value.
+      return handleRun(actualSql ?? activeSqlRef.current);
     },
     handleExplain: (sqlOverride?: string | React.SyntheticEvent) => {
       const actualSql = typeof sqlOverride === "string" ? sqlOverride : undefined;
       updateActiveTab({ error: null });
       return handleExplain(actualSql || undefined);
     },
-    handleFormat: () => handleFormat(activeTab.sql, (s: string) => updateActiveTab({ sql: s })),
+    handleFormat: () => handleFormat(activeTab.sql, setSqlSync),
     handleStop,
     handleImport: () => ui.setIsImportWizardOpen(true),
     handleExport: () => actions.handleExport(activeTab.sql, activeTab.selectedDS),
@@ -315,7 +465,7 @@ export function useSQLLab() {
         try {
           const { format } = await import("sql-formatter");
           finalSql = format(activeTab.sql, { language: "postgresql" });
-          updateActiveTab({ sql: finalSql });
+          setSqlSync(finalSql);
         } catch (e) {
           console.warn("Format on save failed:", e);
         }
@@ -333,7 +483,7 @@ export function useSQLLab() {
       refetchSavedQueries();
     },
     handleSelectSavedQuery: (q: any) => {
-      updateActiveTab({
+      updateActiveTabSqlSync({
         sql: q.sql,
         selectedDS: q.databaseId,
         savedQueryId: q.id,
@@ -341,7 +491,6 @@ export function useSQLLab() {
       renameTab(activeTabId, q.name);
       ui.setIsOpenDialogOpen(false);
     },
-    setSelectedText: (txt: string) => { /* localized in ui trigger if needed */ },
     fixSQLError: ui.fixSQLError,
     setFixSQLError: (v: string | null) => {
       ui.setFixSQLError(v);

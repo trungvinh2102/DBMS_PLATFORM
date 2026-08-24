@@ -266,6 +266,25 @@ export function SQLLabEditorContainer({
                   value={editor.sql}
                   onChange={(val) => lab.setSql(val || "")}
                   onPositionChange={editor.setCursorPos}
+                  // The editor session id (derived from the active tab and its
+                  // activation epoch) pins every selection report to the exact
+                  // mount that produced it, so a delivery from a dead editor
+                  // instance — even one reactivated with identical content —
+                  // is rejected synchronously at Run time.
+                  selectionSessionId={lab.selectionSessionId}
+                  onSelectionChange={(text, meta) =>
+                    lab.setSelectedSql(
+                      editor.activeTabId,
+                      // No metadata means the callback came from a legacy or
+                      // direct caller: synthesize it from this render's
+                      // context, which is current for live deliveries.
+                      meta ?? {
+                        ownerSql: editor.sql,
+                        sessionId: lab.selectionSessionId,
+                      },
+                      text,
+                    )
+                  }
                   onRun={lab.handleRun}
                   onFormat={lab.handleFormat}
                   onStop={lab.handleStop}

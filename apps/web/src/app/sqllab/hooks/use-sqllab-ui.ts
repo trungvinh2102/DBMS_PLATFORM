@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from "react";
-import type { RightPanelMode, ResultTab, CursorPosition } from "../types";
+import type { RightPanelMode, ResultTab, CursorPosition, EditorSelection } from "../types";
 
 export function useSQLLabUI() {
   const [activeRightTab, setActiveRightTab] = useState<string>("data");
@@ -17,6 +17,11 @@ export function useSQLLabUI() {
   const [dataOffset, setDataOffset] = useState<number>(0);
   
   const [cursorPos, setCursorPos] = useState<CursorPosition>({ lineNumber: 1, column: 1 });
+  // Tab-scoped editor text selection. The owning tab id travels with the text
+  // so a selection can never be consumed by, or restored into, another tab.
+  // Ownership metadata (owning SQL content + editor session) travels with it
+  // so consumers can validate it synchronously against the current context.
+  const [selection, setSelection] = useState<EditorSelection | null>(null);
   const [tabSize, setTabSize] = useState<number>(4);
   const [undoTrigger, setUndoTrigger] = useState<number>(0);
   const [redoTrigger, setRedoTrigger] = useState<number>(0);
@@ -57,6 +62,8 @@ export function useSQLLabUI() {
     // Editor States
     cursorPos,
     setCursorPos,
+    selection,
+    setSelection,
     tabSize,
     setTabSize,
     undoTrigger,
