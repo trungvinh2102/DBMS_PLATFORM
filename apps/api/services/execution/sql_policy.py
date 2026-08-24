@@ -40,6 +40,13 @@ class SqlExecutionDecision:
     reason: str | None
     effective_limit: int
 
+class SqlExecutionBlocked(ValueError):
+    """Raised when SQL is not eligible for any execution path."""
+
+    def __init__(self, decision: SqlExecutionDecision) -> None:
+        super().__init__(decision.reason or "SQL execution is blocked.")
+        self.decision = decision
+
 
 class SqlExecutionPolicy:
     """Allows only proven read SQL without an explicit local confirmation."""

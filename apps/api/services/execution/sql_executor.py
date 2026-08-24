@@ -89,6 +89,11 @@ class SqlExecutor:
                 return re.sub(r'(?i)^\s*SELECT\s+', f'SELECT TOP {limit} ', sql)
             elif dialect == 'oracle' and not re.search(r'\sFETCH\s+FIRST\s+\d+\s+ROWS\s+ONLY\s*$', upper_sql) and not re.search(r'\sROWNUM\s*<=', upper_sql):
                 return f"{sql} FETCH FIRST {limit} ROWS ONLY"
-            elif dialect not in ['mssql', 'oracle'] and not re.search(r'\sLIMIT\s+\d+(\s+OFFSET\s+\d+)?\s*$', upper_sql):
+            elif dialect not in ['mssql', 'oracle']:
+                existing_limit = re.search(r'\sLIMIT\s+(\d+)(\s+OFFSET\s+\d+)?\s*$', upper_sql)
+                if existing_limit:
+                    bounded_limit = min(int(existing_limit.group(1)), limit)
+                    start, end = existing_limit.span(1)
+                    return f"{sql[:start]}{bounded_limit}{sql[end:]}"
                 return f"{sql} LIMIT {limit}"
         return sql

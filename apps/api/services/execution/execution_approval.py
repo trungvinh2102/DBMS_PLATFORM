@@ -21,6 +21,14 @@ class ExecutionApprovalInvalid(ValueError):
     """Raised when a supplied approval is missing, stale, or bound elsewhere."""
 
 
+class ExecutionApprovalRequired(ValueError):
+    """Raised when a risky request needs its first explicit confirmation."""
+
+    def __init__(self, approval: "ExecutionApproval", decision: object) -> None:
+        super().__init__("SQL execution requires confirmation.")
+        self.approval = approval
+        self.decision = decision
+
 @dataclass(frozen=True)
 class ExecutionApproval:
     """An immutable approval bound to one exact execution request."""

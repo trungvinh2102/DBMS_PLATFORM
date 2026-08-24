@@ -14,6 +14,7 @@ class ExecuteQueryRequest(BaseModel):
     sql: str
     autoCommit: bool = True
     limit: int = Field(default=1000, ge=1)
+    confirmationToken: Optional[str] = None
 
 
 class ExplainQueryRequest(BaseModel):
