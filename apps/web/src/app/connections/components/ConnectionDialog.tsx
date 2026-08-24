@@ -29,6 +29,17 @@ import { databaseApi } from "@/lib/api-client";
 import { useMutation } from "@tanstack/react-query";
 import { encrypt } from "@/lib/crypto";
 
+
+interface TestConnectionResult {
+  success: boolean;
+  message: string;
+}
+
+interface TestConnectionVariables {
+  type?: string;
+  config: Record<string, unknown>;
+}
+
 interface ConnectionDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -52,9 +63,16 @@ export function ConnectionDialog({
   isPending,
   trigger,
 }: ConnectionDialogProps) {
-  const testConnectionMutation = useMutation({
-    mutationFn: (vars: { type?: string; config: any }) =>
-      databaseApi.test({ ...vars.config, type: selectedType }),
+  const testConnectionMutation = useMutation<
+    TestConnectionResult,
+    Error,
+    TestConnectionVariables
+  >({
+    mutationFn: (vars) =>
+      databaseApi.test({
+        ...vars.config,
+        type: vars.type ?? selectedType,
+      }) as Promise<TestConnectionResult>,
   });
 
   const handleTestConnection = async () => {

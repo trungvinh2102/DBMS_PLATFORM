@@ -21,9 +21,14 @@ import { toast } from "sonner";
 import { databaseApi } from "@/lib/api-client";
 import { useMutation } from "@tanstack/react-query";
 
+interface ConnectionTestResult {
+  success: boolean;
+  message?: string;
+}
+
 function TestConnectionButton({ conn }: { conn: any }) {
   const testConnectionMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (): Promise<ConnectionTestResult> =>
       databaseApi.test({ ...conn.config, type: conn.type, id: conn.id }),
   });
 
@@ -37,8 +42,8 @@ function TestConnectionButton({ conn }: { conn: any }) {
       } else {
         toast.error(`Connection failed: ${result.message}`);
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to test connection");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to test connection");
     }
   };
 

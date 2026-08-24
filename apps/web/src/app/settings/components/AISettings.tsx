@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { z } from "zod";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { aiApi } from "@/lib/api-client";
@@ -25,6 +26,12 @@ import {
   AISettingsSectionKey,
   AISettingsSectionRail,
 } from "./ai-settings/AISettingsSectionRail";
+
+const aiConfigResponseSchema = z.object({
+  apiKey: z.string().nullable(),
+  provider: z.string(),
+  baseUrl: z.string().optional(),
+});
 
 /**
  * Main AI Settings component.
@@ -151,7 +158,7 @@ export function AISettings() {
 
   // Mutation: Reveal API Key
   const revealKeyMutation = useMutation({
-    mutationFn: () => aiApi.getAIConfig(true, provider),
+    mutationFn: async () => aiConfigResponseSchema.parse(await aiApi.getAIConfig(true, provider)),
     onSuccess: (data) => {
       if (data.apiKey) {
         setApiKey(data.apiKey);
