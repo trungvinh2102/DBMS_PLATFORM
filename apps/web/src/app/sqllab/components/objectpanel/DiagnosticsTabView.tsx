@@ -8,7 +8,15 @@ import { databaseApi } from "@/lib/api-client";
 import { Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function DiagnosticsTabView({ databaseId, table }: { databaseId: string; table: string }) {
+export function DiagnosticsTabView({
+  databaseId,
+  table,
+  refreshVersion,
+}: {
+  databaseId: string;
+  table: string;
+  refreshVersion: number;
+}) {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +38,7 @@ export function DiagnosticsTabView({ databaseId, table }: { databaseId: string; 
     if (databaseId && table) {
       fetchDiagnostics();
     }
-  }, [databaseId, table]);
+  }, [databaseId, refreshVersion, table]);
 
   if (loading) {
     return (

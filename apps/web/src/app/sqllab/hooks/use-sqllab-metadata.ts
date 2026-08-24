@@ -237,6 +237,11 @@ export function useSQLLabMetadata({
     }
     await Promise.all([
       tablesQuery.refetch(),
+      viewsQuery.refetch(),
+      functionsQuery.refetch(),
+      proceduresQuery.refetch(),
+      triggersQuery.refetch(),
+      eventsQuery.refetch(),
       schemaColumnsQuery.refetch(),
       materializedViewsQuery.refetch(),
       sequencesQuery.refetch(),

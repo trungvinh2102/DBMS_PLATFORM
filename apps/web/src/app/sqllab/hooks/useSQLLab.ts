@@ -3,7 +3,7 @@
  * @description Master composition hook for SQL Lab, integrating state management, query execution, and metadata retrieval.
  */
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { databaseApi } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -138,6 +138,9 @@ export function useSQLLab() {
     }
   });
 
+  const [isRefreshingSelectedObject, setIsRefreshingSelectedObject] = useState(false);
+  const [selectedObjectRefreshVersion, setSelectedObjectRefreshVersion] = useState(0);
+
   const getSelectedObjectType = useCallback(() => {
     if (!ui.selectedTable) return "table";
     if (metadata.views?.includes(ui.selectedTable)) return "view";
@@ -159,35 +162,73 @@ export function useSQLLab() {
 
   const lastExecutedSql = (tableDataMutation.variables as any)?.sql;
 
-  useEffect(() => {
+  const getDataPreviewSql = useCallback(() => {
     const type = getSelectedObjectType();
     if (
-      ui.selectedTable && 
-      activeTab.selectedDS && 
-      (type === "table" || type === "view")
+      !ui.selectedTable ||
+      !activeTab.selectedDS ||
+      (type !== "table" && type !== "view")
     ) {
-      const limit = settings.defaultQueryLimit || 100;
-      const offset = ui.dataOffset || 0;
-      const q = selectedDSType === "mysql" ? "`" : '"';
-      const schema = activeTab.selectedSchema;
-      const table = ui.selectedTable;
-      
-      const quotedSchema = schema ? schema.split('.').map((s: string) => `${q}${s}${q}`).join('.') : '';
-      const fullTableName = schema && schema !== 'public' ? `${quotedSchema}.${q}${table}${q}` : `${q}${table}${q}`;
-      let sql = `SELECT * FROM ${fullTableName} LIMIT ${limit} OFFSET ${offset}`;
-      
-      if (selectedDSType === "redis") sql = `GET "${ui.selectedTable}"`;
-      else if (selectedDSType === "mongodb") {
-        const dbPrefix = (schema && schema !== "public") ? schema : "db";
-        sql = `${dbPrefix}.${ui.selectedTable}.find()`;
-      }
-      
-      // Only mutate if SQL changed and not already fetching
-      if (sql !== lastExecutedSql && !tableDataMutation.isPending) {
-        tableDataMutation.mutate({ databaseId: activeTab.selectedDS, sql });
-      }
+      return null;
     }
-  }, [ui.selectedTable, activeTab.selectedDS, ui.activeRightTab, ui.dataOffset, settings.defaultQueryLimit, getSelectedObjectType, selectedDSType, activeTab.selectedSchema, lastExecutedSql, tableDataMutation]);
+
+    const limit = settings.defaultQueryLimit || 100;
+    const offset = ui.dataOffset || 0;
+    const q = selectedDSType === "mysql" ? "`" : '"';
+    const schema = activeTab.selectedSchema;
+    const quotedSchema = schema
+      ? schema.split(".").map((part) => `${q}${part}${q}`).join(".")
+      : "";
+    const fullTableName =
+      schema && schema !== "public"
+        ? `${quotedSchema}.${q}${ui.selectedTable}${q}`
+        : `${q}${ui.selectedTable}${q}`;
+
+    if (selectedDSType === "redis") return `GET "${ui.selectedTable}"`;
+    if (selectedDSType === "mongodb") {
+      const databaseName = schema && schema !== "public" ? schema : "db";
+      return `${databaseName}.${ui.selectedTable}.find()`;
+    }
+    return `SELECT * FROM ${fullTableName} LIMIT ${limit} OFFSET ${offset}`;
+  }, [
+    activeTab.selectedDS,
+    activeTab.selectedSchema,
+    getSelectedObjectType,
+    selectedDSType,
+    settings.defaultQueryLimit,
+    ui.dataOffset,
+    ui.selectedTable,
+  ]);
+
+  const refreshSelectedObject = useCallback(async () => {
+    setIsRefreshingSelectedObject(true);
+    try {
+      await refetchAll();
+      setSelectedObjectRefreshVersion((version) => version + 1);
+      const sql = getDataPreviewSql();
+      if (sql && activeTab.selectedDS) {
+        await tableDataMutation.mutateAsync({
+          databaseId: activeTab.selectedDS,
+          sql,
+        });
+      }
+    } finally {
+      setIsRefreshingSelectedObject(false);
+    }
+  }, [activeTab.selectedDS, getDataPreviewSql, refetchAll, tableDataMutation]);
+
+  useEffect(() => {
+    const sql = getDataPreviewSql();
+    if (sql && sql !== lastExecutedSql && !tableDataMutation.isPending) {
+      tableDataMutation.mutate({ databaseId: activeTab.selectedDS, sql });
+    }
+  }, [
+    activeTab.selectedDS,
+    getDataPreviewSql,
+    lastExecutedSql,
+    tableDataMutation,
+    ui.activeRightTab,
+  ]);
 
   // Reset offset when table changes
   useEffect(() => {
@@ -229,7 +270,8 @@ export function useSQLLab() {
     // Data & Results
     dataSources, schemas, isLoadingSchemas, tables, ...metadata,
     indexes, foreignKeys, tableInfo, tableDDL,
-    refetchTables, isLoadingTables, allColumns, autocompleteColumns,
+    refetchTables, refetchAll, isLoadingTables, allColumns, autocompleteColumns,
+    isRefreshingSelectedObject, selectedObjectRefreshVersion, refreshSelectedObject,
     results: activeTab.results, columns: activeTab.columns, error: activeTab.error,
     executing, executionTime: (runSQLMutation as any).data?.executionTime || 0,
     currentTData: (tableDataMutation.data as any)?.data || [],

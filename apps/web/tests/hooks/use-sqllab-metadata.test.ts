@@ -8,18 +8,32 @@ import {
   useSQLLabMetadata,
 } from "@/app/sqllab/hooks/use-sqllab-metadata";
 
-const { getAllColumnsMock } = vi.hoisted(() => ({ getAllColumnsMock: vi.fn() }));
+const {
+  getAllColumnsMock,
+  getEventsMock,
+  getFunctionsMock,
+  getProceduresMock,
+  getTriggersMock,
+  getViewsMock,
+} = vi.hoisted(() => ({
+  getAllColumnsMock: vi.fn(),
+  getEventsMock: vi.fn().mockResolvedValue([]),
+  getFunctionsMock: vi.fn().mockResolvedValue([]),
+  getProceduresMock: vi.fn().mockResolvedValue([]),
+  getTriggersMock: vi.fn().mockResolvedValue([]),
+  getViewsMock: vi.fn().mockResolvedValue([]),
+}));
 
 vi.mock("@/lib/api-client", () => ({
   databaseApi: {
     list: vi.fn().mockResolvedValue([]),
     getSchemas: vi.fn().mockResolvedValue(["public"]),
     getTables: vi.fn().mockResolvedValue(["users"]),
-    getViews: vi.fn().mockResolvedValue([]),
-    getFunctions: vi.fn().mockResolvedValue([]),
-    getProcedures: vi.fn().mockResolvedValue([]),
-    getTriggers: vi.fn().mockResolvedValue([]),
-    getEvents: vi.fn().mockResolvedValue([]),
+    getViews: getViewsMock,
+    getFunctions: getFunctionsMock,
+    getProcedures: getProceduresMock,
+    getTriggers: getTriggersMock,
+    getEvents: getEventsMock,
     getMaterializedViews: vi.fn().mockResolvedValue([]),
     getSequences: vi.fn().mockResolvedValue([]),
     getPartitions: vi.fn().mockResolvedValue([]),
@@ -219,5 +233,36 @@ describe("useSQLLabMetadata autocompleteColumns identity", () => {
       ]);
     });
     expect(result.current.autocompleteColumns).not.toBe(before);
+  });
+
+  it("refetches every sidebar object type", async () => {
+    const objectQueryMocks = [
+      getViewsMock,
+      getFunctionsMock,
+      getProceduresMock,
+      getTriggersMock,
+      getEventsMock,
+    ];
+    objectQueryMocks.forEach((mock) => mock.mockClear());
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useSQLLabMetadata({
+          ...baseProps,
+          selectedSchema: "public",
+        }),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      objectQueryMocks.forEach((mock) => expect(mock).toHaveBeenCalledOnce());
+    });
+
+    await act(async () => {
+      await result.current.refetchAll();
+    });
+
+    objectQueryMocks.forEach((mock) => expect(mock).toHaveBeenCalledTimes(2));
   });
 });

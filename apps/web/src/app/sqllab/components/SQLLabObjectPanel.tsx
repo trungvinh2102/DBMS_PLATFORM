@@ -181,9 +181,16 @@ export function SQLLabObjectPanel() {
             variant="ghost"
             size="icon"
             className="h-7 w-7 opacity-50 hover:opacity-100"
-            onClick={lab.refetchTables}
+            onClick={lab.refreshSelectedObject}
+            disabled={lab.isRefreshingSelectedObject}
+            aria-label="Refresh selected object"
+            aria-busy={lab.isRefreshingSelectedObject}
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            {lab.isRefreshingSelectedObject ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5" />
+            )}
           </Button>
           {effectiveTab === "data" && result.currentTData.length > 0 && (
             <>
@@ -256,6 +263,7 @@ export function SQLLabObjectPanel() {
           <DiagnosticsTabView
             databaseId={lab.selectedDS}
             table={lab.selectedTable}
+            refreshVersion={lab.selectedObjectRefreshVersion}
           />
         ) : effectiveTab === "index" ? (
           <IndexTabView indexes={lab.indexes} />
