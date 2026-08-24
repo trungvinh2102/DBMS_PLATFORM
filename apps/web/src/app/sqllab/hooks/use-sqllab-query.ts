@@ -47,13 +47,20 @@ export function useSQLLabQuery({
       limit?: number;
       confirmationToken?: string;
     }) =>
-      databaseApi.execute(
-        vars.databaseId,
-        vars.sql,
-        vars.autoCommit,
-        vars.limit,
-        vars.confirmationToken,
-      ),
+      vars.confirmationToken
+        ? databaseApi.execute(
+            vars.databaseId,
+            vars.sql,
+            vars.autoCommit,
+            vars.limit,
+            vars.confirmationToken,
+          )
+        : databaseApi.execute(
+            vars.databaseId,
+            vars.sql,
+            vars.autoCommit,
+            vars.limit,
+          ),
   });
 
   const saveQueryMutation = useMutation({
