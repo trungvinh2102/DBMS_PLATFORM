@@ -20,7 +20,6 @@ Before making product, architecture, UI, backend, or desktop changes, read:
 - `apps/desktop`: Tauri 2 desktop wrapper.
 - `build-backend.ps1`: Builds the Python backend into the Tauri sidecar binary.
 - `.agents/rules`: Project behavior rules.
-- `.agents/workflows`: Project workflows.
 - `.agents/skills`: Role-specific reference skills.
 
 ## Tech Stack
