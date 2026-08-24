@@ -33,7 +33,7 @@ export function ExecuteConfirmationDialog({
   onCancel,
 }: ExecuteConfirmationDialogProps) {
   return (
-    <Dialog open={pending !== null} onOpenChange={(open) => !open && onCancel()}>
+    <Dialog open={Boolean(pending)} onOpenChange={(open) => !open && onCancel()}>
       <DialogContent className="sm:max-w-[640px]">
         <DialogHeader>
           <DialogTitle>Confirm SQL execution</DialogTitle>

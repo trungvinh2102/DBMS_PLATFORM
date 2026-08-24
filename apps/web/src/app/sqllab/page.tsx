@@ -28,6 +28,8 @@ import { SQLLabSidebar } from "./components/SQLLabSidebar";
 import { SQLLabToolbar } from "./components/SQLLabToolbar";
 import { SQLLabEditorContainer } from "./components/SQLLabEditorContainer";
 import { SQLLabResultPanel } from "./components/SQLLabResultPanel";
+import { ExecuteConfirmationDialog } from "./components/ExecuteConfirmationDialog";
+
 
 const StableSQLLabSidebar = memo(SQLLabSidebar);
 const StableSQLLabToolbar = memo(SQLLabToolbar);
@@ -43,7 +45,6 @@ const SaveQueryDialog = lazy(() => import("./components/SaveQueryDialog").then(m
 const OpenQueryDialog = lazy(() => import("./components/OpenQueryDialog").then(m => ({ default: m.OpenQueryDialog })));
 const SchemaContent = lazy(() => import("./components/SchemaContent").then(m => ({ default: m.SchemaContent })));
 const ImportWizardModal = lazy(() => import("./components/import/ImportWizardModal").then(m => ({ default: m.ImportWizardModal })));
-const ExecuteConfirmationDialog = lazy(() => import("./components/ExecuteConfirmationDialog").then(m => ({ default: m.ExecuteConfirmationDialog })));
 const StableSQLLabDialogs = memo(SQLLabDialogs);
 
 export default function SQLLabPage() {
