@@ -4,9 +4,11 @@ sql_executor.py
 Specialized executor for relational SQL queries using SQLAlchemy.
 """
 
-import re
 import logging
-from typing import List, Dict, Any, Tuple
+import re
+from typing import Any, Dict, List, Tuple
+
+import sqlparse
 from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,18 @@ class SqlExecutor:
     # --- Private Helpers ---
 
     def _prepare_sql(self, sql: str, limit: int, dialect: str) -> str:
-        """Modifies the SQL query to inject limits based on database dialect."""
+        """Validates a single SQL statement and injects dialect-specific limits."""
+        statements = [
+            statement.strip()
+            for statement in sqlparse.split(sql)
+            if sqlparse.format(statement, strip_comments=True).strip().rstrip(";").strip()
+        ]
+        if not statements:
+            raise ValueError("SQL query is required.")
+        if len(statements) != 1:
+            raise ValueError("SQL execution supports exactly one statement at a time.")
+
+        sql = statements[0]
         if sql.endswith(';'):
             sql = sql[:-1].strip()
             

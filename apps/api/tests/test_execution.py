@@ -41,6 +41,27 @@ def test_execute_select(client, mock_session, mock_engine):
     # It might be in a separate session instance in the service
     # So we mocking SessionLocal class in conftest is key.
 
+def test_execute_rejects_multiple_sql_statements(client, mock_session, mock_engine):
+    """Relational execution must reject a selected SQL script before it reaches the driver."""
+    _, mock_conn = mock_engine
+
+    db_mock = MagicMock()
+    db_mock.type = "postgres"
+    db_mock.config = {}
+    mock_session.query.return_value.filter.return_value.first.return_value = db_mock
+
+    response = client.post(
+        "/api/database/execute",
+        json={
+            "databaseId": "1",
+            "sql": "SELECT * FROM ab_user; SELECT * FROM ab_group;",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json["error"] == "SQL execution supports exactly one statement at a time."
+    mock_conn.execution_options.assert_not_called()
+
 def test_execute_update(client, mock_session, mock_engine):
     """Test executing an UPDATE query handles no rows."""
     _, mock_conn = mock_engine
