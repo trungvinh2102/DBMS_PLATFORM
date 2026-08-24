@@ -146,6 +146,29 @@ export function useSQLLabQuery({
     [selectedDS, sql, explainSQLMutation, onSuccess, onError],
   );
 
+  const confirmExecution = useCallback(
+    async (pending: SqlExecutionConfirmation & {
+      databaseId: string;
+      sql: string;
+      autoCommit: boolean;
+      limit: number;
+    }) => {
+      try {
+        const response = await runSQLMutation.mutateAsync({
+          databaseId: pending.databaseId,
+          sql: pending.sql,
+          autoCommit: pending.autoCommit,
+          limit: pending.limit,
+          confirmationToken: pending.confirmationToken,
+        });
+        onSuccess(response);
+      } catch (error: unknown) {
+        onError(error instanceof Error ? error.message : "Failed to execute query");
+      }
+    },
+    [onError, onSuccess, runSQLMutation],
+  );
+
   const handleFormat = useCallback(
     (currentSql: string, setSql: (s: string) => void) => {
       try {
@@ -174,6 +197,7 @@ export function useSQLLabQuery({
     handleExplain,
     handleFormat,
     handleStop,
+    confirmExecution,
     executing: runSQLMutation.isPending || explainSQLMutation.isPending,
     runSQLMutation,
     explainSQLMutation,

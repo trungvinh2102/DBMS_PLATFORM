@@ -43,6 +43,7 @@ const SaveQueryDialog = lazy(() => import("./components/SaveQueryDialog").then(m
 const OpenQueryDialog = lazy(() => import("./components/OpenQueryDialog").then(m => ({ default: m.OpenQueryDialog })));
 const SchemaContent = lazy(() => import("./components/SchemaContent").then(m => ({ default: m.SchemaContent })));
 const ImportWizardModal = lazy(() => import("./components/import/ImportWizardModal").then(m => ({ default: m.ImportWizardModal })));
+const ExecuteConfirmationDialog = lazy(() => import("./components/ExecuteConfirmationDialog").then(m => ({ default: m.ExecuteConfirmationDialog })));
 const StableSQLLabDialogs = memo(SQLLabDialogs);
 
 export default function SQLLabPage() {
@@ -183,6 +184,11 @@ function SQLLabDialogs() {
         onOpenChange={lab.setIsImportWizardOpen}
         databaseId={lab.selectedDS}
         schemaName={lab.selectedSchema}
+      />
+      <ExecuteConfirmationDialog
+        pending={lab.pendingExecutionConfirmation}
+        onConfirm={lab.confirmPendingExecution}
+        onCancel={lab.cancelPendingExecution}
       />
     </Suspense>
   );

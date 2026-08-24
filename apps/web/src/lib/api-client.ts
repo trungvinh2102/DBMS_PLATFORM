@@ -442,4 +442,3 @@ export const resolveUrl = (path: string | null | undefined) => {
   return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
-export { api };
