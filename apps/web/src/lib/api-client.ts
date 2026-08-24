@@ -7,7 +7,21 @@ import axios from "axios";
 import { useAuth } from "../hooks/use-auth";
 import { getApiBaseUrl, isTauriRuntime } from "./runtime-api";
 
-const api = axios.create({
+export interface SqlExecutionConfirmation {
+  confirmationToken: string;
+  expiresAt: string;
+  risk: "write" | "destructive" | "unknown";
+  reason: string;
+}
+
+export class SqlConfirmationRequiredError extends Error {
+  constructor(public readonly confirmation: SqlExecutionConfirmation) {
+    super(confirmation.reason);
+    this.name = "SqlConfirmationRequiredError";
+  }
+}
+
+export const api = axios.create({
   withCredentials: true,
 });
 
@@ -43,6 +57,14 @@ api.interceptors.response.use(
           window.location.href = "/auth/login";
         }
       }
+    }
+
+    const confirmation = error.response?.data?.detail;
+    if (
+      error.response?.status === 409 &&
+      confirmation?.code === "sql_confirmation_required"
+    ) {
+      return Promise.reject(new SqlConfirmationRequiredError(confirmation));
     }
 
     // Standardize error format
@@ -152,8 +174,15 @@ export const databaseApi = {
     sql: string,
     autoCommit: boolean = true,
     limit?: number,
+    confirmationToken?: string,
   ) =>
-    req(api.post("database/execute", { databaseId, sql, autoCommit, limit })),
+    req(api.post("database/execute", {
+      databaseId,
+      sql,
+      autoCommit,
+      limit,
+      ...(confirmationToken ? { confirmationToken } : {}),
+    })),
   getExplainPlan: (databaseId: string, sql: string) =>
     req(api.post("database/explain", { databaseId, sql })),
   saveQuery: (data: any) => req(api.post("database/save-query", data)),
@@ -413,4 +442,3 @@ export const resolveUrl = (path: string | null | undefined) => {
   return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
 };
 
-export { api };

@@ -18,6 +18,13 @@ from .sql_executor import SqlExecutor
 from .mongo_executor import MongoExecutor
 from .redis_executor import RedisExecutor
 from .explain_executor import ExplainExecutor
+from .execution_approval import (
+    ExecutionApprovalInvalid,
+    ExecutionApprovalRequired,
+    ExecutionApprovalStore,
+)
+from .sql_policy import SqlExecutionBlocked, SqlExecutionPolicy
+
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +40,8 @@ class ExecutionService(BaseDatabaseService):
         self.mongo_executor = MongoExecutor(self)
         self.redis_executor = RedisExecutor(self)
         self.explain_executor = ExplainExecutor(self)
+        self.sql_policy = SqlExecutionPolicy()
+        self.approval_store = ExecutionApprovalStore()
 
     def execute_query(
         self,
@@ -41,41 +50,65 @@ class ExecutionService(BaseDatabaseService):
         session: Session,
         auto_commit: bool = True,
         limit: int = 1000,
+        user_id: str = "",
+        confirmation_token: str | None = None,
     ) -> Dict[str, Any]:
-        """Routes and executes a query, persisting the outcome to history."""
+        """Routes queries through policy before relational driver access."""
         start_time = datetime.now()
-        status = 'SUCCESS'
+        status = "SUCCESS"
         error_message = None
         data, columns = [], []
-        
-        try:
-            if not database_id or not sql:
-                raise ValueError("Database ID and SQL query are required.")
 
-            # Resolve db_type to determine correct executor
-            db_type, _ = self.get_db_config(database_id, session)
+        if not database_id or not sql:
+            raise ValueError("Database ID and SQL query are required.")
 
-            # Delegate execution based on engine type
-            if db_type == 'mongodb':
-                data, columns = self.mongo_executor.execute(database_id, sql, limit)
-            elif db_type == 'redis':
-                data, columns = self.redis_executor.execute(database_id, sql, limit)
-            else:
-                data, columns = self.sql_executor.execute(database_id, sql, limit, auto_commit)
-            
-        except Exception as e:
-            status = 'FAILED'
-            error_message = str(e)
-            logger.error(f"Execution failed for {database_id}: {status} - {error_message}")
-            
+        db_type, _ = self.get_db_config(database_id, session)
+        if db_type == "mongodb":
+            data, columns = self.mongo_executor.execute(database_id, sql, limit)
+        elif db_type == "redis":
+            data, columns = self.redis_executor.execute(database_id, sql, limit)
+        else:
+            decision = self.sql_policy.decide(sql, db_type, limit)
+            if decision.outcome == "blocked":
+                raise SqlExecutionBlocked(decision)
+            if decision.outcome == "confirmation_required":
+                if confirmation_token:
+                    self.approval_store.consume(
+                        confirmation_token,
+                        user_id=user_id,
+                        database_id=database_id,
+                        sql_fingerprint=decision.fingerprint,
+                        effective_limit=decision.effective_limit,
+                        auto_commit=auto_commit,
+                    )
+                else:
+                    approval = self.approval_store.create(
+                        user_id=user_id,
+                        database_id=database_id,
+                        sql_fingerprint=decision.fingerprint,
+                        effective_limit=decision.effective_limit,
+                        auto_commit=auto_commit,
+                    )
+                    raise ExecutionApprovalRequired(approval, decision)
+            try:
+                data, columns = self.sql_executor.execute(
+                    database_id,
+                    decision.normalized_sql,
+                    decision.effective_limit,
+                    auto_commit,
+                )
+            except Exception as exc:
+                status = "FAILED"
+                error_message = str(exc)
+                logger.error("Execution failed for %s: %s - %s", database_id, status, error_message)
+
         execution_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
         self._save_history(database_id, sql, status, execution_time_ms, error_message, session)
-             
         return {
             "data": data,
             "columns": columns,
             "executionTime": execution_time_ms,
-            "error": error_message
+            "error": error_message,
         }
 
     def get_explain_plan(self, database_id: str, sql: str, session: Session) -> Dict[str, Any]:

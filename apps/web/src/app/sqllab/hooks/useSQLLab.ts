@@ -5,7 +5,7 @@
 
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { databaseApi } from "@/lib/api-client";
+import { databaseApi, type SqlExecutionConfirmation } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 
@@ -25,6 +25,14 @@ export function useSQLLab() {
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useSettingsStore();
+  const [pendingExecutionConfirmation, setPendingExecutionConfirmation] = useState<
+    (SqlExecutionConfirmation & {
+      databaseId: string;
+      sql: string;
+      autoCommit: boolean;
+      limit: number;
+    }) | null
+  >(null);
 
   // 1. Compose Sub-hooks
   const {
@@ -56,7 +64,7 @@ export function useSQLLab() {
   }, [isRelational, selectedDSType, ui.rightPanelMode, ui]);
 
   const {
-    handleRun, handleExplain, handleFormat, handleStop, executing, runSQLMutation, explainSQLMutation, saveQueryMutation,
+    handleRun, handleExplain, handleFormat, handleStop, confirmExecution, executing, runSQLMutation, explainSQLMutation, saveQueryMutation,
     savedQueries, refetchSavedQueries,
   } = useSQLLabQuery({
     selectedDS: activeTab.selectedDS,
@@ -82,6 +90,7 @@ export function useSQLLab() {
       ui.setActiveResultTab("messages");
       toast.error("Network or execution error. Check details.");
     },
+    onConfirmationRequired: setPendingExecutionConfirmation,
   });
 
   const saveActiveSavedQuery = useCallback(async (contentOverride?: string) => {
@@ -367,6 +376,15 @@ export function useSQLLab() {
     previousSelectedTable.current = ui.selectedTable;
   }, [ui.selectedTable, ui.setShowRightPanel, ui.setRightPanelMode]);
 
+  const confirmPendingExecution = useCallback(async () => {
+    if (!pendingExecutionConfirmation) return;
+    try {
+      await confirmExecution(pendingExecutionConfirmation);
+    } finally {
+      setPendingExecutionConfirmation(null);
+    }
+  }, [confirmExecution, pendingExecutionConfirmation]);
+
   // 4. Expose Clean API
   return {
     ...ui,
@@ -403,6 +421,9 @@ export function useSQLLab() {
     selectedDSName: selectedDSData?.databaseName || "",
     selectedDSType, isRelational, selectedObjectType: getSelectedObjectType(),
     savedQueries, refetchSavedQueries,
+    pendingExecutionConfirmation,
+    confirmPendingExecution,
+    cancelPendingExecution: () => setPendingExecutionConfirmation(null),
 
     // Actions
     handleRun: async (

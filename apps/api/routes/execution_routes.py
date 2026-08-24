@@ -4,7 +4,7 @@ execution_routes.py
 API routes for query execution, history management, and saved queries.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from deps import get_db
@@ -18,16 +18,55 @@ from schemas.execution import (
     SaveQueryRequest,
 )
 from services.execution import execution_service
+from services.execution.execution_approval import (
+    ExecutionApprovalInvalid,
+    ExecutionApprovalRequired,
+)
+from services.execution.sql_policy import SqlExecutionBlocked
+
 from utils.auth_middleware import get_current_user
 from utils.http_errors import raise_http_error
 
 execution_bp = APIRouter(dependencies=[Depends(get_current_user)])
 
 @execution_bp.post('/execute', response_model=ExecuteQueryResponse)
-def execute_query(data: ExecuteQueryRequest, db: Session = Depends(get_db)):
+def execute_query(
+    data: ExecuteQueryRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Executes a SQL/MQL query against the specified database instance."""
     try:
-        return execution_service.execute_query(data.databaseId, data.sql, db, data.autoCommit, data.limit)
+        return execution_service.execute_query(
+            data.databaseId,
+            data.sql,
+            db,
+            data.autoCommit,
+            data.limit,
+            current_user["userId"],
+            data.confirmationToken,
+        )
+    except ExecutionApprovalRequired as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "sql_confirmation_required",
+                "confirmationToken": exc.approval.token,
+                "expiresAt": exc.approval.expires_at.isoformat(),
+                "risk": exc.decision.risk,
+                "reason": exc.decision.reason,
+            },
+        ) from exc
+    except ExecutionApprovalInvalid as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "sql_confirmation_invalid", "reason": str(exc)},
+        ) from exc
+    except SqlExecutionBlocked as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "sql_execution_blocked", "reason": str(exc)},
+        ) from exc
     except Exception as exc:
         raise_http_error(exc)
 

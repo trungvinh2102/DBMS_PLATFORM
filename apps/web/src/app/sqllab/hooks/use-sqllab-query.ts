@@ -5,7 +5,11 @@
 
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { databaseApi } from "@/lib/api-client";
+import {
+  databaseApi,
+  SqlConfirmationRequiredError,
+  type SqlExecutionConfirmation,
+} from "@/lib/api-client";
 import { toast } from "sonner";
 import { format } from "sql-formatter";
 
@@ -16,6 +20,12 @@ interface QueryProps {
   limit?: number;
   onSuccess: (response: any) => void;
   onError: (error: string) => void;
+  onConfirmationRequired?: (pending: SqlExecutionConfirmation & {
+    databaseId: string;
+    sql: string;
+    autoCommit: boolean;
+    limit: number;
+  }) => void;
 }
 
 export function useSQLLabQuery({
@@ -25,6 +35,7 @@ export function useSQLLabQuery({
   limit = 100,
   onSuccess,
   onError,
+  onConfirmationRequired,
 }: QueryProps) {
   const queryClient = useQueryClient();
 
@@ -34,13 +45,22 @@ export function useSQLLabQuery({
       sql: string;
       autoCommit?: boolean;
       limit?: number;
+      confirmationToken?: string;
     }) =>
-      databaseApi.execute(
-        vars.databaseId,
-        vars.sql,
-        vars.autoCommit,
-        vars.limit,
-      ),
+      vars.confirmationToken
+        ? databaseApi.execute(
+            vars.databaseId,
+            vars.sql,
+            vars.autoCommit,
+            vars.limit,
+            vars.confirmationToken,
+          )
+        : databaseApi.execute(
+            vars.databaseId,
+            vars.sql,
+            vars.autoCommit,
+            vars.limit,
+          ),
   });
 
   const saveQueryMutation = useMutation({
@@ -71,9 +91,19 @@ export function useSQLLabQuery({
         // Axios returns data in data prop usually, but our client interceptor returns response.data
         // Flask returns { data: [], columns: [], ... }
         onSuccess(response);
-      } catch (error: any) {
-        const msg = error.message || "Failed to execute query";
-        onError(msg);
+      } catch (error: unknown) {
+        if (error instanceof SqlConfirmationRequiredError) {
+          onConfirmationRequired?.({
+            ...error.confirmation,
+            databaseId: selectedDS,
+            sql: sqlOverride || sql,
+            autoCommit,
+            limit,
+          });
+        } else {
+          const msg = error instanceof Error ? error.message : "Failed to execute query";
+          onError(msg);
+        }
       } finally {
         queryClient.invalidateQueries({
           queryKey: ["history", selectedDS],
@@ -88,6 +118,7 @@ export function useSQLLabQuery({
       runSQLMutation,
       onSuccess,
       onError,
+      onConfirmationRequired,
       queryClient,
     ],
   );
@@ -122,6 +153,29 @@ export function useSQLLabQuery({
     [selectedDS, sql, explainSQLMutation, onSuccess, onError],
   );
 
+  const confirmExecution = useCallback(
+    async (pending: SqlExecutionConfirmation & {
+      databaseId: string;
+      sql: string;
+      autoCommit: boolean;
+      limit: number;
+    }) => {
+      try {
+        const response = await runSQLMutation.mutateAsync({
+          databaseId: pending.databaseId,
+          sql: pending.sql,
+          autoCommit: pending.autoCommit,
+          limit: pending.limit,
+          confirmationToken: pending.confirmationToken,
+        });
+        onSuccess(response);
+      } catch (error: unknown) {
+        onError(error instanceof Error ? error.message : "Failed to execute query");
+      }
+    },
+    [onError, onSuccess, runSQLMutation],
+  );
+
   const handleFormat = useCallback(
     (currentSql: string, setSql: (s: string) => void) => {
       try {
@@ -150,6 +204,7 @@ export function useSQLLabQuery({
     handleExplain,
     handleFormat,
     handleStop,
+    confirmExecution,
     executing: runSQLMutation.isPending || explainSQLMutation.isPending,
     runSQLMutation,
     explainSQLMutation,

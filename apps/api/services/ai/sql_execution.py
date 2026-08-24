@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from services.base_service import BaseDatabaseService
 from services.execution.sql_executor import SqlExecutor
+from services.execution.sql_policy import SqlExecutionPolicy
+
 
 from .retrieval.metadata_source import SchemaMetadataSource
 from .sql_safety import sql_safety_validator
@@ -44,16 +46,26 @@ class SqlExecutionVerifier:
         self.database_service = database_service or BaseDatabaseService()
         self.sql_executor = SqlExecutor(self.database_service)
         self.metadata = metadata or SchemaMetadataSource()
+        self.sql_policy = SqlExecutionPolicy()
+
 
     def preview(self, database_id: str, sql: str, max_rows: int = 50) -> SqlPreviewResult:
         """Runs one safe preview attempt without persisting query history."""
         dialect = self._dialect(database_id)
+        decision = self.sql_policy.decide(sql, dialect, max_rows)
         validation = sql_safety_validator.validate(
             sql,
             dialect=dialect,
             allow_write=False,
             max_preview_rows=max_rows,
         )
+        if decision.outcome != "allowed":
+            return SqlPreviewResult(
+                ok=False,
+                sql=decision.normalized_sql or sql,
+                error=decision.reason or validation.blockedReason,
+                validation=validation.to_dict(),
+            )
         if not validation.isAllowed:
             return SqlPreviewResult(
                 ok=False,
@@ -65,13 +77,13 @@ class SqlExecutionVerifier:
         try:
             data, columns = self.sql_executor.execute(
                 database_id,
-                validation.sanitizedSql,
-                limit=max_rows,
+                decision.normalized_sql,
+                limit=decision.effective_limit,
                 auto_commit=False,
             )
             return SqlPreviewResult(
                 ok=True,
-                sql=validation.sanitizedSql,
+                sql=decision.normalized_sql,
                 validation=validation.to_dict(),
                 columns=columns,
                 rowCount=len(data),

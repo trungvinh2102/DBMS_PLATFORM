@@ -28,6 +28,8 @@ import { SQLLabSidebar } from "./components/SQLLabSidebar";
 import { SQLLabToolbar } from "./components/SQLLabToolbar";
 import { SQLLabEditorContainer } from "./components/SQLLabEditorContainer";
 import { SQLLabResultPanel } from "./components/SQLLabResultPanel";
+import { ExecuteConfirmationDialog } from "./components/ExecuteConfirmationDialog";
+
 
 const StableSQLLabSidebar = memo(SQLLabSidebar);
 const StableSQLLabToolbar = memo(SQLLabToolbar);
@@ -183,6 +185,11 @@ function SQLLabDialogs() {
         onOpenChange={lab.setIsImportWizardOpen}
         databaseId={lab.selectedDS}
         schemaName={lab.selectedSchema}
+      />
+      <ExecuteConfirmationDialog
+        pending={lab.pendingExecutionConfirmation}
+        onConfirm={lab.confirmPendingExecution}
+        onCancel={lab.cancelPendingExecution}
       />
     </Suspense>
   );
