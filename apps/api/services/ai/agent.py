@@ -14,6 +14,8 @@ from .sql_safety import sql_safety_validator
 from ..prompts import get_agent_prompt
 from ..base_service import BaseDatabaseService
 from sqlalchemy import text
+from services.execution.sql_policy import SqlExecutionPolicy
+
 
 logger = logging.getLogger(__name__)
 
@@ -147,22 +149,23 @@ class AgentAIService(BaseAIService):
     def _agent_execute_node(self, state: AgentGraphState) -> AgentGraphState:
         sql = state.get("sql") or ""
         safety = sql_safety_validator.validate(sql)
-        if not safety.isAllowed:
+        decision = SqlExecutionPolicy().decide(sql, None, 50)
+        if not safety.isAllowed or decision.outcome != "allowed":
             retries = int(state.get("retries") or 0) + 1
             agent_res = dict(state.get("agent_res") or {})
             agent_res.update({
                 "type": "error",
-                "message": safety.blockedReason,
+                "message": decision.reason or safety.blockedReason,
                 "sql": "",
                 "validation": safety.to_dict(),
             })
-            return {**state, "agent_res": agent_res, "error": safety.blockedReason, "retries": retries}
-        state = {**state, "sql": safety.sanitizedSql}
+            return {**state, "agent_res": agent_res, "error": agent_res["message"], "retries": retries}
+        state = {**state, "sql": decision.normalized_sql}
         try:
-            exec_res = self._execute_sql_internal(state["db_id"], safety.sanitizedSql)
+            exec_res = self._execute_sql_internal(state["db_id"], decision.normalized_sql)
             agent_res = dict(state.get("agent_res") or {})
             agent_res.update(exec_res)
-            agent_res["sql"] = safety.sanitizedSql
+            agent_res["sql"] = decision.normalized_sql
             agent_res["validation"] = safety.to_dict()
             return {**state, "agent_res": agent_res, "error": ""}
         except Exception as e:
