@@ -10,7 +10,7 @@ import re
 from typing import List, Optional
 
 
-READ_ONLY_STARTERS = {"select", "with", "show", "describe", "desc", "explain", "pragma"}
+READ_ONLY_STARTERS = {"select", "with", "values", "show", "describe", "desc", "explain", "pragma"}
 WRITE_STARTERS = {
     "alter",
     "analyze",
