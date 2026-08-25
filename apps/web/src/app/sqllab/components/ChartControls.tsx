@@ -116,7 +116,7 @@ export function ChartAxisControls({
           </span>
           <Select
             value={xAxisKey}
-            onValueChange={(val: string) => val && setXAxisKey(val)}
+            onValueChange={(val) => val && setXAxisKey(val)}
           >
             <SelectTrigger className="h-7 w-30 text-[10px] font-bold bg-background/50 border-none shadow-none focus:ring-0">
               <SelectValue />

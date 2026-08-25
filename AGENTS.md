@@ -13,6 +13,23 @@ Before making product, architecture, UI, backend, or desktop changes, read:
 - `README.md`
 - Relevant `.agents/rules/*`
 
+## Agent Discovery And Tooling
+
+Use the repository's available skills and MCP servers to establish evidence before proposing or making a change.
+
+1. Read `AGENTS.md`, `README.md`, and the rules relevant to the area being changed.
+2. Load a matching project skill before specialized work. Use the backend skill for API, persistence, security, or scalability work; use the frontend and UI/UX skills for React or interface work; use the desktop guidance for Tauri or sidecar work.
+3. When the CodeGraph MCP server is available, use it before text search to explore code semantically:
+   - Locate a symbol definition and its containing module.
+   - Find references, callers, implementations, and overridden methods.
+   - Trace dependency paths and data flow across frontend, API, and desktop boundaries.
+   - Inspect a module or package outline before reading individual implementation files.
+4. Use `Glob` to locate files and `Grep` for literal text, configuration values, comments, generated artifacts, or queries CodeGraph cannot answer. Do not use text search as a substitute for semantic reference or call-path queries when CodeGraph supports them.
+5. If CodeGraph is unavailable, unindexed, returns incomplete results, or lacks a needed query, state the limitation briefly and use `Glob`, `Grep`, and targeted file reads as the fallback.
+6. Before editing, identify the smallest affected code path and report concrete evidence with file paths and relevant symbols. Do not infer behavior from filenames alone.
+
+For cross-layer changes, trace the complete flow before editing: UI and API client, FastAPI route and service/model layer, then Tauri sidecar lifecycle when desktop behavior is involved.
+
 ## Repository Layout
 
 - `apps/web`: React 19 + Vite frontend.
