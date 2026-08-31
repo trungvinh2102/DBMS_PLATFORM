@@ -117,9 +117,9 @@ export function TaskRoutingCard({
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-25rem)] min-h-72 overflow-y-auto rounded-lg border border-border/50 bg-background/40 custom-scrollbar">
+          <div className="overflow-hidden rounded-lg border border-border/50 bg-background/40">
             <Table>
-              <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
+              <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[32%] px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                     Task
