@@ -117,7 +117,7 @@ export function VectorStoreMap({
           <div className="min-w-0">
             <div className="truncate text-base font-bold">Vector Store Map</div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
-              <span>{vectorStatus?.backend || "sqlite_json"}</span>
+              <span>{vectorStatus?.backend || "sqlite_vec"}</span>
               <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
               <span>{sources.length} sources</span>
               {selectedChunkCount > 0 ? (

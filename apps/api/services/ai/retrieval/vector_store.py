@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Dict
 
 
-SUPPORTED_VECTOR_BACKENDS = {"sqlite_json", "sqlite_vec"}
+SUPPORTED_VECTOR_BACKENDS = {"sqlite_vec"}
 
 
 @dataclass(frozen=True)
@@ -30,12 +30,12 @@ class VectorStoreConfig:
 
 
 def resolve_vector_store_config() -> VectorStoreConfig:
-    """Resolves the configured vector backend while defaulting to desktop-safe SQLite JSON."""
-    backend = os.getenv("QURIODB_RAG_VECTOR_BACKEND", "sqlite_json").strip().lower()
+    """Resolves the configured vector backend defaulting to sqlite_vec."""
+    backend = os.getenv("QURIODB_RAG_VECTOR_BACKEND", "sqlite_vec").strip().lower()
     if backend not in SUPPORTED_VECTOR_BACKENDS:
-        backend = "sqlite_json"
+        backend = "sqlite_vec"
     return VectorStoreConfig(
         backend=backend,
         enabled=os.getenv("QURIODB_RAG_ENABLED", "true").lower() not in {"0", "false", "no"},
-        requires_external_service=backend in {"qdrant", "pinecone", "pgvector"},
+        requires_external_service=False,
     )

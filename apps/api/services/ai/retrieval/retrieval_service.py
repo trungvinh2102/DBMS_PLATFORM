@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from models import RagChunk, RagEmbedding, RagRetrievalEvent, RagSource, SessionLocal
 
 from .embedding_gateway import GeminiEmbeddingGateway
-from .ranking import cosine_similarity, fuse_scores
+from .ranking import fuse_scores
 from .reranking import DeterministicRagReranker, RagReranker
 from .sqlite_vec_store import sqlite_vec_store
 from .text import build_reasons, expand_query_terms, lexical_score, matched_terms
@@ -270,20 +270,15 @@ class RagRetrievalService:
             source_types=source_types,
             k=max(candidate_limit, 32),
         )
-        if sqlite_vec_scores:
-            candidate_chunk_ids = {chunk.id for _source, chunk, _embedding in rows}
-            return {
-                chunk_id: score
-                for chunk_id, score in sqlite_vec_scores.items()
-                if chunk_id in candidate_chunk_ids
-            }
+        if not sqlite_vec_scores:
+            return {}
 
-        scores = {}
-        for _source, chunk, embedding in rows:
-            if not embedding or embedding.dimensions != len(query_vector):
-                continue
-            scores[chunk.id] = cosine_similarity(query_vector, embedding.vectorJson or [])
-        return scores
+        candidate_chunk_ids = {chunk.id for _source, chunk, _embedding in rows}
+        return {
+            chunk_id: score
+            for chunk_id, score in sqlite_vec_scores.items()
+            if chunk_id in candidate_chunk_ids
+        }
 
     def _build_trace(
         self,

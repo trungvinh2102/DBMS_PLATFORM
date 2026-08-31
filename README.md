@@ -173,7 +173,7 @@ The AI settings screen manages:
 
 ### 🔎 RAG Pipeline
 
-RAG is enabled by default and is desktop-safe. The default vector backend is SQLite JSON storage, with optional `sqlite_vec` acceleration when available.
+RAG is enabled by default and is desktop-safe. The default vector backend is `sqlite_vec`.
 
 The RAG layer can index:
 
@@ -198,7 +198,7 @@ RAG environment controls:
 
 ```powershell
 $env:QURIODB_RAG_ENABLED="true"
-$env:QURIODB_RAG_VECTOR_BACKEND="sqlite_json" # sqlite_json or sqlite_vec
+$env:QURIODB_RAG_VECTOR_BACKEND="sqlite_vec"
 $env:QURIODB_RAG_RERANK_ENABLED="true"
 $env:QURIODB_RAG_INGEST_MAX_BYTES="10485760"
 $env:QURIODB_RAG_INGEST_URL_TIMEOUT="10"
@@ -248,9 +248,7 @@ flowchart TD
   Embedding -->|Yes| Vector[Gemini embeddings model models/gemini-embedding-2-preview]
   Embedding -->|No| LexicalOnly[Keep lexical-only chunks]
   Vector --> Store[(RagEmbedding JSON vector in SQLite)]
-  Vector --> Vec{QURIODB_RAG_VECTOR_BACKEND}
-  Vec -->|sqlite_json| Store
-  Vec -->|sqlite_vec| SqliteVec[Mirror vectors into sqlite-vec tables]
+  Vector --> SqliteVec[Mirror vectors into sqlite-vec tables]
 ```
 
 Chunking strategies by source:

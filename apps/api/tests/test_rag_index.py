@@ -445,15 +445,27 @@ def test_vector_store_config_defaults_to_desktop_safe_backend(monkeypatch):
 
     status = resolve_vector_store_config().to_status()
 
-    assert status["backend"] == "sqlite_json"
+    assert status["backend"] == "sqlite_vec"
     assert status["enabled"] is True
     assert status["requiresExternalService"] is False
+    assert status["supportedBackends"] == ["sqlite_vec"]
 
 
 def test_vector_store_config_sanitizes_unknown_backend(monkeypatch):
     monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "unknown-cloud")
 
-    assert resolve_vector_store_config().backend == "sqlite_json"
+    assert resolve_vector_store_config().backend == "sqlite_vec"
+
+
+def test_vector_store_config_falls_back_from_sqlite_json_to_sqlite_vec(monkeypatch):
+    monkeypatch.setenv("QURIODB_RAG_VECTOR_BACKEND", "sqlite_json")
+
+    config = resolve_vector_store_config()
+    status = config.to_status()
+
+    assert config.backend == "sqlite_vec"
+    assert status["backend"] == "sqlite_vec"
+    assert status["supportedBackends"] == ["sqlite_vec"]
 
 
 def test_vector_store_config_supports_sqlite_vec_without_external_service(monkeypatch):
@@ -614,7 +626,8 @@ def test_rag_pipeline_status_maps_all_production_flows():
     assert "generation" in keys
     assert "evaluation" in keys
     assert "security_acl" in keys
-    assert status["vectorStore"]["backend"] == "sqlite_json"
+    assert status["vectorStore"]["backend"] == "sqlite_vec"
+    assert status["vectorStore"]["supportedBackends"] == ["sqlite_vec"]
 
 
 def test_rag_pipeline_plan_returns_understanding_and_context(monkeypatch):

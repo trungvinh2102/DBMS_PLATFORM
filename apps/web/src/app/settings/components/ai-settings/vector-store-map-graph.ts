@@ -119,7 +119,7 @@ export function buildVectorStoreGraph({
 }: BuildVectorStoreGraphInput): { nodes: VectorStoreGraphNode[]; edges: Edge[] } {
   const nodes: VectorStoreGraphNode[] = [
     createNode("backend", "rag-backend", {
-      label: vectorStatus?.backend || "sqlite_json",
+      label: vectorStatus?.backend || "sqlite_vec",
       subtitle: vectorStatus?.requiresExternalService ? "External vector backend" : "Desktop local vector backend",
       status: vectorStatus?.enabled === false ? "disabled" : "enabled",
       meta: "Vector store",

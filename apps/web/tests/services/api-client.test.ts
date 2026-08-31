@@ -138,7 +138,7 @@ describe("api-client", () => {
 
   it("aiApi RAG pipeline endpoints should work", async () => {
     server.use(
-      http.get("*/api/rag/status", () => HttpResponse.json({ vectorStore: { backend: "sqlite_json" } })),
+      http.get("*/api/rag/status", () => HttpResponse.json({ vectorStore: { backend: "sqlite_vec" } })),
       http.get("*/api/rag/pipeline/status", () => HttpResponse.json({ enabled: true, stageCount: 16, stages: [] })),
       http.get("*/api/rag/sources", () => HttpResponse.json([{ id: "source-1", title: "Users", status: "indexed" }])),
       http.get("*/api/rag/sources/source-1", () => HttpResponse.json({ id: "source-1", chunks: [] })),
@@ -149,7 +149,7 @@ describe("api-client", () => {
       http.post("*/api/rag/evaluate", () => HttpResponse.json({ summary: { totalCases: 1, passedCases: 1 } })),
     );
 
-    expect(await aiApi.getRagStatus()).toEqual({ vectorStore: { backend: "sqlite_json" } });
+    expect(await aiApi.getRagStatus()).toEqual({ vectorStore: { backend: "sqlite_vec" } });
     expect(await aiApi.getRagPipelineStatus()).toEqual({ enabled: true, stageCount: 16, stages: [] });
     expect(await aiApi.getRagSources()).toHaveLength(1);
     expect(await aiApi.getRagSource("source-1")).toEqual({ id: "source-1", chunks: [] });

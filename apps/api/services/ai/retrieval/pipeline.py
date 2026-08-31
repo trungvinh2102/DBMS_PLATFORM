@@ -39,7 +39,7 @@ PRODUCTION_RAG_STAGES = [
         "key": "embedding_indexing",
         "name": "Embedding and indexing",
         "status": "available",
-        "capabilities": ["sqlite_json_vectors", "sqlite_vec_acceleration", "lexical_index", "optional_gemini_embeddings"],
+        "capabilities": ["sqlite_vec_acceleration", "lexical_index", "optional_gemini_embeddings"],
     },
     {
         "key": "sync_update_delete",

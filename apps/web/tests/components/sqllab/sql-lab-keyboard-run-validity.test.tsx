@@ -17,9 +17,9 @@
  * SQL mirror has already advanced — exactly the window under regression.
  */
 
-import { act, fireEvent, render, screen, waitFor } from "../../test-utils";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "../../test-utils";
 import React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { format } from "sql-formatter";
 
 const h = vi.hoisted(() => {
@@ -264,6 +264,7 @@ async function selectStatement(text: string) {
 
 describe("keyboard run shares the selection validity boundary", () => {
   beforeEach(() => {
+    cleanup();
     labCaptures.length = 0;
     h.selectionListeners.length = 0;
     h.positionListeners.length = 0;
@@ -272,6 +273,18 @@ describe("keyboard run shares the selection validity boundary", () => {
     h.sessionIds.length = 0;
     executeMock.mockReset();
     executeMock.mockResolvedValue({ data: [], columns: [] });
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    labCaptures.length = 0;
+    h.selectionListeners.length = 0;
+    h.positionListeners.length = 0;
+    h.commands.length = 0;
+    h.activeSelection = null;
+    h.sessionIds.length = 0;
+    executeMock.mockReset();
     localStorage.clear();
   });
 

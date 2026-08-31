@@ -34,7 +34,7 @@ describe("buildVectorStoreGraph", () => {
   it("groups vector store sources by source type", () => {
     const graph = buildVectorStoreGraph({
       mode: "store",
-      vectorStatus: { backend: "sqlite_json", enabled: true },
+      vectorStatus: { backend: "sqlite_vec", enabled: true },
       sources,
       databaseLabels: { "db-1": "Analytics Warehouse" },
     });
@@ -110,7 +110,7 @@ describe("buildVectorStoreGraph", () => {
   it("creates ordered pipeline stage edges", () => {
     const graph = buildVectorStoreGraph({
       mode: "pipeline",
-      vectorStatus: { backend: "sqlite_json", enabled: true },
+      vectorStatus: { backend: "sqlite_vec", enabled: true },
       sources,
       pipelineStatus: {
         stages: [

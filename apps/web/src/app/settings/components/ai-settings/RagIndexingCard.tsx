@@ -174,7 +174,7 @@ export function RagIndexingCard() {
               </div>
             </div>
             <div className="text-right text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              {pipelineStatus?.stageCount || 0} stages / {vectorStatus?.backend || "sqlite_json"}
+              {pipelineStatus?.stageCount || 0} stages / {vectorStatus?.backend || "sqlite_vec"}
             </div>
           </div>
         </CardHeader>

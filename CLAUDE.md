@@ -60,7 +60,7 @@ Key flow: `POST /api/ai/stream` (SSE) → `services/ai_service.py` coordinates q
 - Routers registered in `apps/api/core/routers.py`; AI routes: `routes/ai*.py`, `routes/rag.py`.
 - Service runtime: `services/ai/langchain_runtime.py`; retrieval: `services/ai/retrieval/*`.
 - Frontend: `apps/web/src/app/sqllab/hooks/useAIChat.ts`, `.../components/AIAssistant.tsx`.
-- RAG defaults on, desktop-safe; vector backend `sqlite_json` (optional `sqlite_vec`). Endpoints under `/api/rag`. Full ingestion/retrieval diagrams are in `README.md`.
+- RAG defaults on, desktop-safe; vector backend `sqlite_vec`. Endpoints under `/api/rag`. Full ingestion/retrieval diagrams are in `README.md`.
 
 ## Notes / gotchas
 
