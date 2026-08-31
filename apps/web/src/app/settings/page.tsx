@@ -162,11 +162,11 @@ function SettingsContent() {
 
 
   return (
-    <div className="container mx-auto py-4 px-2 md:px-2">
-      <header className="flex items-center justify-between mb-4">
+    <div className="container mx-auto py-2 px-2 md:px-2">
+      <header className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">Settings</h2>
-          <p className="text-muted-foreground font-medium mt-1">
+          <h2 className="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">Settings</h2>
+          <p className="text-muted-foreground font-medium text-xs mt-0.5">
             Tailor your workspace, AI intelligence, and personal profile.
           </p>
         </div>
@@ -198,16 +198,16 @@ function SettingsContent() {
         value={activeTab}
         onValueChange={(val) => setSearchParams({ tab: val })}
       >
-        <div className="flex items-center justify-between border-b border-border/40 pb-4">
-          <TabsList className="flex h-14 items-center bg-card/40 backdrop-blur-md border border-border/60 p-1.5 rounded-[1.2rem] shadow-premium gap-1 w-fit">
+        <div className="flex items-center justify-between border-b border-border/40 pb-2.5 mb-2">
+          <TabsList className="flex h-11 items-center bg-card/40 backdrop-blur-md border border-border/60 p-1 rounded-[1.2rem] shadow-premium gap-1 w-fit">
             {TABS.map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="flex items-center py-2.5 px-6 rounded-xl transition-all data-active:bg-primary data-active:text-primary-foreground data-active:shadow-lg data-active:shadow-primary/20 hover:bg-muted/50 group whitespace-nowrap h-full border border-transparent data-active:border-primary/10"
+                className="flex items-center py-1.5 px-5 rounded-xl transition-all data-active:bg-primary data-active:text-primary-foreground data-active:shadow-lg data-active:shadow-primary/20 hover:bg-muted/50 group whitespace-nowrap h-full border border-transparent data-active:border-primary/10"
               >
-                <tab.icon className="mr-2.5 h-4 w-4 transition-transform group-hover:scale-110" />
-                <span className="font-bold tracking-tight text-sm">{tab.label}</span>
+                <tab.icon className="mr-2 h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+                <span className="font-bold tracking-tight text-xs">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>

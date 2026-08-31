@@ -126,8 +126,8 @@ export function AccountSettings({ user }: any) {
   ].filter(Boolean).length * 25;
 
   return (
-    <div className="h-[calc(100vh-280px)] overflow-y-auto pr-6 custom-scrollbar scroll-smooth space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="h-[calc(100vh-175px)] overflow-y-auto pr-6 custom-scrollbar scroll-smooth space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-8">
         <ProfileCard 
           user={user}
           databases={databases}

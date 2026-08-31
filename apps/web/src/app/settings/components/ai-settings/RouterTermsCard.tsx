@@ -166,7 +166,7 @@ export function RouterTermsCard() {
               </Select>
             </div>
 
-            <div className="max-h-[calc(100vh-31rem)] min-h-64 overflow-y-auto rounded-lg border border-border/50 bg-background/40 custom-scrollbar">
+            <div className="max-h-[calc(100vh-23rem)] min-h-64 overflow-y-auto rounded-lg border border-border/50 bg-background/40 custom-scrollbar">
               {terms.length ? (
                 <Table>
                   <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">

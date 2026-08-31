@@ -30,7 +30,7 @@ export function GeneralSettings({
 }: GeneralSettingsProps) {
   return (
     <TooltipProvider delay={200}>
-      <div className="max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-6 pt-1">
+      <div className="max-h-[calc(100vh-175px)] overflow-y-auto custom-scrollbar pr-6 pt-1">
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-8">
           
           <Card className="border-none shadow-premium overflow-hidden bg-card/50 backdrop-blur-sm group/card">

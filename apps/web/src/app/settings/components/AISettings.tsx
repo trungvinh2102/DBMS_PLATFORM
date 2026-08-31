@@ -265,7 +265,7 @@ export function AISettings() {
 
   return (
     <TooltipProvider delay={200}>
-      <div className="h-[calc(100vh-280px)] min-h-136 overflow-hidden pr-2 pt-1">
+      <div className="h-[calc(100vh-175px)] min-h-136 overflow-hidden pr-2 pt-1">
         <div className="flex h-full flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
             <AISettingsSectionRail

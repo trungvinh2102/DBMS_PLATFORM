@@ -11,7 +11,7 @@ import { EditorPreviewBox } from "./editor-settings/EditorPreviewBox";
 export function EditorSettings({ settings, updateEditor }: any) {
   return (
     <TooltipProvider delay={200}>
-      <div className="max-h-[calc(100vh-280px)] overflow-y-auto custom-scrollbar pr-6">
+      <div className="max-h-[calc(100vh-175px)] overflow-y-auto custom-scrollbar pr-6">
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-8">
           <EditorAppearanceCard 
             settings={settings} 
