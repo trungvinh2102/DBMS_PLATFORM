@@ -1,11 +1,13 @@
 /**
  * @file settings-layout.test.tsx
- * @description Unit tests verifying layout container sizing constraints across settings tabs.
+ * @description Unit tests verifying layout container sizing constraints across settings tabs and SettingsPage composition.
  */
 
-import { render } from "../../test-utils";
+import { render, screen } from "../../test-utils";
 import { describe, expect, it, vi } from "vitest";
 
+import SettingsPage from "@/app/settings/page";
+import { SettingsContent } from "@/app/settings/components/SettingsContent";
 import { GeneralSettings } from "@/app/settings/components/GeneralSettings";
 import { EditorSettings } from "@/app/settings/components/EditorSettings";
 import { DataSettings } from "@/app/settings/components/DataSettings";
@@ -68,6 +70,31 @@ const mockDataSettings = {
   csvDelimiter: "," as const,
   resultEncoding: "UTF-8",
 };
+
+describe("SettingsPage & SettingsContent Integration", () => {
+  it("renders SettingsPage root with SettingsActionsProvider and SettingsContent", async () => {
+    render(<SettingsPage />);
+
+    expect(await screen.findByRole("heading", { name: "Settings", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Save/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Refresh/i })).toBeInTheDocument();
+  });
+
+  it("renders SettingsContent inside SettingsActionsProvider", async () => {
+    render(
+      <SettingsActionsProvider>
+        <SettingsContent />
+      </SettingsActionsProvider>
+    );
+
+    expect(await screen.findByRole("heading", { name: "Settings", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /General/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Editor/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Data/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /AI Assistant/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Account/i })).toBeInTheDocument();
+  });
+});
 
 describe("Settings Layout Container Heights", () => {
   it("verifies GeneralSettings container uses calc(100vh-175px)", () => {
@@ -137,4 +164,3 @@ describe("Settings Layout Container Heights", () => {
     expect(scrollContainer?.className).toContain("h-[calc(100vh-175px)]");
   });
 });
-
