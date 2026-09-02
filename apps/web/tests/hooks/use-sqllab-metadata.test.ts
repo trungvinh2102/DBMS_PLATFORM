@@ -13,6 +13,7 @@ const {
   getEventsMock,
   getFunctionsMock,
   getProceduresMock,
+  getTablesMock,
   getTriggersMock,
   getViewsMock,
 } = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const {
   getEventsMock: vi.fn().mockResolvedValue([]),
   getFunctionsMock: vi.fn().mockResolvedValue([]),
   getProceduresMock: vi.fn().mockResolvedValue([]),
+  getTablesMock: vi.fn().mockResolvedValue(["users"]),
   getTriggersMock: vi.fn().mockResolvedValue([]),
   getViewsMock: vi.fn().mockResolvedValue([]),
 }));
@@ -28,7 +30,7 @@ vi.mock("@/lib/api-client", () => ({
   databaseApi: {
     list: vi.fn().mockResolvedValue([]),
     getSchemas: vi.fn().mockResolvedValue(["public"]),
-    getTables: vi.fn().mockResolvedValue(["users"]),
+    getTables: getTablesMock,
     getViews: getViewsMock,
     getFunctions: getFunctionsMock,
     getProcedures: getProceduresMock,
@@ -257,6 +259,8 @@ describe("useSQLLabMetadata autocompleteColumns identity", () => {
 
     await waitFor(() => {
       objectQueryMocks.forEach((mock) => expect(mock).toHaveBeenCalledOnce());
+      expect(result.current.isLoadingTables).toBe(false);
+      expect(result.current.isFetchingTables).toBe(false);
     });
 
     await act(async () => {
@@ -264,5 +268,62 @@ describe("useSQLLabMetadata autocompleteColumns identity", () => {
     });
 
     objectQueryMocks.forEach((mock) => expect(mock).toHaveBeenCalledTimes(2));
+  });
+
+  it("sets isFetchingTables=true while isLoadingTables=false during deferred refetchTables", async () => {
+    getTablesMock.mockReset();
+    getTablesMock.mockResolvedValue(["users"]);
+
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(
+      () =>
+        useSQLLabMetadata({
+          ...baseProps,
+          selectedSchema: "public",
+        }),
+      { wrapper },
+    );
+
+    // 1. Resolve initial load
+    await waitFor(() => {
+      expect(result.current.isLoadingTables).toBe(false);
+      expect(result.current.isFetchingTables).toBe(false);
+      expect(result.current.tables).toEqual(["users"]);
+    });
+
+    // 2. Set up deferred getTables promise for refetch
+    let resolveRefetch: ((value: string[]) => void) | undefined;
+    getTablesMock.mockImplementation(
+      () =>
+        new Promise<string[]>((resolve) => {
+          resolveRefetch = resolve;
+        }),
+    );
+
+    // 3. Trigger refetchTables() without awaiting completion
+    let refetchPromise: Promise<void> | undefined;
+    act(() => {
+      refetchPromise = result.current.refetchTables();
+    });
+
+    // 4. Assert isFetchingTables === true and isLoadingTables === false during pending refetch
+    await waitFor(() => {
+      expect(result.current.isFetchingTables).toBe(true);
+    });
+    expect(result.current.isLoadingTables).toBe(false);
+    expect(result.current.tables).toEqual(["users"]);
+
+    // 5. Resolve deferred refetch and await completion
+    await act(async () => {
+      resolveRefetch?.(["users", "orders"]);
+      await refetchPromise;
+    });
+
+    // 6. Assert both flags false afterward and updated data settled
+    await waitFor(() => {
+      expect(result.current.isLoadingTables).toBe(false);
+      expect(result.current.isFetchingTables).toBe(false);
+      expect(result.current.tables).toEqual(["users", "orders"]);
+    });
   });
 });

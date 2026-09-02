@@ -100,6 +100,7 @@ export function SQLLabSidebar() {
           hasRefresh
           isExpanded={expandedFolders.includes("tables")}
           isLoading={lab.isLoadingTables}
+          isRefreshing={lab.isFetchingTables}
           searchQuery={searchQuery}
           selectedItem={lab.selectedTable}
           onToggle={toggleFolder}

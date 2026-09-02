@@ -16,6 +16,7 @@ interface SidebarFolderProps {
   hasRefresh?: boolean;
   isExpanded: boolean;
   isLoading: boolean;
+  isRefreshing?: boolean;
   searchQuery: string;
   selectedItem: string | null;
   onToggle: (id: string) => void;
@@ -32,6 +33,7 @@ export function SidebarFolder({
   hasRefresh,
   isExpanded,
   isLoading,
+  isRefreshing,
   searchQuery,
   selectedItem,
   onToggle,
@@ -73,16 +75,21 @@ export function SidebarFolder({
         </div>
         {hasRefresh && isExpanded && (
           <button
+            aria-label={`Refresh ${label.toLowerCase()}`}
+            aria-busy={Boolean(isRefreshing)}
+            disabled={Boolean(isRefreshing)}
             onClick={(e) => {
               e.stopPropagation();
               onRefresh?.();
             }}
-            className="p-1 hover:bg-muted rounded transition-colors"
+            className="p-1 hover:bg-muted rounded transition-colors disabled:cursor-not-allowed"
           >
             <RefreshCw
+              data-testid={id === "tables" ? "tables-refresh-icon" : undefined}
+              aria-hidden="true"
               className={cn(
                 "h-3 w-3 opacity-40",
-                isLoading && "animate-spin opacity-100",
+                isRefreshing && "animate-spin opacity-100",
               )}
             />
           </button>
@@ -90,8 +97,8 @@ export function SidebarFolder({
       </div>
       {isExpanded && (
         <div className="flex flex-col border-l ml-4.5 mt-0.5 mb-1.5 pl-1.5 py-1 gap-px">
-          {isLoading && id === "tables" ? (
-            <div className="px-3 py-2 space-y-2 opacity-20">
+          {isLoading && id === "tables" && (!items || items.length === 0) ? (
+            <div data-testid="tables-skeleton" className="px-3 py-2 space-y-2 opacity-20">
               <div className="h-2 bg-muted rounded w-3/4 animate-pulse" />
               <div className="h-2 bg-muted rounded w-1/2 animate-pulse" />
             </div>

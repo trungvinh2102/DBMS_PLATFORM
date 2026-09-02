@@ -262,6 +262,7 @@ export function useSQLLabMetadata({
     tables,
     refetchTables: refetchAll,
     isLoadingTables: tablesQuery.isLoading,
+    isFetchingTables: tablesQuery.isFetching,
     isLoadingColumns: allColumnsQuery.isLoading || schemaColumnsQuery.isLoading,
     allColumns,
     autocompleteColumns,
