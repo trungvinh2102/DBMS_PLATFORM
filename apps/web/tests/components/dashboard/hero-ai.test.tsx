@@ -5,12 +5,12 @@ import { useAuth } from "@/hooks/use-auth";
 
 describe("HeroAI", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useAuth.setState({ user: null });
   });
 
   it("renders greeting based on time of day", () => {
     render(<HeroAI />);
-    // Should show one of the greetings
     const greeting = screen.getByRole("heading", { level: 1 });
     expect(greeting).toBeInTheDocument();
     expect(greeting.textContent).toMatch(
@@ -52,24 +52,11 @@ describe("HeroAI", () => {
     expect(screen.getByText("Developer")).toBeInTheDocument();
   });
 
-  it("renders AI command bar placeholder", () => {
-    render(<HeroAI />);
-    const input = screen.getByPlaceholderText(
-      /ask ai to write sql/i,
-    );
-    expect(input).toBeInTheDocument();
-  });
-
   it("renders the tagline question", () => {
     render(<HeroAI />);
     expect(
       screen.getByText(/what would you like to build or analyze today/i),
     ).toBeInTheDocument();
-  });
-
-  it("renders keyboard shortcut hint", () => {
-    render(<HeroAI />);
-    expect(screen.getByText("K")).toBeInTheDocument();
   });
 
   it("renders good morning before noon", () => {
@@ -100,5 +87,15 @@ describe("HeroAI", () => {
     expect(screen.getByText(/good evening/i)).toBeInTheDocument();
 
     vi.useRealTimers();
+  });
+
+  it("does not render AI prompt input, placeholder, or keyboard shortcut hint", () => {
+    render(<HeroAI />);
+    expect(
+      screen.queryByPlaceholderText(/ask ai to write sql/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("form")).not.toBeInTheDocument();
+    expect(screen.queryByText("K")).not.toBeInTheDocument();
   });
 });
