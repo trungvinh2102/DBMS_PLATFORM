@@ -80,3 +80,60 @@ def test_test_connection_failure(client, mock_engine):
     assert response.status_code == 200
     assert response.json['success'] is False
     assert "Connection refused" in response.json['message']
+
+def test_test_connection_redacts_uri_user_info(client, mock_engine, caplog):
+    """Test connection failure redacts URI credentials and user info in response and logs."""
+    import logging
+    mock_eng, _ = mock_engine
+    mock_eng.connect.side_effect = Exception(
+        "FATAL: password authentication failed for user alice connecting to postgres://alice:plain_password@db.example:5432/app"
+    )
+
+    payload = {
+        "type": "postgres",
+        "config": {
+            "user": "alice",
+            "password": "plain_password",
+            "host": "db.example",
+            "port": 5432,
+            "database": "app"
+        }
+    }
+
+    with caplog.at_level(logging.ERROR):
+        response = client.post('/api/database/test', json=payload)
+    assert response.status_code == 200
+    assert response.json['success'] is False
+    msg = response.json['message']
+    assert "plain_password" not in msg
+    assert "alice:" not in msg
+    assert "password authentication failed" in msg
+
+    # Verify log is also sanitized
+    log_text = caplog.text
+    assert "plain_password" not in log_text
+    assert "alice:" not in log_text
+    assert "Connection test failed:" in log_text
+
+def test_test_connection_redacts_config_password(client, mock_engine):
+    """Test connection failure redacts repeated config password."""
+    mock_eng, _ = mock_engine
+    mock_eng.connect.side_effect = Exception(
+        "Could not connect using password super_secret_pass_123 on host db.internal"
+    )
+
+    payload = {
+        "type": "postgres",
+        "config": {
+            "user": "admin",
+            "password": "super_secret_pass_123",
+            "host": "db.internal"
+        }
+    }
+
+    response = client.post('/api/database/test', json=payload)
+    assert response.status_code == 200
+    assert response.json['success'] is False
+    msg = response.json['message']
+    assert "super_secret_pass_123" not in msg
+    assert "Could not connect" in msg

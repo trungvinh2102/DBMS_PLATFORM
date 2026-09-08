@@ -8,6 +8,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { server } from "../../mocks/server";
+import { http, HttpResponse } from "msw";
 
 const handleRun = vi.hoisted(() => vi.fn());
 
@@ -62,6 +64,11 @@ describe("SQLLabToolbar Run selection precedence", () => {
   beforeEach(() => {
     handleRun.mockClear();
     labState.selectedSql = "";
+    server.use(
+      http.post("*/api/database/test", () => {
+        return HttpResponse.json({ success: true, message: "Connected successfully" });
+      }),
+    );
   });
 
   it("runs only the non-empty selected statement instead of the full tab SQL", async () => {

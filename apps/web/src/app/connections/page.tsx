@@ -20,8 +20,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-// Lazy-loaded components for conditional rendering
-const ConnectionConfig = lazy(() => import("./components/ConnectionConfig").then((m) => ({ default: m.ConnectionConfig })));
+import { ConnectionConfig } from "./components/ConnectionConfig";
 const DeleteConnectionDialog = lazy(() => import("./components/DeleteConnectionDialog").then((m) => ({ default: m.DeleteConnectionDialog })));
 
 export default function ConnectionsPage() {
@@ -102,9 +101,7 @@ function ConnectionsContent() {
               </Breadcrumb>
             </div>
             <div className="flex-1 overflow-auto p-8">
-              <Suspense fallback={<div className="animate-pulse space-y-4 p-8"><div className="h-8 w-48 bg-muted rounded" /><div className="h-64 bg-muted rounded-lg" /></div>}>
-                <ConnectionConfig activeConn={activeConn} onBack={handleBack} />
-              </Suspense>
+              <ConnectionConfig activeConn={activeConn} onBack={handleBack} />
             </div>
           </div>
         ) : (

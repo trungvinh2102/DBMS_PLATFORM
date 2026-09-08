@@ -173,38 +173,38 @@ export function ConnectionConfig({
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500 max-w-5xl mx-auto pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/50 pb-6">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border/50 pb-6 gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full hover:bg-muted"
+            className="rounded-full hover:bg-muted shrink-0"
             onClick={onBack}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-none">
                 {isFileBased 
                   ? (activeConn.databaseName || "").replace(/\.(db|duckdb|sqlite|sqlite3)$/i, "") 
                   : activeConn.databaseName}
               </h1>
-              <Badge className={`${envColor === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/30' : envColor === 'amber' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'} border uppercase text-[10px] font-bold px-2 py-0 h-5`}>
+              <Badge className={`${envColor === 'red' ? 'bg-red-500/10 text-red-500 border-red-500/30' : envColor === 'amber' ? 'bg-amber-500/10 text-amber-500 border-amber-500/30' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'} border uppercase text-[10px] font-bold px-2 py-0 h-5 shrink-0`}>
                 {environment}
               </Badge>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-              <span className="flex items-center gap-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
+              <span className="flex items-center gap-1 shrink-0">
                 {dbType?.icon} {dbType?.name}
               </span>
               <span>•</span>
               {isFileBased ? (
-                <span className="font-mono text-[10px] truncate max-w-[300px]" title={config.database}>
+                <span className="font-mono text-[10px] truncate max-w-[180px] sm:max-w-[300px]" title={config.database}>
                   {config.database || 'No file path'}
                 </span>
               ) : (
-                <span className="font-mono text-[10px]">{config.host}:{config.port}</span>
+                <span className="font-mono text-[10px] truncate max-w-[180px] sm:max-w-none">{config.host}:{config.port}</span>
               )}
             </div>
           </div>
@@ -215,17 +215,17 @@ export function ConnectionConfig({
         {activeConn.type === 'redis' && (
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-red-600 opacity-50" />
         )}
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
           <Button
             variant="outline"
-            className="h-9 px-4 font-bold uppercase tracking-wider text-[10px] border-border hover:bg-muted/30 rounded-lg gap-2"
+            className="h-9 px-3 sm:px-4 font-bold uppercase tracking-wider text-[10px] border-border hover:bg-muted/30 rounded-lg gap-2 shrink-0"
             onClick={() => navigate(`/sqllab?ds=${activeConn.id}`)}
           >
             <Database className="h-3.5 w-3.5" />
             Explore Data
           </Button>
           <Button
-            className="h-9 px-4 font-bold uppercase tracking-wider text-[10px] bg-foreground text-background hover:bg-foreground/90 rounded-lg shadow-lg shadow-foreground/10 gap-2 transition-all active:scale-95"
+            className="h-9 px-3 sm:px-4 font-bold uppercase tracking-wider text-[10px] bg-foreground text-background hover:bg-foreground/90 rounded-lg shadow-lg shadow-foreground/10 gap-2 transition-all active:scale-95 shrink-0"
             onClick={handleSave}
             disabled={updateMutation.isPending}
           >

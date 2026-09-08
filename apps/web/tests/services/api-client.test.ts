@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { databaseApi, authApi, userApi, aiApi, api } from "@/lib/api-client";
+import { databaseApi, authApi, userApi, aiApi, api, authNavigation } from "@/lib/api-client";
 import { server } from "../mocks/server";
 import { http, HttpResponse } from "msw";
 import { useAuth } from "@/hooks/use-auth";
@@ -51,13 +51,11 @@ describe("api-client", () => {
     await expect(databaseApi.list()).rejects.toThrow();
   });
 
-  it("should handle 401 errors and logout", async () => {
+  it("should handle 401 errors, logout, and navigate to /auth/login via authNavigation", async () => {
     const logoutSpy = vi.spyOn(useAuth.getState(), "logout");
-    const originalHref = window.location.href;
-    Object.defineProperty(window, "location", {
-      writable: true,
-      value: { ...window.location, href: originalHref },
-    });
+    const navigateSpy = vi.spyOn(authNavigation, "navigate").mockImplementation(() => {});
+    const originalPathname = window.location.pathname;
+    window.history.pushState({}, "", "/dashboard");
 
     server.use(
       http.get("*/api/database/list", () =>
@@ -65,12 +63,100 @@ describe("api-client", () => {
       ),
     );
 
+    let caughtError: any;
     try {
       await databaseApi.list();
-    } catch (e) {}
+    } catch (e) {
+      caughtError = e;
+    }
     expect(logoutSpy).toHaveBeenCalled();
-    expect(window.location.href).toBe("/auth/login");
-    window.location.href = originalHref;
+    expect(navigateSpy).toHaveBeenCalledWith("/auth/login");
+    expect(caughtError).toBeDefined();
+    expect(caughtError).toBeInstanceOf(Error);
+    expect(caughtError.status).toBe(401);
+    expect(caughtError.response?.status).toBe(401);
+    expect(caughtError.message).toBe("Unauthorized");
+    window.history.pushState({}, "", originalPathname || "/");
+  });
+
+  it("should preserve status, response, and message on 401 response error through interceptor without navigation side effect on login", async () => {
+    const logoutSpy = vi.spyOn(useAuth.getState(), "logout");
+    const navigateSpy = vi.spyOn(authNavigation, "navigate").mockImplementation(() => {});
+    const originalPathname = window.location.pathname;
+    window.history.pushState({}, "", "/auth/login");
+
+    server.use(
+      http.post("*/api/auth/login", () =>
+        HttpResponse.json({ detail: "Invalid credentials" }, { status: 401 }),
+      ),
+    );
+
+    let caughtError: any;
+    try {
+      await authApi.login({ email: "bad@example.com", password: "wrong" });
+    } catch (e) {
+      caughtError = e;
+    }
+
+    expect(logoutSpy).not.toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(caughtError).toBeDefined();
+    expect(caughtError).toBeInstanceOf(Error);
+    expect(caughtError.status).toBe(401);
+    expect(caughtError.response?.status).toBe(401);
+    expect(caughtError.message).toBe("Invalid credentials");
+    window.history.pushState({}, "", originalPathname || "/");
+  });
+
+  it("should preserve status, response, and message on 401 response from database/test without logging out or redirecting", async () => {
+    const logoutSpy = vi.spyOn(useAuth.getState(), "logout");
+    const navigateSpy = vi.spyOn(authNavigation, "navigate").mockImplementation(() => {});
+    const originalPathname = window.location.pathname;
+    window.history.pushState({}, "", "/connections");
+
+    server.use(
+      http.post("*/api/database/test", () =>
+        HttpResponse.json({ detail: "Database connection failed" }, { status: 401 }),
+      ),
+    );
+
+    let caughtError: any;
+    try {
+      await databaseApi.test({ id: "conn-1", type: "postgres" });
+    } catch (e) {
+      caughtError = e;
+    }
+
+    expect(logoutSpy).not.toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/connections");
+    expect(caughtError).toBeDefined();
+    expect(caughtError).toBeInstanceOf(Error);
+    expect(caughtError.status).toBe(401);
+    expect(caughtError.response?.status).toBe(401);
+    expect(caughtError.message).toBe("Database connection failed");
+    window.history.pushState({}, "", originalPathname || "/");
+  });
+
+  it("should preserve status, response, and message on 403 response error through interceptor", async () => {
+    server.use(
+      http.get("*/api/database/list", () =>
+        HttpResponse.json({ error: "Forbidden access" }, { status: 403 }),
+      ),
+    );
+
+    let caughtError: any;
+    try {
+      await databaseApi.list();
+    } catch (e) {
+      caughtError = e;
+    }
+
+    expect(caughtError).toBeDefined();
+    expect(caughtError).toBeInstanceOf(Error);
+    expect(caughtError.status).toBe(403);
+    expect(caughtError.response?.status).toBe(403);
+    expect(caughtError.message).toBe("Forbidden access");
   });
 
   it("userApi endpoints should work", async () => {

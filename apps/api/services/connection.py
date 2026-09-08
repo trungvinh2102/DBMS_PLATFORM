@@ -7,6 +7,7 @@ Service for managing database connection configurations (CRUD) and connectivity 
 import uuid
 import logging
 import os
+import re
 from typing import Dict, Any, List, Optional, Tuple
 
 from .base_service import BaseDatabaseService
@@ -105,6 +106,7 @@ class ConnectionService(BaseDatabaseService):
 
     def test_connection(self, data: Dict[str, Any], session: Optional[Session] = None) -> Dict[str, Any]:
         """Tests connectivity to a database with the provided configuration."""
+        config: Dict[str, Any] = {}
         try:
             db_type, config = self._prepare_test_config(data, session)
             if not config:
@@ -120,10 +122,30 @@ class ConnectionService(BaseDatabaseService):
                 
             return self._test_sqlalchemy(db_type, config)
         except Exception as e:
-            logger.error(f"Connection test failed: {e}")
-            return {"success": False, "message": str(e)}
+            sanitized_message = self._sanitize_error_message(str(e), config)
+            logger.error(f"Connection test failed: {sanitized_message}")
+            return {"success": False, "message": sanitized_message}
 
     # --- Private Helper Methods ---
+
+    def _sanitize_error_message(self, message: str, config: Optional[Dict[str, Any]] = None) -> str:
+        """Sanitizes connection test error messages by redacting credentials and URI user-info."""
+        if not message:
+            return message
+
+        sanitized = message
+
+        # 1. Redact URI user-info patterns (e.g. scheme://user:pass@host or scheme://user@host)
+        # Replaces user:pass@ or user@ with [redacted]@ or :[redacted]@
+        sanitized = re.sub(r'(://)(?:[^/@:\s]+)(?::[^/@\s]+)?(@)', r'\1[redacted]\2', sanitized)
+
+        # 2. Redact known sensitive values from config if present
+        if config and isinstance(config, dict):
+            password = config.get('password')
+            if password and str(password).strip():
+                sanitized = sanitized.replace(str(password), '[redacted]')
+
+        return sanitized
 
     def _format_db_response(self, db: Db) -> Dict[str, Any]:
         """Formats a Db model instance into a dictionary for API response."""

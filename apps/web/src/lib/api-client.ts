@@ -14,6 +14,14 @@ export interface SqlExecutionConfirmation {
   reason: string;
 }
 
+export const authNavigation = {
+  navigate: (url: string) => {
+    if (typeof window !== "undefined") {
+      window.location.href = url;
+    }
+  },
+};
+
 export class SqlConfirmationRequiredError extends Error {
   constructor(public readonly confirmation: SqlExecutionConfirmation) {
     super(confirmation.reason);
@@ -46,16 +54,15 @@ api.interceptors.response.use(
   (error: any) => {
     // Check for 401 Unauthorized
     if (error.response?.status === 401) {
-      const isLoginRequest = error.config.url?.includes("auth/login");
+      const isLoginRequest = error.config?.url?.includes("auth/login");
+      const isDatabaseTestRequest = error.config?.url?.includes("database/test");
       const isAlreadyOnLoginPage = typeof window !== "undefined" && window.location.pathname.includes("/auth/login");
 
-      if (!isLoginRequest && !isAlreadyOnLoginPage) {
+      if (!isLoginRequest && !isDatabaseTestRequest && !isAlreadyOnLoginPage) {
         // Clear auth state and redirect to login
         console.warn("API 401: Unauthorized. Logging out.");
         useAuth.getState().logout();
-        if (typeof window !== "undefined") {
-          window.location.href = "/auth/login";
-        }
+        authNavigation.navigate("/auth/login");
       }
     }
 
@@ -83,7 +90,10 @@ api.interceptors.response.use(
        }
     }
     
-    return Promise.reject(new Error(message));
+    const err = new Error(message);
+    (err as any).status = error.response?.status;
+    (err as any).response = error.response;
+    return Promise.reject(err);
   },
 );
 

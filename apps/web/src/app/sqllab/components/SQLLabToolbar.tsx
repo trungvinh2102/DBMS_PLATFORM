@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToolbarButton } from "./ToolbarButton";
+import { DatasourceStatusBadge } from "./DatasourceStatusBadge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
@@ -74,6 +75,15 @@ export function SQLLabToolbar() {
       </div>
 
       <div className="w-px h-6 bg-border/60 mx-1" />
+
+      {/* Datasource connection failure dialog */}
+      <DatasourceStatusBadge
+        connection={
+          lab.selectedDS
+            ? { id: lab.selectedDS, type: lab.selectedDSType }
+            : undefined
+        }
+      />
 
       <ToolbarButton
         icon={<Save className="h-4 w-4 text-indigo-500" />}
